@@ -24,13 +24,14 @@ ballot or vote can set a project hard rule or an operator ruling aside.
 | **Voting advisor** ×2 — one read-only herdr tab each, different model families | votes on every decision (§10) — design approval, scope, every merge before a task's final PR, the canary, machine lifecycle, DNS and certificates, secrets — and every question a product brainstorm raises; second opinions, design review (code review goes to a fresh session of the other model, §8) | edits, commits, host access, herdr commands, messages to other tabs |
 | **Executor** — one herdr tab per task, Claude or Codex | investigation, root cause, design, plan, code, offline tests, local commits in its own worktree | production, push/PR/merge (unless the phase grants it), creating or driving tabs, decisions, contact with the operator |
 | **Prose subagent** — Sonnet by default, Opus when the text needs technical judgement | docs, state snapshots, PR bodies, reports, translations | decisions, host access |
-| **Operator** — the human who owns the work | the final PR and the release of every task, every change of course, every advisor split (§10); the hands-on acceptance steps; any ballot the operator chooses to decide directly | being asked about what the vote already decided 2/2 — that reaches the operator in the status and the backlog |
+| **Operator** — the human who owns the work | the final PR and the release of every task, every change of course, every advisor split, and every change to the operator's own environment (§10); the hands-on acceptance steps; any ballot the operator chooses to decide directly | being asked about what the vote already decided 2/2 — that reaches the operator in the status and the backlog |
 
 - **Orchestrate; don't implement.** — The orchestrator's context is the scarcest resource;
   large edits burn it and leave nobody supervising the other tabs.
 - **Take no decision alone** — every decision goes to the vote of the two voting advisors
-  (§10), and the vote decides everything except the three kinds of decision the operator
-  keeps: the final PR and the release of a task, a change of course, and every split. —
+  (§10), and the vote decides everything except the four kinds of decision the operator
+  keeps: the final PR and the release of a task, a change of course, every split, and
+  every change to the operator's own environment. —
   The orchestrator frames the options; deciding them too removes the only independent
   check.
 - **Brainstorm every new task before any executor exists** — two product advisors, relayed
@@ -120,7 +121,8 @@ herdr agent start <name> --kind codex --pane <pane_id> --timeout 120000 -- \
   prompts bias toward action; only a tested boundary holds.
 - **On `agent_not_ready`, read the screen before sending anything.** A Codex "Update
   available" prompt blocks startup: choose Skip with `herdr agent send-keys <name> …`;
-  updating the CLI is a decided step (§10), never a side effect of answering a dialog. —
+  updating the CLI changes the operator's own environment — the operator's call, asked by
+  poll with the recommendation first (§10), never a side effect of answering a dialog. —
   Blind keystrokes can accept the wrong dialog.
 
 **Hand over a brief** — one background call that delivers it and waits for the result (§3):
@@ -231,8 +233,9 @@ jq -nc --arg tab "${HERDR_TAB_ID:-unknown}" --arg time "$(date -u +%FT%TZ)" \
 
 - **Test the hook once on a scratch tab before relying on it.** — A broken hook fails
   silently from the orchestrator's point of view.
-- **Codex has its own mechanism** (a `notify` program in its config, run at turn end); wire
-  it the same way if a durable record of Codex tabs is needed.
+- **Codex has its own mechanism** (a `notify` program in its config, run at turn end);
+  wiring it changes the operator's own environment (§10) — ask the operator by poll,
+  recommendation first, if a durable record of Codex tabs is needed.
 
 ## 4. Tab supervision and lifecycle
 
@@ -323,8 +326,10 @@ rejected and the phase is redone with the skill.
 - **The review skills structure the request and the response; they do not replace the
   other-model review** of §8. — Same-model review repeats the author's blind spots.
 - **Confirm the skills are installed for an executor's or product advisor's CLI before
-  dispatching to it.** If they are not, install them or give the task to an agent that has
-  them — never waive the rule. — A missing skill otherwise turns into a silent skip.
+  dispatching to it.** If they are not, a CLI install changes the operator's own
+  environment: ask the operator by poll (recommendation first, §10) to install them, or
+  give the task to an agent that already has them — never waive the rule. — A missing
+  skill otherwise turns into a silent skip.
 
 ## 6. The brief
 
@@ -575,7 +580,7 @@ decision.
 
 **Who decides what**
 
-- **The vote decides everything (2/2) except three kinds of decision, which the operator
+- **The vote decides everything (2/2) except four kinds of decision, which the operator
   keeps:**
   1. **The final PR and the release of a task.** The final PR is the task's last PR that
      changes a value (code, configuration, inventory); a PR that changes what agents may do
@@ -585,17 +590,22 @@ decision.
      rollout, that rollout.
   2. **A change of course** — dropping a task or changing its goal.
   3. **Every split.**
+  4. **Every change to the operator's own environment** — the workstation (Mac settings,
+     keeping it awake, local configs such as the Codex config or the status line, CLI
+     installs and updates), the operator's network (VPN profiles) and accounts. Asked by
+     poll with the orchestrator's recommendation first, never decided by the vote.
 
-  — Operator ruling (§15). The advisors decide everything before the final PR and the
-  release; the operator decides the end of a task, its direction, and what the advisors
-  cannot agree on. A vote cannot widen its own mandate, which is why a change to the rules
-  is a final PR.
+  — Operator ruling (§15; item 4 an interpretation poll, 2026-09-28, overruling the literal
+  reading of an earlier revision). The advisors decide everything before the final PR and
+  the release; the operator decides the end of a task, its direction, what touches their
+  own environment, and what the advisors cannot agree on. A vote cannot widen its own
+  mandate, which is why a change to the rules is a final PR.
 - **Project hard rules still bind; a vote never overrides one.** An action a project hard
   rule reserves to the operator stays the operator's until the project amends that rule. A
   vote cannot revise an operator ruling either (precedence, top of this document); a
   question that would goes to the operator. — Rules are not voted away.
 - **The operator is not asked about what the vote decided 2/2.** Report each decision in
-  the next status and record it in the backlog. — Interruptions are for the three kinds of
+  the next status and record it in the backlog. — Interruptions are for the four kinds of
   decision above.
 - **Routine steps need neither a ballot nor a poll:** creating branches and worktrees;
   writing code and docs in a worktree; starting and stopping the tabs and subagents you
@@ -611,7 +621,7 @@ decision.
 - **Irreversible or outward-facing actions run only after a decision whose options stated
   the cost of being wrong and the rollback path** — a merge that changes a value, a deploy,
   creating, moving, stopping or deleting a machine, a DNS or certificate change, a secret
-  rotation or a vault change. The vote decides them, except where one of the three kinds
+  rotation or a vault change. The vote decides them, except where one of the four kinds
   above applies. — The cost and the rollback are what the voters actually weigh.
 
 Ballots come from three sources: an executor's ballot proposal, every open question a
@@ -655,7 +665,7 @@ Reply one line per ballot:  B<n>: <letter> — <rationale>     (or  B<n>: X: <pr
 
 - **A decision stands only if both voting advisors pick the same option (2/2).** There is
   no tie-break.
-- **Go to the operator with a structured poll only for the three kinds of decision above**,
+- **Go to the operator with a structured poll only for the four kinds of decision above**,
   and where a project hard rule reserves the action. Every operator poll has concrete,
   mutually exclusive options, the orchestrator's recommendation as the first option, and
   one question; a poll on a split also shows both votes and both rationales next to the
@@ -974,9 +984,12 @@ machine.
 **Standing rulings**
 
 - **Decision authority** (2026-09-28): the voting advisors decide everything 2/2; the
-  operator keeps the final PR and the release of each task, every change of course, and
-  every split — in the operator's words (translated), "the final PR and the release are
-  the operator's; before that, the advisors 2/2" (§10).
+  operator keeps the final PR and the release of each task, every change of course, every
+  split, and every change to the operator's own environment — in the operator's words
+  (translated), "the final PR and the release are the operator's; before that, the
+  advisors 2/2" (§10). The environment item is a 2026-09-28 interpretation ruling: it
+  stays with the operator, asked by poll with the recommendation first, never swept into
+  the vote by the general rule.
 - **Recommendation first** (2026-09-28): every operator poll leads with the orchestrator's
   recommendation, including a poll on an advisor split, with both votes and rationales
   next to the options (§10, §12).
@@ -995,10 +1008,11 @@ machine.
 - **The zsh and macOS pitfalls of §14 apply:** no word-splitting of unquoted variables (use
   arrays), no GNU `timeout`.
 - **A sleeping workstation kills agent turns mid-response and locks the keychain,** after
-  which SSH fails with "Permission denied" on every host. Keep the machine awake during
-  long orchestration (`caffeinate`) and keep the SSH key loaded in the agent
-  (`ssh-add --apple-use-keychain`). — Seen live: turns cut off mid-answer, then every host
-  refusing the same key.
+  which SSH fails with "Permission denied" on every host. Keeping the machine awake during
+  long orchestration (`caffeinate`) changes the operator's own environment: ask the
+  operator by poll, recommendation first (§10), rather than starting it yourself. Keep the
+  SSH key loaded in the agent (`ssh-add --apple-use-keychain`). — Seen live: turns cut off
+  mid-answer, then every host refusing the same key.
 - **The same "Permission denied" on unrelated hosts means the keychain** (§13): stop
   probing, and ask the operator to run `ssh-add --apple-use-keychain` — a hand action, an
   instruction rather than a question.
@@ -1030,7 +1044,7 @@ Nothing project-specific lives in this manifest. A project binds it through its 
     docs-closed gate update (§8);
   - its forbidden targets and their ban sentences, verbatim (§6 `SAFETY`, §13);
   - its docs-only check and its authority documents (§8);
-  - anything it reserves to the operator beyond the three kinds of decision of §10 — as a
+  - anything it reserves to the operator beyond the four kinds of decision of §10 — as a
     hard rule, since only a hard rule outranks the operator's rulings.
 - **If a project does not name one of these, ask the operator in a poll before the first
   dispatch that needs it** — never guess a deploy command or a maintenance route. — A
