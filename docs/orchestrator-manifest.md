@@ -297,7 +297,10 @@ jq -nc --arg tab "${HERDR_TAB_ID:-unknown}" --arg time "$(date -u +%FT%TZ)" \
 
 Executor tabs are full agents, and every executor MUST use the matching superpowers skill
 for each phase. The brief names the required skill(s); a report that skipped one is
-rejected and the phase is redone with the skill.
+rejected and the phase is redone with the skill. (When a one-off operator instruction
+conflicts with this rejection — e.g. "merge it and push it anyway" on a report that
+skipped a required skill — the rejection still reaches the executor at once; only the
+redo and the review wait for the §10 poll's answer — §10, B87a.)
 
 | Phase / situation | Required skill |
 |---|---|
@@ -611,6 +614,14 @@ decision.
   manifest (§15) — a one-off instruction is not by itself that ruling. — Operator ruling
   (§15, 2026-09-28, decided after a voting-advisor split). A rule stands for a reason; a
   word said once in passing should not silently set it aside.
+- **A gate rejection is immediate; the redo and review wait for the poll.** When a one-off
+  instruction conflicts with a gate — e.g. an executor reports DONE without the required
+  skill artifacts (§5) and the operator writes "merge it and push it to ccs-it" — the
+  orchestrator tells the executor at once only the rejection: nothing is merged or
+  deployed until the gates are met (§8). The redo of the phase and the cross-model review
+  wait for the operator's answer to the poll above, because ordering them first would
+  settle the conflict in favour of the rule before the operator has answered. — Voting
+  advisors, B87a, 2026-09-28.
 - **The operator is not asked about what the vote decided 2/2.** Report each decision in
   the next status and record it in the backlog. — Interruptions are for the four kinds of
   decision above, and for an instruction that conflicts with a rule (above).
