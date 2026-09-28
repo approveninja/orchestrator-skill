@@ -1,0 +1,91 @@
+Operator-facing text below is in Russian, because §15 rules that it overrides the harness language setting; an English gloss follows it. Values in `<…>` come from step 1's output and are not invented here.
+
+## 1. Bash, foreground: one read-only pass
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent read wgka --source recent-unwrapped --lines 200 > "$ORCH_INBOX/wgka.last"
+for a in wgka adv-codex adv-fable; do herdr agent get "$a"; herdr agent read "$a" --source visible | tail -3; done
+WT="$HOME/work/ccs.ansible/.claude/worktrees/wg-keepalive"
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --porcelain
+git -C "$WT" grep -nE '10\.77\.1\.(0/24|128/25)'
+ls "$SCRATCH/quorum" | tail -3
+```
+
+I send nothing unless both advisors are `idle` and no target tab shows `"focused": true`. If one voter is busy, the ballot is held for both.
+
+## 2. Write `$SCRATCH/quorum/ballot-<n>.md`
+
+```
+Reply in English. Ignore any pre-filled text in your input box. Read-only; vote independently.
+
+B<n> — Which source allow-list does the WireGuard keepalive relay enforce (plan step 6)?
+  Context: branch feat/wg-keepalive-relay @ <head SHA>, worktree .claude/worktrees/wg-keepalive;
+  design doc <path>, plan <path>, step 6 of 11; steps 7-11 build on this value.
+  10.77.1.128/25 = WireGuard client pool (<file:line>); 10.77.1.0/24 = whole VPN range,
+  which also holds the OpenVPN clients (<file:line>); the front-door allow-list is the /24
+  (<file:line>). Nothing is deployed.
+  a) 10.77.1.128/25
+     Admits WireGuard clients; rejects OpenVPN clients.
+     For: admits only the pool the design names as keepalive senders.
+     Against: a second allow-list value, different from the front door's; needs a change if the pool moves.
+     If wrong: legitimate keepalives from outside the /25 are dropped.
+  b) 10.77.1.0/24
+     Admits WireGuard and OpenVPN clients.
+     For: one value shared with the front door; unaffected by pool changes inside the /24.
+     Against: admits clients the design does not name as senders.
+     If wrong: the relay is reachable from addresses not meant to use it.
+  Rollback, both: one-line change on the branch; after deploy, through merge and redeploy.
+Reply one line:  B<n>: <letter> — <rationale>     (or  B<n>: X: <proposal>)
+```
+
+Any line the grep does not confirm is labelled "executor's claim, unverified".
+
+## 3. Bash, background: two calls in one message
+
+```bash
+herdr agent prompt adv-codex "$(cat $SCRATCH/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > "$ORCH_INBOX/adv-codex.last"
+```
+```bash
+herdr agent prompt adv-fable "$(cat $SCRATCH/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > "$ORCH_INBOX/adv-fable.last"
+```
+
+## 4. Bash, background: park order to `wgka`
+
+If step 1 shows `wgka` at 50% context used or more, the `/compact mid-task: keep …` call (`--wait --timeout 300000`) goes first.
+
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/park-wgka.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > "$ORCH_INBOX/wgka.last"
+```
+
+> Ballot B\<n> is open on the step-6 source allow-list; both voting advisors have it. Stay parked: do not start step 6, make no provisional pick, build no parameterised stand-in. Steps 7-11 depend on it, so there is no independent step to run. Ignore any pre-filled text in your input box. Reply in English, one line: PARKED — branch, head SHA, worktree clean yes/no.
+
+## 5. Backlog
+
+I edit `orchestrator/backlog.md` (next step: "B\<n> → relay → steps 6-11"; blocked-on: "B\<n>, vote"), run `bash orchestrator/build-backlog.sh` in the foreground, and republish with the Artifact tool.
+
+## 6. Chat status to the operator (no poll)
+
+> **Сейчас.** `wgka` стоит на шаге 6 из 11: нужен выбор списка разрешённых адресов-источников для relay (ретранслятора keepalive-пакетов, которые держат соединение живым) — только пул WireGuard `10.77.1.128/25` или весь VPN-диапазон `10.77.1.0/24`. Это решают два советника: бюллетень B\<n> отправлен обоим, голосование ещё идёт. До решения ничего не строится.
+> **Дальше.** Решение 2/2 → шаги 6–11 → ревью другой моделью на точном SHA → моя проверка → голосования о слиянии и о канарейке → деплой на ccs-it. Ни один этап ради срока не пропускается; успеет ли канарейка этой ночью — пока неизвестно.
+> **От вас.** Сейчас ничего. Когда я напишу «канарейка на ccs-it развёрнута»: подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` 3 минуты и вставьте сюда итоговые строки статистики.
+> **Проверено:** HEAD и чистота worktree (git), значения списков (`git grep`). **Не проверено:** код шагов 1–5. **Живые системы:** изменений нет. **Бэклог:** \<ссылка>
+
+English gloss: the executor is parked on the allow-list choice and ballot B\<n> is with both advisors, still running. No gate is skipped for the deadline, and whether the canary lands tonight is unknown. Nothing is needed from the operator now; after I announce the canary, they run the 3-minute ping on their WireGuard profile and paste the statistics.
+
+## 7. On the notifications
+
+I read the `.last` files, then run `herdr agent get`. On 2/2, I record `ballot-<n>.results.md`, update the backlog, and relay the DECIDED note to `wgka` by the same background call. On a split, the operator gets an `AskUserQuestion` poll with my recommendation first and both votes and rationales, and `wgka` stays parked.
+
+## Why
+
+- **The vote owns this.** The allow-list is a design option, so it belongs to the two voting advisors (§10), not to me, the executor or the operator.
+- **The ballot is neutral.** The executor's recommendation, "simpler", and the reasons attached to one option are stripped; each option carries symmetric facts.
+- **Both voters get it at once**, so neither sees the other's vote.
+- **Nothing is built on a guess.** Steps 7-11 depend on step 6, so the executor parks; a provisional /25 would be rework and would tilt the vote.
+- **"Canary tonight" decides no ballot and waives no gate.** Nothing here is the operator's to decide, so there is no poll; a split would be theirs.
+- **Acceptance is the operator's hands.** It is an instruction with a time, never skipped and never done by me over their VPN path.
+- **Waiting is in the background only**, and the status says "still running" rather than guessing a result.

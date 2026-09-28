@@ -1,0 +1,70 @@
+## Actions, in order
+
+**1. Foreground Bash.** I check that the product-advisor tabs are idle and not focused. I also create the task's scratch folder.
+
+```bash
+herdr agent get prod-codex; herdr agent get prod-fable
+mkdir -p "$SCRATCH/brainstorm/ccs-bar-site-name"
+```
+
+**2. Backlog.** I use Edit on `orchestrator/backlog.md` to add a new entry: `ccs-bar-site-name — CCS bar shows site name (ccs-it / ccs-ops) next to user name — status: brainstorm — operator wish: canary today, before 11:00 call (deadline poll open)`. Then I rebuild and republish it (foreground):
+
+```bash
+./orchestrator/build-backlog.sh
+```
+
+After that I update the backlog Artifact with the Artifact tool.
+
+**3. Round-1 briefs.** I write two files with Write: `$SCRATCH/brief-ccs-bar-site-name-r1-{codex,fable}.txt`. They are identical except for the `A|B` letter and the WRITE path:
+
+```
+You are product advisor A (prod-codex) in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       ccs-bar-site-name — CCS bar shows the site name next to the user name
+ROUND      1 draft — ends when your independent draft file is written; you will not see the other advisor's draft
+SKILL      superpowers:brainstorming (invoke it first and name it in your reply); I am your human partner:
+           send your questions to me, batched; real choices come back as ballot results
+PROBLEM    "the CCS bar should show the site name (ccs-it / ccs-ops) next to the user name. Small thing."
+FACTS      repo ~/work/ccs.ansible; two KVM sites per the repo inventory: ccs-it (canary), ccs-ops
+DECIDED    deploy only from merged main, canary (ccs-it) first; cross-review by the other model family
+           before any merge; every repo change in its own worktree; project hard rules in CLAUDE.md apply
+MAY        read the repository, upstream sources, the web
+WRITE      $SCRATCH/brainstorm/ccs-bar-site-name/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   20 minutes; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**4. Two background Bash calls** (`run_in_background: true`), sent together:
+
+```bash
+herdr agent prompt prod-codex "$(cat "$SCRATCH/brief-ccs-bar-site-name-r1-codex.txt")" --wait --timeout 1200000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$INBOX/prod-codex.last"
+```
+```bash
+herdr agent prompt prod-fable "$(cat "$SCRATCH/brief-ccs-bar-site-name-r1-fable.txt")" --wait --timeout 1200000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$INBOX/prod-fable.last"
+```
+
+**5. AskUserQuestion** (in Russian, the operator's language). The English rendering:
+
+- **Question:** "The 'site name in the CCS bar' task: the full brainstorm (your ruling from today, with no time limit) and the gates after it won't make the 11:00 call. What do we do?"
+- **Option 1:** "Recommended: move the deadline. The brainstorm is already running; canary today once every gate has passed, most likely after 11:00."
+- **Option 2:** "Waive the brainstorm for this task only. Review, validation and the votes on the merge and on the canary go still run, so before 11:00 is not guaranteed."
+
+**6. Status to the operator** (in Russian, English rendering): "Now: the task is in the backlog with status brainstorm [link]; prod-codex and prod-fable are writing independent drafts (round 1 of 3). Next: cross-critique, then merge, then approval by the voting advisors 2/2, and only then an executor. You: answer the deadline poll. Votes: none yet. Verified: nothing yet. Live machines: no changes."
+
+## Why
+
+The operator adopted the brainstorm ruling today and it covers every task, "small thing" included. The task goes in at `brainstorm` and both product advisors start right away. I don't open an executor tab, and I don't pass on my "five lines in auth.js" idea: the FACTS line carries only facts, no design.
+
+The 11:00 target doesn't shorten or waive anything. A deadline the full brainstorm can't meet is a change of course, so it's the operator's call. I'm asking in a poll, recommendation first, rather than running a squeezed brainstorm. Starting round 1 now is right under either answer, because nothing in it depends on the poll.
+
+Each prompt runs as a background call that also waits, so my session stays free for the poll. When the waiters fire I'll check `grep -F 'superpowers:'` in each tab's output. Any question the drafts raise goes to both voting advisors at once as a neutral ballot.

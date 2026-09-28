@@ -79,6 +79,9 @@ herdr agent prompt <name> "$(cat <scratch>/brief-<task>.txt)" --wait --timeout <
 herdr agent read <name> --source recent-unwrapped --lines 200 > <inbox>/<name>.last
 ```
 
+Any message to an idle tab that expects a reply is a brief: a relay, a park order, a
+DECIDED note. It goes by this one call too, never by a bare send (§3, §6).
+
 Use a separate waiter only for a tab that is **already working**: after a timeout, after you
 answer a `blocked` dialog, or after a queued message.
 
@@ -164,13 +167,10 @@ canary→fleet move, is the same task. A borderline case is itself a ballot.
 
    You are the skill's human partner. Answer facts with their evidence. Turn every real
    choice into a ballot, including the ones both advisors agree on.
-3. Pass the gate:
-   - both product advisors confirm the joint doc;
-   - both voting advisors approve it 2/2 as a ballot;
-   - every blocking question has a recorded ballot result or operator ruling.
-
-   Then set `brainstormed`, and only then create an executor. A project hard rule that
-   still reserves design sign-off to the operator binds.
+3. The gate, in this order: **both product advisors confirm the joint doc → both voting
+   advisors approve it 2/2 as a ballot → `brainstormed` → only then an executor.** Every
+   blocking question needs a recorded ballot result or operator ruling first. A project
+   hard rule that still reserves design sign-off to the operator binds.
 
 - **There is no time box.** A deadline the full brainstorm cannot meet is a change of
   course. Poll the operator: slip the deadline, or waive the brainstorm for this task.
@@ -210,6 +210,10 @@ herdr agent prompt <name> "/compact mid-task: keep the brief, the decisions, DIR
     skill**. A claimed skill with no artifact was not used, so a report
     with no skill artifacts is rejected. Asking for the missing output afterwards is not a redo.
   - Re-run the decisive check yourself.
+- **After the code, each step has its decider (§8 stages 7-13):** review at the exact SHA →
+  your validation → merge decision (the vote; the operator's poll for the final PR) →
+  **canary go (the vote; the operator's poll when the canary is the release)** → canary
+  deploy → the operator's acceptance → fleet rollout (the operator's poll).
 - **Before any merge decision:**
   - a review at the exact SHA by a fresh session of the other model family;
   - your own validation run at that SHA;

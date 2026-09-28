@@ -1,0 +1,57 @@
+## 1. Record the ballot (Write tool)
+
+I write `orchestrator/quorum/ballot-8.md`. The executor's recommendation is left out, and each option gets the same kinds of facts:
+
+```
+B8 — Source allow-list for the WireGuard keepalive relay (plan step 6)
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <head SHA>;
+  plan <plan path> step 6; executor question in <inbox>/wgka.last.
+  10.77.1.128/25 = WireGuard clients; 10.77.1.0/25 = OpenVPN clients; the front-door allow-list is 10.77.1.0/24.
+  Prior: B<k> (last night), a related allow-list, was decided 2/2 for the narrower range (quorum/ballot-<k>.results.md).
+  a) Allow 10.77.1.128/25 only. The relay accepts only WireGuard clients. This range differs from the front-door
+     list, so there are two ranges to keep in sync.
+     Cost if wrong: an OpenVPN client that needs the relay is dropped. Rollback: widen via PR + canary redeploy.
+  b) Allow 10.77.1.0/24. Same range as the front-door list, so one range to maintain. OpenVPN clients can also
+     reach the relay; the executor reports they do not use it.
+     Cost if wrong: a wider set of sources can reach the relay until it is narrowed. Rollback: narrow via PR + canary redeploy.
+Reply one line per ballot:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+Reply in English.
+```
+
+## 2. Park the executor (Bash, background)
+
+```bash
+herdr agent get wgka   # confirm "focused": false
+herdr agent prompt wgka "Step 6 (relay source allow-list) is now ballot B8, sent to the voting advisors. Do NOT implement step 6 or anything that depends on the allow-list, and use no provisional value. Continue only with plan steps that are independent of it, using the plan's superpowers skills (TDD, verification-before-completion). If there are none, commit and park. Report in English: phase, branch, head SHA, what is parked." --wait --timeout <remaining time box ms>; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+## 3. Hold B8 until both voters are free
+
+I don't send B8 to `adv-fable` now. The B7 waiter I already armed on `adv-codex` will notify me when that tab finishes. At that point I read `<inbox>/adv-codex.last`, record B7, and check `herdr agent get` on both voters. Then, in one message, I make **two background calls** at the same time, one per voter:
+
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+## 4. Update the backlog
+
+I set the task's status to "step 6 waiting on B8", run `build-backlog.sh`, and update the Artifact.
+
+## 5. Message to the operator (Russian, as an instruction, not a question)
+
+> **Сейчас:** wgka на шаге 6 (allow-list источников relay). Это решает совет: бюллетень B8. adv-codex ещё ~12 мин на B7, после этого B8 уходит обоим советникам одновременно. Пока нет решения, на этом выборе ничего не строится. Живые машины не менялись.
+> **Дальше:** B8 → шаг 6 → ревью на точном SHA → моя валидация → merge → голосование go → канарейка на ccs-it.
+> **От вас:** (1) Этот PR финальный, поэтому merge — ваш опрос, ориентировочно около 03:00. Без вашего ответа канарейки сегодня не будет. (2) Приёмка, это не мелочь: после моего сообщения «канарейка развёрнута» подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` 3 минуты и вставьте сюда итоговую статистику. Если спите, канарейка ждёт утра, флот я не трогаю.
+> Бэклог: <link>
+
+## Why
+
+- **The allow-list is the vote's decision, not mine.** It is a choice between options that changes the outcome. I agree with Option 1, and last night's similar ballot went 2/2 for the narrower range, but neither of those decides B8.
+- **"Tonight" does not decide anything.** The operator wants the canary tonight, but a wish decides no ballot and skips no gate.
+- **Both voters get the ballot together.** Neither may see the other's vote first. So `adv-fable` waits the ~12 minutes for `adv-codex` rather than getting the ballot early.
+- **The executor builds nothing on an open ballot.** That rules out a provisional pick.
+- **The ballot is neutral.** I moved "only WireGuard sends keepalives" and "matches the front door" into the facts of each option, so neither option carries a recommendation.
+- **The merge poll is not trivia.** This is the task's final PR, so the merge is the operator's call. Saying so now means "canary tonight" isn't silently dropped.
+- **Acceptance is an instruction with a time.** It is the evidence the fleet rollout depends on, so I tell the operator what to run and when, rather than asking.

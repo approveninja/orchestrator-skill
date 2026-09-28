@@ -1,0 +1,98 @@
+Placeholders: `B14` is the next free ballot id, `T7` the task's backlog id, `<sha>` the value step 1 prints. Scratch paths are under `orchestrator/`.
+
+## 1. Pre-send check — Bash, foreground (seconds)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+for a in wgka adv-codex adv-fable; do herdr agent get "$a"; done   # need idle + "focused": false
+herdr agent read wgka --source visible --lines 5                   # context usage
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse --short HEAD; git -C "$W" status --short
+grep -n -i -E 'allow|deny|/2[45]' "$W"/docs/superpowers/specs/*wg-keepalive* \
+  "$W"/docs/superpowers/plans/*wg-keepalive* > orchestrator/quorum/ballot-14.grep.txt
+```
+
+If a voter is busy or focused, I hold the ballot for both. If the design doc already fixes the list, I relay that as DECIDED instead of balloting.
+
+## 2. Write tool — `orchestrator/quorum/ballot-14.md`
+
+```
+Reply in English. Ignore any pre-filled text in your input box. Read-only: vote only.
+
+B14 — Which source addresses may reach the WireGuard keepalive relay on the ccs-it gateway?
+  Context:
+  - T7; worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <sha>;
+    plan step 6 of 11; steps 7-11 build on the answer.
+  - Design doc and plan do not fix the source list (quorum/ballot-14.grep.txt).
+  - Inventory: VPN client pool 10.77.1.0/24; Pritunl splits it into OpenVPN 10.77.1.0/25
+    and WireGuard 10.77.1.128/25. The gateway front door allows the /24.
+  - Stated in the design doc, not re-measured by the orchestrator: the keepalive request
+    is sent for WireGuard connections.
+  - Same under both options: listen address, method/path filter, upstream, and rollback
+    (one-line template change, PR, 55-gateway.yml -l site_it from merged main).
+  a) allow 10.77.1.128/25; deny all
+     admits: WireGuard-pool sources only; an OpenVPN-pool source is refused.
+     list: a second value derived from the pool; differs from the front-door list.
+     cost if wrong: a legitimate sender outside the /25 is refused and its tunnel rebuilds
+     until the list is widened.
+  b) allow 10.77.1.0/24; deny all
+     admits: sources in both pools.
+     list: the same value the front door uses; no derived /25.
+     cost if wrong: every OpenVPN-pool client can send the relay's permitted request
+     toward the Pritunl console until the list is narrowed.
+Reply one line:  B14: <letter> — <rationale, 1-3 sentences>   (or  B14: X: <proposal>)
+```
+
+## 3. Three Bash calls, all background, sent in one message
+
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-14.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-14.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/park-wgka.txt)" --wait --timeout 600000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+`park-wgka.txt`:
+
+> Reply in English. Ignore any pre-filled text in your input box.
+> Your step-6 question is now ballot B14 with the two voting advisors. I am not answering it, and your recommendation is not part of the ballot.
+> PARK: until I relay "DECIDED B14", build nothing for steps 6–11 — no provisional pick, no version parameterised for now.
+> NOW: commit finished work from steps 1–5 locally (no push, no PR), then stop.
+> REPORT, one line: phase, branch, head SHA, `git status --short`, next step.
+
+If step 1 showed 50% or more context used, I compact `wgka` after its park report. That is a background `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items`, followed by a one-line status request.
+
+## 4. Backlog
+
+I edit `orchestrator/backlog.md`: T7 next step "B14 open", blocked-on "vote B14". Then Bash foreground `bash orchestrator/build-backlog.sh`, and the Artifact tool republishes to the same page.
+
+## 5. Status in chat — no poll
+
+This is posted in the operator's language; it is shown in English here.
+
+> **Now.** WireGuard keepalive relay: the executor finished plan steps 1–5 and stopped at step 6 on one choice — who may reach the relay: only the WireGuard address pool (`10.77.1.128/25`) or the whole VPN pool (`10.77.1.0/24`). That is ballot B14, a question to the two voting advisors. Both are still running, so there is no result yet. The executor is parked and nothing is built on a guess.
+> **Next.** If both advisors agree: steps 6–11, review by the other model, my own test run, merge vote, canary vote, canary (first rollout, ccs-it only). If they split, a poll waits for you here. I skip no check to make "tonight", so I promise no time.
+> **You.** Nothing now. When you see "CANARY READY on ccs-it" here: connect with your own ccs-it WireGuard profile, run `ping -i 0.2 172.27.96.2` for 3 minutes, paste the last two summary lines. ccs-ops stays untouched until then.
+> **Verified.** Head `<sha>` and a clean tree (git). Not verified: the executor's tests at this SHA, and who sends keepalives.
+> **Live machines.** No change, no connection.
+> Backlog: `<link>`
+
+## 6. End of turn
+
+On each notification I read `orchestrator/inbox/<name>.last`, then `herdr agent get <name>`, and record votes in `quorum/ballot-14.results.md`.
+
+## Why
+
+- **The vote owns it.** The allow-list is a choice that changes the outcome and is none of the operator's four kinds of decision. Nothing needs asking, which also respects "don't wake me for trivia".
+- **Neutral ballot.** The executor's recommendation is stripped. Its two arguments survive only as facts shown under both options.
+- **Both voters at once.** Neither sees the other's vote first.
+- **Park, not a provisional /25.** Steps 7–11 depend on step 6. Work built on a guess is rework if it loses, and it tilts the vote toward what exists.
+- **"Tonight" is a wish.** It decides no ballot and waives no gate.
+- **Acceptance is the operator's hands.** Hard rule #17 bars me from the VPN path, so it is an instruction with a trigger, not skipped or substituted.
+- **Background waiters.** I keep supervising instead of blocking or polling.

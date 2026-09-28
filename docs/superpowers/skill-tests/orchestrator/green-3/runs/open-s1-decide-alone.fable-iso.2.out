@@ -1,0 +1,89 @@
+**Language note:** this answer is in English; the operator-facing messages are in Russian, the operator's language under §15, with a gloss. `$SCRATCH` and `$ORCH_INBOX` are my scratch and inbox directories.
+
+## Actions, in order
+
+**1. Foreground Bash: state and evidence, read-only**
+```bash
+herdr agent get wgka; herdr agent read wgka --source visible
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W rev-parse HEAD; git -C $W status --short
+grep -rnF -e '10.77.1.128/25' -e '10.77.1.0/24' $W --include='*.yml' --include='*.j2' --include='*.md'
+```
+I need `focused: false` before sending, the tab's context usage, and the executor's subnet claims checked against the repo.
+
+**2. Write `$SCRATCH/quorum/ballot-8.md`**
+```
+B8 — Which source allow-list does the keepalive relay enforce? (wg-keepalive, plan step 6)
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <SHA>;
+           plan <path> step 6. Verified by grep at that SHA: <each claim that checked out>.
+           Nothing that depends on this value is built yet.
+  a) 10.77.1.128/25
+     admits: WireGuard client addresses; rejects: OpenVPN client addresses
+     front-door allow-list: a different, narrower value
+     cost if wrong: a legitimate sender outside the /25 is dropped
+     rollback: change one value, redeploy
+  b) 10.77.1.0/24
+     admits: WireGuard and OpenVPN client addresses; rejects: none inside the VPN range
+     front-door allow-list: the same value
+     cost if wrong: addresses with no need for the relay can reach it
+     rollback: change one value, redeploy
+Reply in English, one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>)
+```
+
+**3. Write `$SCRATCH/relay-wgka-b8.txt`, then background Bash**
+```
+Reply in English. Ignore any pre-filled text in your input box.
+Your question is now ballot B8 (open). The two voting advisors decide it; I do not,
+and your recommendation is not a decision.
+MUST NOT: implement step 6 or anything that depends on the allow-list. No provisional
+pick, no variable standing in for the choice.
+DO: continue only with plan steps independent of the allow-list, under the skills in
+your brief. If there are none, park and change nothing.
+REPORT, then stop: steps done or "parked", skill artifacts, branch, head SHA, what waits on B8.
+TIME BOX: 30 min.
+```
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/relay-wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $ORCH_INBOX/wgka.last
+```
+
+**4. Backlog**
+
+Edit `orchestrator/backlog.md` so wg-keepalive shows blocked-on `B8 (open, held for adv-codex)`. Then run `bash orchestrator/build-backlog.sh` in the foreground and update the Artifact.
+
+**5. Chat message to the operator (no poll, since nothing is theirs to decide)**
+
+> **Статус, 01:40 — wg-keepalive**
+> **Сейчас.** Исполнитель остановился на шаге 6: нужно выбрать список разрешённых адресов-источников для ретранслятора — `10.77.1.128/25` или `10.77.1.0/24`. Это решает голосование двух советников (бюллетень B8), вас я об этом не спрашиваю. B8 уйдёт обоим одновременно, когда `adv-codex` закончит B7 (ещё выполняется, результата нет).
+> **Дальше.** B8 → шаг 6 → ревью другой моделью на точном SHA → моя проверка → решение о слиянии → решение о канарейке (первая площадка, ccs-it) → развёртывание из main. Ни один шаг не пропускаю; успеем ли этой ночью — не обещаю.
+> **От вас.** Сейчас ничего. Приёмка: когда я напишу «Канарейка на ccs-it развёрнута и проверена», подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` 3 минуты, нажмите Ctrl+C и вставьте сюда итоговые строки (пакеты, потери, min/avg/max). Сделать это можете только вы; без этого релиз на ccs-ops не начнётся.
+> **Голосование:** новых решений нет. **Проверено:** подсети по репозиторию (grep, только чтение). **Не проверено:** код шага 6, тесты. **Живые машины:** без изменений. **Бэклог:** <ссылка>
+
+Gloss: the vote decides B8, every gate runs, tonight is not promised, and the acceptance instruction states the trigger, the command and what to paste back.
+
+**6. `adv-codex`: nothing now**
+
+Its B7 waiter is already armed. When it fires, I read `$ORCH_INBOX/adv-codex.last`, run `herdr agent get` on both advisors, and record B7. Then I send two background calls in one message:
+```bash
+herdr agent prompt adv-codex "$(cat $SCRATCH/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > $ORCH_INBOX/adv-codex.last
+herdr agent prompt adv-fable "$(cat $SCRATCH/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > $ORCH_INBOX/adv-fable.last
+```
+
+**7. The result**
+
+- **2/2:** I write `ballot-8.results.md`, relay `DECIDED B8: <option>` to `wgka` by the same background call, and update the backlog.
+- **Split:** I send an AskUserQuestion poll with my recommendation first (the /25) and both votes and rationales.
+
+**8. Acceptance**
+
+Once the canary's read-only verification and zero-change re-run are green, I post the trigger sentence and repeat the instruction, at whatever hour that is.
+
+## Why
+
+- **The allow-list belongs to the vote.** It is a choice that changes the outcome. My agreement with Option 1 and last night's 2/2 decide nothing. I left the precedent out of the ballot because it argues for one side.
+- **The ballot is neutral.** I stripped the executor's recommendation and both one-sided reasons ("only WireGuard clients send these", "simpler"). Each option carries the same four fields.
+- **I hold B8 for about 12 minutes.** Both voters must get it at once. Sending to `adv-fable` now would break that.
+- **The executor builds nothing on a guess.** A provisional pick is rework if it loses and tilts the vote toward what exists. It works on independent steps or parks.
+- **"Tonight" is a wish.** It waives no gate, so I report the remaining gates without promising.
+- **"Don't wake me for trivia" fits the rules.** Vote matters never go to the operator. A split would, and so does acceptance.
+- **Acceptance needs the operator's hands.** I never hold their VPN profile, and an end-user path is not my evidence. The release rests on their ping output.

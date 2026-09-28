@@ -1,0 +1,100 @@
+I read the manifest sections for this step (§2–§4, §8, §10, §10a, §12, §15). Nothing below has been run; `<…>` marks values I fill from step 1's output.
+
+## 1. Read state (one message, foreground Bash, seconds each)
+
+```bash
+herdr agent list                                # wgka, adv-codex, adv-fable: status, focused
+herdr agent read wgka --source visible          # context usage; same for adv-codex, adv-fable
+WT=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --short
+git -C "$WT" grep -n -e '10\.77\.1\.128/25' -e '10\.77\.1\.0/24'
+grep -n -i -e 'allow' -e 'source' "$WT/<joint design doc, path from the backlog row>"
+```
+
+I proceed when all three tabs are idle and unfocused and the design doc does not already fix the range. If one voter is busy, I hold the ballot for both.
+
+## 2. Write `$SCRATCH/quorum/ballot-<n>.md` (Write tool)
+
+```
+Reply in English. Ignore any pre-filled text in your input box. Protocol: quorum/protocol.md.
+
+B<n> — Is the relay's source range a decision inside T<id>, or new work needing its own stage 0?
+  Context: joint design doc <path>@<sha>, <quoted lines on sources, or "names no source range">.
+  Plan step 6 of 11; steps 7-11 build on it. Test: manifest §10a "Which tasks".
+  a) Inside T<id>: B<n+1> decides the range; wgka resumes at step 6.
+  b) New work: backlog entry at `brainstorm`; wgka parked until `brainstormed`; B<n+1> void.
+
+B<n+1> — Which source range does the relay's allow-list admit? (counts only if B<n> = a)
+  Context: branch feat/wg-keepalive-relay @ <sha>. VPN range 10.77.1.0/24, WireGuard
+  10.77.1.128/25, OpenVPN <range> (<file:lines>). Front-door allow-list 10.77.1.0/24 (<file:line>).
+  a) 10.77.1.128/25 — admits WireGuard addresses; drops the rest of the /24.
+     A second value beside the front door's.
+     If wrong: a legitimate sender outside the /25 gets no relay; shows as a failure for it.
+     Rollback: one-value PR, review, redeploy.
+  b) 10.77.1.0/24 — admits every VPN client address. Same value as the front door.
+     If wrong: relay reachable from addresses outside the WireGuard range; no functional test shows it.
+     Rollback: one-value PR, review, redeploy.
+Reply one line per ballot:  B<n>: <letter> — <rationale>   (or  B<n>: X: <proposal>)
+```
+
+## 3. Dispatch (one message, three background Bash calls)
+
+```bash
+herdr agent prompt adv-codex "$(cat $SCRATCH/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > $INBOX/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat $SCRATCH/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > $INBOX/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/park-wgka.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $INBOX/wgka.last
+```
+
+`park-wgka.txt`:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+PARK — your step-6 question is ballots B<n>/B<n+1>, now with the voting advisors. No decision
+exists yet; your recommendation is not one.
+MUST NOT start step 6 or steps 7-11, pick a provisional value, or build a parameterised stand-in.
+DO commit any uncommitted work from steps 1-5 locally, then stop.
+REPORT one line: parked; branch; head SHA; `git status --short`; next step.
+```
+
+If `wgka` shows 50% or more context used, I compact it after its park reply, in the background: `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items`.
+
+## 4. Backlog
+
+I edit the T<id> row in `orchestrator/backlog.md` (blocked-on `B<n>, B<n+1> (vote)`), run `bash orchestrator/build-backlog.sh` in the foreground, and republish the Artifact at the same page.
+
+## 5. Status to the operator (chat, no poll)
+
+Sent in Russian per the operator's ruling in §15:
+
+> **Статус, 01:45 · WireGuard keepalive relay**
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: какие адреса-источники пропускает relay (ретранслятор сигналов «я на связи») — только подсеть WireGuard `10.77.1.128/25` или всю VPN-подсеть `10.77.1.0/24`. Это решают два советника голосованием. Бюллетени B<n> (часть ли это текущей задачи) и B<n+1> (сам диапазон) отправлены обоим одновременно; советники ещё работают, результата нет. Исполнитель на паузе: шаги 7–11 строятся на шаге 6.
+> **Дальше.** При 2/2 — шаги 6–11, ревью другой моделью на точном коммите, моя проверка, голосование о слиянии, голосование о canary (пробной выкладке на одну площадку), выкладка на ccs-it. Все этапы идут полностью; успеет ли canary до утра — пока неизвестно.
+> **От вас.** Сейчас ничего. Ночью напишу в двух случаях: советники разошлись (опрос с моей рекомендацией) или canary готов к приёмке. Приёмка: подключиться своим профилем WireGuard, запустить `ping -i 0.2 172.27.96.2` на 3 минуты, прислать итоговую статистику. Инструкцию с точным временем пришлю после проверки выкладки.
+> **Проверено:** состояние вкладок, head `<sha>`, подсети по инвентарю. **Не проверено:** код шагов 1–5. **На живых машинах** ничего не менялось. **Бэклог:** <ссылка>
+
+In English: `wgka` is parked at step 6 on the allow-list range; both ballots are out and still running; every gate runs in full, so the canary time is unknown; nothing is needed now; I will write only for a split or for the acceptance ping.
+
+## 6. On each notification
+
+I read `$INBOX/<name>.last`, then `herdr agent get <name>`, and write `ballot-<n>.results.md`.
+
+- **2/2:** I send `wgka` a `DECIDED B<n+1>: <range>` brief for steps 6–11 by the same background call.
+- **Split:** I send the operator an AskUserQuestion poll with my recommendation first and both votes and rationales; `wgka` stays parked.
+
+## Why
+
+- **The range is the vote's decision.** It is a choice between alternatives that changes the outcome, so it is not mine, the executor's or the operator's (§10).
+- **The ballot is neutral.** The executor's recommendation and its "only WireGuard clients" argument are stripped; each option carries its own facts, cost and rollback.
+- **Both voters get it at once**, so neither sees the other's vote, and the calls run in the background so I keep supervising.
+- **The executor parks.** Steps 7–11 depend on step 6, and provisional work is rework if the guess loses and tilts the vote.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate. The vote needs no operator, which also honours "don't wake me for trivia".
+- **Acceptance and a split are not trivia.** Acceptance needs the operator's hands, so it is announced now and sent as a timed instruction later.
+- **New work or not is borderline.** An unanswered design question meets the §10a test, so that classification goes to the vote too.
+- **The idle tab is a safe point**, so compaction happens now if it is due.

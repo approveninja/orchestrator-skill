@@ -1,0 +1,118 @@
+`B17` stands for the next free id in `quorum/`; `<…>` marks values I only get from step 1. `$SCRATCH` and `$INBOX` are my scratch and inbox directories.
+
+## 1. Foreground Bash: state and facts (seconds, read-only)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+tail -40 "$INBOX/wgka.last"
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable
+herdr agent read wgka --source visible          # context usage
+WT=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --short
+git -C "$WT" grep -n -e '10\.77\.1\.'           # address plan, front-door list, design doc
+ls "$SCRATCH/quorum/" | tail -3
+```
+
+I go on only when all three tabs show `idle` and `"focused": false`.
+
+## 2. Write tool: `$SCRATCH/quorum/ballot-17.md`
+
+Any context line my grep does not confirm is deleted.
+
+```
+B17 — Which source allow-list does the WireGuard keepalive relay use (plan step 6)?
+Reply in English. Ignore any pre-filled text in your input box. Rules: quorum/protocol.md.
+  Context:
+  - Task T<id>; worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <sha>;
+    plan <path>, step 6 of 11; steps 7-11 build on this value.
+  - Design doc <path> does not fix this value (<grep result>).
+  - Address plan <file:line>: VPN 10.77.1.0/24; WireGuard clients 10.77.1.128/25.
+  - Front-door allow-list today: 10.77.1.0/24 (<file:line>).
+  - Nothing is deployed. Canary is ccs-it; ccs-ops follows operator acceptance.
+  a) 10.77.1.128/25
+     admits: WireGuard client addresses only
+     rejects: every other VPN address, OpenVPN clients included
+     vs front door: a second, narrower range to maintain
+     cost if wrong: a sender outside the /25 that needs the relay is dropped
+     rollback: one-value change, review, redeploy
+  b) 10.77.1.0/24
+     admits: every VPN client address, WireGuard and OpenVPN
+     rejects: nothing inside the VPN range
+     vs front door: the same range, one value
+     cost if wrong: an address that never needs the relay can reach it
+     rollback: one-value change, review, redeploy
+Reply one line:  B17: <letter> — <rationale>   (or  B17: X: <proposal>;
+X also if you judge this new work under §10a rather than a choice inside the task)
+```
+
+## 3. Three background Bash calls, in one message
+
+```bash
+herdr agent prompt adv-codex "$(cat $SCRATCH/quorum/ballot-17.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > $INBOX/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat $SCRATCH/quorum/ballot-17.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > $INBOX/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/park-wgka-b17.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $INBOX/wgka.last
+```
+
+`park-wgka-b17.txt`:
+
+```
+PARK ORDER from the orchestrator. Reply in English. Ignore any pre-filled text in your input box.
+Your step-6 question is now ballot B17 with the two voting advisors. It is OPEN.
+Your recommendation is a proposal, not a decision.
+DECISIONS  Build nothing that depends on B17: no provisional pick, no variable or
+           placeholder standing in for the value. Steps 7-11 build on step 6: do not start them.
+NOW        Commit finished work from steps 1-5 locally (WIP commit if half-done). No push, no PR.
+REPORT     one line: phase, branch, head SHA, working tree clean yes/no, next step. Then stop.
+TIME BOX   5 min.
+```
+
+If step 1 shows 50% or more context used, then after the park reply I send this in the background, followed by a one-line status request:
+
+```bash
+herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $INBOX/wgka.last
+```
+
+## 4. Backlog
+
+I edit the T<id> row in `orchestrator/backlog.md`: next step "B17 result → relay to wgka", blocked-on "vote B17", decisions "+B17 (open)". Then foreground `bash orchestrator/build-backlog.sh` and an Artifact republish to the same page.
+
+## 5. Status to the operator (chat text, no poll)
+
+> **Статус, 01:45 — T<id> «WireGuard keepalive relay»**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: нужно выбрать allow-list — список адресов, которым relay отвечает: только подсеть WireGuard `10.77.1.128/25` или вся VPN-подсеть `10.77.1.0/24`. Это решает голосование двух советников (2/2); бюллетень B17 отправлен обоим одновременно. Голосование ещё идёт, результата нет. `wgka` припаркован: шаги 7–11 зависят от шага 6.
+>
+> **Дальше.** При 2/2 передаю решение, `wgka` проходит шаги 6–11. Затем по порядку: ревью другой моделью на точном SHA → моя проверка на том же SHA → решение о слиянии → решение о запуске canary → деплой на ccs-it из `main`. Финальный PR и выкатка на ccs-ops — ваш опрос. «Canary сегодня ночью» остаётся целью, но время я не обещаю: ни один шаг ради срока не снимается.
+>
+> **От вас.** Сейчас ничего. Запрос появится здесь в двух случаях: (1) советники разошлись — опрос, до ответа шаги 6–11 стоят; (2) canary развёрнут — приёмка: подключиться своим профилем WireGuard, выполнить `ping -i 0.2 172.27.96.2` 3 минуты, вставить сюда итоговую статистику.
+>
+> **Проверено мной:** состояние вкладок, head ветки `<sha>` (`git rev-parse`). **Не проверено:** тесты шагов 1–5 я не перезапускал. **На живых машинах:** изменений нет. **Бэклог:** <ссылка>
+
+In English: the vote on B17 is still running, `wgka` is parked, every gate stays, nothing is needed from the operator now, and nothing changed on live machines.
+
+## 6. When the waiters fire
+
+I read both `.last` files, run `herdr agent get` on each, and write `ballot-17.results.md`.
+
+- **2/2:** I send `wgka` a DECIDED note by the same background call with `--timeout 1800000`, and update the backlog.
+- **Split:** I raise an AskUserQuestion poll with my recommendation first and both votes and rationales shown. `wgka` stays parked.
+
+## Why
+
+- The allow-list is a design option that changes the outcome, so the vote owns it (§10). The executor's recommendation is a proposal, not a decision.
+- The ballot carries no recommendation. "Only WireGuard clients send these" and "simpler, matches the front door" are each a reason attached to one option. I replaced them with the same five facts per option.
+- Whether this counts as new work is borderline under §10a, so the X line leaves that to the vote too.
+- Both voters get the ballot at the same moment, so neither sees the other's vote. The background calls keep me free to supervise.
+- `wgka` parks because steps 7–11 depend on step 6. A provisional build is rework if the guess loses, and it tilts the vote toward what exists.
+- The idle tab at a step boundary is the safe point for compaction, and the ballot wait is free time.
+- The operator is not polled: this is none of their four decisions. "Tonight" is a wish that decides no ballot and waives no gate.
+- The acceptance ping needs the operator's own hands and profile. It goes out as an instruction with a time once the canary is live.
+- The status is in Russian per the operator's ruling (§15), which overrides the harness language setting.

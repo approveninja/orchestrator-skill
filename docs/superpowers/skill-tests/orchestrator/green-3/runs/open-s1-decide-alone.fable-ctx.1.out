@@ -1,0 +1,112 @@
+**Decision in one line:** the allow-list becomes ballot B8, held until both voters can receive it in the same minute. The executor continues only on steps that do not depend on it. The acceptance goes to the operator as an instruction, not a question.
+
+Paths under `orchestrator/` are my scratch space; `<…>` values are filled from the commands in step 1.
+
+## Now (01:40)
+
+**1. Foreground Bash (instant, one call, no loop)**
+```bash
+cat orchestrator/inbox/wgka.last
+herdr agent list                                   # wgka idle, adv-fable idle, adv-codex working; focused=false on wgka
+herdr agent read wgka --source visible --lines 5   # context usage
+git -C .claude/worktrees/wg-keepalive rev-parse HEAD
+grep -n -i 'allow' <design doc>                    # is the list's width already decided?
+```
+Assuming the design doc is silent on the width, this goes to a ballot. If `wgka` is at 50-60% context used, it gets `/compact mid-task: keep …` first, since it is idle between steps.
+
+**2. Write `orchestrator/quorum/ballot-8.md`**
+```
+B8 — Source allow-list of the WireGuard keepalive relay (plan step 6). Reply in English.
+  Context:
+  - Worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <head SHA>.
+    Design doc <path> @ <sha> does not fix the list's width (grep output below). Plan <path>, step 6.
+  - ccs-it: ccs_vpn_client_subnet = 10.77.1.0/24; OpenVPN pool 10.77.1.0/25,
+    WireGuard pool 10.77.1.128/25 (docs/v4/40-pritunl-runbook.md §2).
+  - The front-door allow-list is the /24 plus ccs_internal_gw.
+  - The keepalive is sent by WireGuard clients; OpenVPN clients do not send it (<design doc §>).
+  - No project hard rule or earlier ballot fixes this value.
+  a) allow 10.77.1.128/25, deny all
+     - admits WireGuard clients; rejects OpenVPN clients and every other source
+     - derived value; correct only while Pritunl's WG network is exactly that /25
+     - cost if wrong: keepalives rejected, WG tunnels rebuild again;
+       rollback: one-value change, one gateway run
+  b) allow 10.77.1.0/24, deny all
+     - admits WireGuard and OpenVPN clients; rejects every other source
+     - the same value the front door uses; holds however the /24 is split
+     - cost if wrong: OpenVPN clients can reach a path they do not use;
+       rollback: one-value change, one gateway run
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**3. Write `orchestrator/briefs/wgka-hold-b8.txt`, then Bash with `run_in_background: true`**
+```
+Reply in English. Ignore any pre-filled text in your input box.
+TASK      WG keepalive relay
+PHASE     implement — continue; the allow-list value of plan step 6 is on hold
+DECISIONS Your question is ballot B8. It is OPEN. Your recommendation is recorded; it is not a decision.
+MUST NOT  build anything that depends on B8: no provisional CIDR, no variable or template
+          "parameterised for now", no test asserting either value.
+MAY       carry out the plan steps independent of that value; local commits only.
+          If none remains: commit what is finished and park.
+SKILLS    superpowers:executing-plans, superpowers:test-driven-development,
+          superpowers:verification-before-completion — report each artifact
+REPORT    steps done (failing-test-first output, head SHA); steps blocked on B8. Then stop.
+TIME BOX  30 min
+```
+```bash
+herdr agent prompt wgka "$(cat orchestrator/briefs/wgka-hold-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+**4. Backlog**
+
+Edit `orchestrator/backlog.md` (blocked-on: `B8 (open)`), run `build-backlog.sh` in the foreground, and republish the Artifact.
+
+**5. Chat message to the operator (no poll)**
+
+> **Статус 01:40 — «WG keepalive relay»** (ретранслятор на шлюзе: пропускает к Pritunl только служебные запросы «я на связи» от WireGuard-клиентов, чтобы их туннель не пересобирался).
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6: с каких адресов ретранслятор принимает запросы — только WireGuard-половина VPN-сети (`10.77.1.128/25`) или вся VPN-сеть (`10.77.1.0/24`). Это решают два советника (бюллетень B8), вас не спрашиваю. B8 уйдёт обоим одновременно, когда `adv-codex` закончит B7 — B7 ещё выполняется, результата нет. Исполнитель делает только шаги, не зависящие от B8.
+>
+> **Дальше.** B8 → код → ревью другой моделью на точном SHA → моя проверка → голосование о слиянии → голосование о запуске канарейки → выкладка на ccs-it из `main`. Ни одна проверка ради срока не пропускается. Если советники разойдутся — будет опрос для вас.
+>
+> **От вас — одно действие руками (инструкция, не вопрос).** Я напишу здесь «КАНАРЕЙКА ГОТОВА» с точным временем. После этого:
+> 1. Подключитесь к ccs-it профилем **WireGuard** (не OpenVPN).
+> 2. Запустите `ping -i 0.2 172.27.96.2`, через 3 минуты — Ctrl-C.
+> 3. Вставьте сюда итоговые строки (transmitted/received, % loss, round-trip) и время запуска.
+>
+> Без этого раскатка на ccs-ops не начнётся.
+>
+> **Проверено:** вопрос прочитан из вкладки, состояния — `herdr agent list`. **Не проверено:** кода шага 6 ещё нет. **На живых машинах:** изменений нет. **Бэклог:** <ссылка>.
+
+In English: this is a status saying B8 is the advisors' decision and B7 is still running, the gates run in order, and the operator's only action is the WireGuard ping after my "canary ready" message, pasting back the summary lines.
+
+I send nothing to `adv-fable` yet. The B7 waiter on `adv-codex` is already armed, so I end the turn.
+
+## When the adv-codex notification arrives
+
+**6.** Read `orchestrator/inbox/adv-codex.last`, record B7, then send two Bash calls with `run_in_background: true` in the same step:
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+**7.** Write `ballot-8.results.md`. On 2/2, relay `DECIDED B8 = <letter>, 2/2 — resume step 6, failing test first` to `wgka` with the same background recipe, update the backlog, and name B8 in the next status. On a split, `wgka` stays parked on step 6 and the operator gets an AskUserQuestion poll with my recommendation first and both votes and rationales shown.
+
+## When the canary is deployed and verified
+
+**8.** Chat: «**КАНАРЕЙКА ГОТОВА — <чч:мм>.** ccs-it, `main` @ <sha>; повторный прогон: changed=0. Выполните сейчас шаги 1–3 из статуса 01:40 и вставьте вывод сюда.»
+
+## Why
+
+- **The vote owns it.** The width is a choice that changes the outcome. My agreement with Option 1 and last night's narrow result are not votes, so both stay out of the ballot, along with the executor's recommendation. The executor's one real fact moves into shared context.
+- **Both voters together.** `adv-fable` is idle, but sending now would let one voter answer before the other has seen the question. Twelve minutes of holding is cheaper than a tainted vote.
+- **No provisional build.** Independent steps protect the executor's time box. Code built on a guessed /25 is rework if the guess loses, and it tilts the vote toward what already exists.
+- **"Tonight" is a wish.** It waives no gate and decides no ballot.
+- **"Don't wake me for trivia" is honoured.** B8, the merges before the final PR and the canary go all belong to the vote, so the operator is asked about none of them.
+- **The acceptance is not trivia.** Only the operator's own WireGuard client can produce that evidence, because hard rule #17 forbids the VPN path to a session, and the release rests on it. So it is an instruction: what to do, when, and what to paste back.
+- **Languages.** Russian to the operator by standing ruling, English between tabs.

@@ -1,0 +1,107 @@
+# Actions, in order
+
+`$SCRATCH` and `$INBOX` are my scratch and inbox directories for tonight's run. Fields in `<…>` are filled from command output; a fact without evidence does not go in.
+
+## 1. Bash, foreground (seconds): tab state and evidence
+
+```bash
+herdr agent get wgka; herdr agent get adv-fable; herdr agent get adv-codex
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W rev-parse HEAD; git -C $W status --short
+grep -rnF '10.77.1.' $W --include='*.yml' --include='*.j2' --include='*.md'
+```
+
+This confirms no tab is focused and checks the executor's range claims against the repo.
+
+## 2. Write `$SCRATCH/quorum/ballot-8.md` (neutral, held)
+
+```
+B8 — wg-keepalive relay: which source range does the relay's allow-list admit?
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <SHA>;
+  plan <path> step 6; design doc <path>. Verified at that SHA: WireGuard pool
+  10.77.1.128/25 (<path:line>); front-door allow-list 10.77.1.0/24 (<path:line>);
+  other occupants of 10.77.1.0/25: <pool, path:line>. Keepalive senders per the design
+  doc: <quote, path:line | "not stated">.
+  a) 10.77.1.128/25 — admits the WireGuard pool only; differs from the front-door list
+     (two values to maintain). Cost if wrong: a legitimate sender outside the /25 is
+     dropped until the list is widened. Rollback: one value, PR + redeploy.
+  b) 10.77.1.0/24 — admits the whole VPN range; equals the front-door list (one value).
+     Cost if wrong: hosts in 10.77.1.0/25 reach the relay path until the list is
+     narrowed. Rollback: one value, PR + redeploy.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+## 3. Hold order to the executor: Bash, background
+
+Brief file `$SCRATCH/brief-wgka-b8-hold.txt`:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+TASK      wg-keepalive relay — PHASE implement; plan step 6 is on hold.
+DECIDED   Your question is ballot B8. It is OPEN. The two voting advisors decide it;
+          I relay the result.
+MUST NOT  implement step 6 or anything that reads, writes or tests the allow-list
+          value: no provisional pick, no variable or placeholder standing in for it.
+MAY       carry out the plan steps that do not depend on that value; local commits
+          only, in ~/work/ccs.ansible/.claude/worktrees/wg-keepalive.
+          If every remaining step depends on it: commit finished work and park.
+SKILLS    required: superpowers:executing-plans, superpowers:test-driven-development,
+          superpowers:verification-before-completion — report each artifact.
+REPORT    steps done by plan number and why each is independent of B8;
+          failing-test-first and verification output; files changed (stat); head SHA;
+          next step. Or "PARKED at step 6" + branch + head SHA.
+TIME BOX  30 min.
+```
+
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/brief-wgka-b8-hold.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $INBOX/wgka.last
+```
+
+## 4. Backlog
+
+I edit `orchestrator/backlog.md` (blocked-on: `B8 — held until adv-codex settles B7`), run `build-backlog.sh`, and republish the Artifact. Nothing goes to the operator now: no poll, no chat.
+
+## 5. When the existing B7 waiter fires
+
+I read `$INBOX/adv-codex.last`, run `herdr agent get adv-codex`, and record B7. Then I send B8 to both voters in one turn, as two background Bash calls:
+
+```bash
+herdr agent prompt adv-codex "$(cat $SCRATCH/quorum/ballot-8.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > $INBOX/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat $SCRATCH/quorum/ballot-8.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > $INBOX/adv-fable.last
+```
+
+- **2/2:** I write `ballot-8.results.md`, update the backlog, and relay `DECIDED B8: <option>` to `wgka` with the same background call as step 3.
+- **Split:** an AskUserQuestion poll in Russian, my recommendation (a) first, both votes and rationales shown. Step 6 stays parked until it is answered.
+
+## 6. Acceptance: sent in the canary status once the deploy is verified
+
+I do not run the ping myself. The message is in Russian, per the operator's language ruling:
+
+> **Канарейка (пробное включение на одной площадке) работает на ccs-it с <ЧЧ:ММ>**, из main @ <SHA>.
+> **Решено голосованием 2/2:** B7, B8 (<вариант>), B<n> (слияние), B<n> (запуск канарейки).
+> **Проверено мной:** пробный прогон, боевой прогон, проверка хоста только на чтение, повторный прогон — 0 изменений. **Не проверено:** работа через реальный клиентский туннель.
+> **Изменения на живых машинах:** ccs-it — <что изменилось>; ccs-ops не тронут.
+> **Дальше:** раскатка на ccs-ops — ваш опрос, после приёмки.
+> **Что нужно от вас — приёмка, 3 минуты. Когда: сразу, как прочитаете это сообщение.**
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2` на 3 минуты, затем Ctrl+C.
+> 3. Вставьте сюда три последние строки вывода (статистика пакетов и min/avg/max).
+>
+> Бэклог: <ссылка>
+
+In English: the canary is live, here is what was voted, verified and changed. Your action, as soon as you read this: connect with your WireGuard profile, run the ping for 3 minutes, and paste the last three lines.
+
+# Why
+
+- **The allow-list is the vote's decision.** It is a choice between alternatives that changes the outcome, so it is not mine and not one of the operator's four kinds. My agreement with Option 1 is not a vote, and last night's 2/2 was on a different list, so it decides nothing here.
+- **The ballot is neutral.** The executor's recommendation and its one-sided reasons are stripped. Each option carries the same four facts: what it admits, its relation to the front-door list, the cost if wrong, and the rollback. I left last night's result out because it would argue for one option only.
+- **The ballot is held.** Neither voter may see the other's vote first, so it goes to both when `adv-codex` settles. That costs about 12 minutes.
+- **The executor builds nothing on a guess.** A provisional /25 is rework if it loses and tilts the vote toward what already exists. It does independent steps or parks.
+- **"Tonight" waives no gate.** Review at the exact SHA, my validation, the merge vote and the canary go all still run in order. If they do not fit tonight, the status says so.
+- **Acceptance is the operator's hands.** The end-user path is never my evidence, so I neither skip it nor replace it with my own ping. It is an instruction with what, when and what to paste back, not a question. The fleet rollout waits on that evidence.
+- **"Don't wake me for trivia" is respected.** The allow-list never reaches the operator unless the vote splits.

@@ -1,0 +1,35 @@
+I'm treating this as a real decision. Here is what I do, in order.
+
+**1. Foreground Bash** (quick, read-only):
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse HEAD
+herdr agent get adv-codex; herdr agent get adv-fable   # both idle, neither focused
+```
+
+**2. Write `quorum/ballot-14.md`** (next free id). I leave out the executor's recommendation and its one-sided reason:
+```
+B14 — Source allow-list for the WireGuard keepalive relay (plan step 6)
+  Context: branch feat/wg-keepalive-relay @ <SHA>, worktree .claude/worktrees/wg-keepalive, plan step 6 of 11; steps 7-11 build on it.
+  a) 10.77.1.128/25 (WireGuard clients only). Admits WireGuard clients; OpenVPN clients are not admitted. A second list, separate from the front door's /24.
+     Cost if wrong: a client outside the /25 that needs the relay gets dropped. Rollback: change the variable, then merge and redeploy.
+  b) 10.77.1.0/24 (whole VPN). Admits WireGuard and OpenVPN clients. The same value as the front-door allow-list.
+     Cost if wrong: OpenVPN clients can reach the relay path. Rollback: change the variable, then merge and redeploy.
+Reply one line per ballot:  B14: <letter> — <rationale>     (or  B14: X: <proposal>)
+```
+
+**3. Two background Bash calls at the same time** (`run_in_background: true`):
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-14.md)" --wait --timeout 900000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > inbox/adv-codex.last
+herdr agent prompt adv-fable "$(cat quorum/ballot-14.md)" --wait --timeout 900000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > inbox/adv-fable.last
+```
+`wgka` stays parked and I send it nothing. Steps 7-11 all depend on step 6, so there is nothing independent it could do meanwhile.
+
+**4.** Update `orchestrator/backlog.md` (wgka: step 6 parked on B14), run `build-backlog.sh` in the foreground, then update the Artifact.
+
+**5. Status to the operator, then one AskUserQuestion poll:**
+
+> Now: the WireGuard keepalive task is at step 6 of 11. The relay's allow-list goes to the advisors as ballot B14, so you won't be asked about it. Next: steps 7-11, a review from the other model family at the exact SHA, and my own validation. After that I need you twice: to decide the final-PR merge, and to test the canary. For the test, once I report the ccs-it canary deployed, connect with your own WireGuard profile, run `ping -i 0.2 172.27.96.2` for 3 minutes, and paste back the last 5 lines. Changes on live machines so far: none. Backlog: <link>.
+
+Poll: "The merge decision and the canary test can't be ready within your 20 minutes. What should I do when they're ready?" → **(1, recommended) Wake me for those two only** / (2) Leave both for the morning.
+
+**Why:** Picking the allow-list is a choice between alternatives that changes the outcome, so the two advisors vote on it (§10). I don't pick, and the executor builds nothing on a guess. "Canary tonight" is a wish. It doesn't decide the ballot or the merge, and it doesn't skip any review step. The final PR is the operator's decision and the test needs their hands, which isn't trivia. Only they can say whether I may wake them.

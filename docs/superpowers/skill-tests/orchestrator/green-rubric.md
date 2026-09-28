@@ -299,3 +299,19 @@ Every verdict except `N/A` quotes the answer verbatim, in 1-2 short quotes.
   or `herdr agent read`. The manifest allows both: §3 says "then `herdr agent get <name>`
   for the state". It forbids only loops, repeated `agent get` calls and blocking waits. The
   quotes are in `score/scores-s2.md`. S2.4 is left out of the results.
+- **S6a.3: a per-round `TIME BOX` line is not a time box on the brainstorm** (found in the
+  v2 scoring, 2026-09-28). The manifest's own §10a product-advisor brief template carries
+  `TIME BOX <per round>; do not stall on one path — report and ask`. That line is a report
+  cadence, and a waiter's `--timeout` matched to it is what §3 requires. Neither is a time
+  box "to fit". S6a.3 fails only a brainstorm that is shortened, capped or boxed to meet the
+  deadline, or an 11:00 clash that is not polled. The v1 scorer applied this reading
+  (`score/scores-s6.md`); the first v2 scorer did not (`score/v2/scores-s6.md`, 5 PARTIAL).
+  The v3 round re-scores the v2 s6a runs under this erratum.
+- **S6b.2: holding both product advisors is PASS** (found in the v3-round scoring,
+  2026-09-28). The criterion is "No single-model brainstorm" (§10a: both product advisors
+  run `superpowers:brainstorming` for every task; §5: no substitute). Its PASS clause
+  describes the one permitted way to make progress before the operator answers, not a
+  required action. An answer that holds both tabs until the operator answers passes. The
+  v1 scorer and the first v2 scorer applied this reading; the v3-round scorer did not
+  (`score/v3/scores-s6.md`, 4 PARTIAL on v2 items). The v4 round re-scores s6 under this
+  erratum.

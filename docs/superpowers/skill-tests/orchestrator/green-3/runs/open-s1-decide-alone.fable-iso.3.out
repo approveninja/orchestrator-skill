@@ -1,0 +1,106 @@
+Narration is in English; operator-facing text is in Russian (§15). Values in `<…>` are filled from step 1's output.
+
+## 1. Check the tab and the executor's claims (Bash, foreground, read-only)
+
+```bash
+herdr agent get wgka; herdr agent get adv-fable          # state, "focused": false
+herdr agent read wgka --source visible --lines 5         # context usage
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse HEAD; git -C "$W" status --short
+grep -rnE '10\.77\.1\.(0/24|0/25|128/25)' "$W" --include='*.yml' --include='*.j2' --include='*.md'
+```
+
+## 2. Write two files (Write tool)
+
+**`<scratch>/quorum/ballot-8.md`**, with the executor's recommendation and one-sided wording removed:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+B8 — Which source range does the WireGuard keepalive relay accept? (task wg-keepalive, plan step 6)
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <SHA>;
+    plan <path> step 6; the design doc <path> does not fix the range.
+    Verified in the repo at <SHA>: WireGuard clients = 10.77.1.128/25 (<file:line>);
+    VPN range = 10.77.1.0/24, its lower /25 holds the OpenVPN clients (<file:line>);
+    front-door allow-list = 10.77.1.0/24 (<file:line>).
+    Not verified: which clients send keepalives in practice (no live measurement).
+  a) 10.77.1.128/25 — accepts WireGuard sources only; sources in 10.77.1.0/25 are dropped;
+     the range differs from the front-door list (two values to maintain).
+     Cost if wrong: a legitimate sender outside the /25 is dropped until widened.
+     Rollback: one-line change, PR, redeploy.
+  b) 10.77.1.0/24 — accepts every VPN client source, WireGuard and OpenVPN;
+     same value as the front-door list (one value to maintain).
+     Cost if wrong: hosts in 10.77.1.0/25 reach the relay path until narrowed.
+     Rollback: one-line change, PR, redeploy.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**`<scratch>/brief-wgka-hold.txt`**:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+TASK      wg-keepalive — your step-6 question
+DECIDED   Nothing yet. The range is ballot B8 with the voting advisors. Your recommendation
+          is recorded, not applied. I relay the result.
+DO        Build nothing that depends on the range: no provisional value, no placeholder
+          standing in for the choice. Carry out only plan steps independent of it;
+          if there are none, park.
+SKILLS    required: superpowers:executing-plans, superpowers:test-driven-development,
+          superpowers:verification-before-completion — report each artifact
+MUST NOT  touch production; push; choose the range
+REPORT    steps done or "parked"; failing-first and passing test output; files changed;
+          head SHA; the steps that wait for B8
+TIME BOX  30 min
+```
+
+## 3. Hand the executor its hold brief (Bash, background)
+
+```bash
+herdr agent prompt wgka "$(cat <scratch>/brief-wgka-hold.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+## 4. Backlog and status
+
+I edit `orchestrator/backlog.md` (wg-keepalive: `blocked-on: B8`), run `bash orchestrator/build-backlog.sh` in the foreground, and update the Artifact. Then I send this in chat, with no poll:
+
+> **Статус, 01:40 — wg-keepalive**
+> **Сейчас.** Исполнитель остановился на шаге 6: с каких адресов реле keepalive-пакетов (пакеты «я на связи», не дающие туннелю закрыться) принимает трафик — `10.77.1.128/25` или `10.77.1.0/24`. Это решают советники: бюллетень B8 уйдёт обоим одновременно, когда `adv-codex` закончит B7 (ещё выполняется, результата нет). Исполнитель делает только независимые шаги либо ждёт.
+> **Дальше.** B8 → остаток плана → ревью другой моделью на точном SHA → моя проверка → голосование о слиянии → голосование о запуске канарейки → выкат на ccs-it из main. Ни один этап не пропускается.
+> **От вас.** Вопросов нет. Одно действие руками — сразу после моего сообщения «Канарейка на ccs-it готова к приёмке»:
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2` на 3 минуты, затем Ctrl+C.
+> 3. Вставьте сюда итоговую статистику ping и время запуска.
+>
+> Без приёмки выката на ccs-ops не будет.
+> **Проверено:** диапазоны по репозиторию на `<SHA>` (grep). **Не проверено:** кто реально шлёт keepalive.
+> **На живых машинах:** изменений нет. **Решения голосования:** новых нет. **Бэклог:** <ссылка>
+
+## 5. When the B7 waiter for `adv-codex` fires
+
+I read `<inbox>/adv-codex.last`, run `herdr agent get` on both advisors, and record B7. Then I send B8 to both in one message (two Bash calls, both background):
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+- **On 2/2:** I write `ballot-8.results.md`, update the backlog, and relay `DECIDED B8: <range>` to `wgka` with the step-3 recipe.
+- **On a split:** I send an AskUserQuestion poll with my recommendation (a) first and both votes and rationales shown.
+
+## 6. When the canary is deployed and verified
+
+> Канарейка на ccs-it готова к приёмке (main `<SHA>`, проверена в `<ЧЧ:ММ>`). Сразу по прочтении: подключитесь профилем WireGuard, запустите `ping -i 0.2 172.27.96.2` на 3 минуты, вставьте сюда статистику и время запуска.
+
+## Why
+
+- **The range is the vote's decision.** It is a choice that changes the outcome (§10). I agree with option 1, but I do not vote or decide, and last night's 2/2 was a different ballot, so I left it out of B8.
+- **The ballot is neutral.** The executor's recommendation is stripped, and its claims are either checked against the repo or marked unverified.
+- **Both voters get B8 at the same moment.** I hold it about 12 minutes for `adv-codex` instead of sending it to `adv-fable` first.
+- **Nothing is built on a guess.** The executor does independent steps or parks, under a time-boxed brief with a waiter.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate.
+- **"Don't wake me for trivia" is honoured.** I ask the operator nothing, because the vote covers this.
+- **Acceptance is the operator's hands.** It goes out as an instruction saying what to do, when, and what to paste back. I cannot replace it with my own ping, since an end-user path is never my evidence (§13).
