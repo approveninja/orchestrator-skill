@@ -277,3 +277,30 @@ Options:
 - b) The redo goes at once, in parallel with the poll. §5 does not depend on the operator's
   words; only the merge and the deploy wait for the answer.
 - c) The same as (b), but the poll must say that the redo has already been ordered.
+
+## E. PR preparation (2026-09-28, after the rev 3.3 round)
+
+### B7 — How the manifest commits reach main
+
+Context:
+
+- `feat/orchestrator-skill` is rebased on `origin/main` (5e28990). Its first six commits are
+  the manifest drafts through rev 3.3, replayed with new SHAs. The orchestrator's local
+  branch `docs/orchestrator-manifest` (not on origin) still holds the originals: 04f559e …
+  00a862b.
+- The skill, its references and `validate.sh` depend on `docs/orchestrator-manifest.md`
+  being on main: `build-references.sh --check` reads it.
+- The rubric and the results cite manifest revisions by commit (e56bb79, 3ae551f, 00a862b)
+  and by blob. The blobs are identical on both branches; the commit ids are the manifest
+  branch's.
+- A change to the manifest alters what agents may do, so its merge is the operator's poll
+  (CLAUDE.md, Git / PR workflow).
+
+Options:
+
+- a) One PR carries both the manifest commits and the skill; the operator's merge poll
+  covers both.
+- b) The manifest merges first in its own PR. This branch then rebases, and git drops the
+  replayed manifest commits as already applied.
+- c) Split the skill onto a branch based on `docs/orchestrator-manifest`, and merge the two
+  PRs in order.

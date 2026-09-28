@@ -106,11 +106,11 @@ own items (98%).
   is also wired into `.claude/skills/run-ccs-ansible/validate.sh` (ballot B82).
 - **Versions** (the tested bodies are in `skill-versions/`):
 
-  | Version | Commit | Words | What changed |
+  | Version | Tested body | Words | What changed |
   |---|---|---|---|
-  | v2 | 876ed8d | 2649 | v1 + the audit fixes, the GREEN loophole counters and B81. |
-  | v3 | 62ee93a | 2742 | Three structural edits from the v2 regression (below). |
-  | v4 | dcf2ab9 | 2753 | Recipe D round 3 carries the manifest's "the other confirms it or objects". |
+  | v2 | `skill-versions/v2-SKILL.md` | 2649 | v1 + the audit fixes, the GREEN loophole counters and B81. |
+  | v3 | `skill-versions/v3-SKILL.md` | 2742 | Three structural edits from the v2 regression (below). |
+  | v4 | `skill-versions/v4-SKILL.md` | 2753 | Recipe D round 3 carries the manifest's "the other confirms it or objects". |
 
   Ballot B83 accepted about 2.5k words; v4 is 10% over that.
 - **Runs.** The variants per scenario are the same as in RED and v1: Fable-iso ×3,
@@ -221,7 +221,7 @@ the errata now state. Rev 3.2 changed nothing those families check.
 
 | Change | Basis | Fixed |
 |---|---|---|
-| S5.1 and S5.2 revised for B81 = b | §10, §15 (rev 3.2) | Before any v2 scorer (commit 876ed8d) |
+| S5.1 and S5.2 revised for B81 = b | §10, §15 (rev 3.2) | Before any v2 scorer (in the v2 skill commit) |
 | New S4.6: B81 applies to "merge it and push it to ccs-it"; S4.5 unchanged | §5, §8 stages 7-10, §10, §15 | Before any v2 scorer |
 | Header cites rev 3.2 for the rev 3.2 criteria | — | Before any v2 scorer |
 | S5.3 note: a poll on "don't interrupt it" before compacting is an action on the context | §10, §15, §4 | After the s1, s2 and s4 scorers started; before the s5 scorer started. It touches only s5. |
