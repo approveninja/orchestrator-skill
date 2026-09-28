@@ -1,0 +1,67 @@
+I'm running two things side by side tonight. The relay task gets fully closed, since "accepted" doesn't make it `done` yet. RDP audio starts at stage 0 with two new product-advisor tabs. It doesn't go to `wgka`.
+
+### 1. Check where things stand (foreground, a few seconds each)
+```bash
+test "${HERDR_ENV:-}" = 1 && herdr agent list && herdr tab list --workspace "$HERDR_WORKSPACE_ID"
+grep -niE 'hard rule|sign-off|operator|forbidden' ~/work/ccs.ansible/CLAUDE.md   # rules to copy into the brief as DECIDED
+ls ~/work/ccs.ansible/roles | grep -E 'desktop|gateway|host_proxy'               # FACTS for the brief
+codex plugin list | grep -F superpowers; claude plugin list | grep -F superpowers
+```
+
+### 2. Backlog
+- Relay task: status `docs closed`. Add "operator acceptance 2026-09-28 23:10" to its decisions. Set `docs closed: no — snapshot, memory, cleanup`.
+- New entry `rdp-audio | RDP audio | brainstorm | pa-codex, pa-fable | $SCRATCH/brainstorm/rdp-audio/ | — | round 1 drafts | — | — | no`.
+- Then `bash build-backlog.sh` and an Artifact update to the same page path.
+
+### 3. Stage 0 for RDP audio
+```bash
+mkdir -p $SCRATCH/brainstorm/rdp-audio
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $SCRATCH/brainstorm/rdp-audio --label pa-codex --no-focus
+herdr agent start pa-codex --kind codex --pane <pane> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $SCRATCH/brainstorm/rdp-audio --label pa-fable --no-focus
+herdr agent start pa-fable --kind claude --pane <pane> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name pa-fable
+```
+- Brief files `brief-rdp-audio-r1-{A,B}.txt` follow the §10a template:
+  - `ROUND 1 draft — ends when your draft file is written`
+  - `SKILL superpowers:brainstorming; I am your human partner (questions batched)`
+  - `PROBLEM "Now the RDP audio thing — I want a design by morning."`
+  - `FACTS` = the role paths from step 1
+  - `DECIDED` = the CLAUDE.md hard rules verbatim, deploy only from merged main, canary `ccs-it` first
+  - `WRITE $SCRATCH/brainstorm/rdp-audio/draft-{A,B}.md` and nothing else
+  - `TIME BOX 60 min to first report`
+- One background call per tab:
+  `herdr agent prompt pa-codex "$(cat …r1-A.txt)" --wait --timeout 3600000; herdr agent read pa-codex --source recent-unwrapped --lines 200 > $SCRATCH/inbox/pa-codex.last`, and the same for `pa-fable`.
+- `pa-fable` will ask for permission to write. I answer those prompts myself: yes inside its folder, no everywhere else.
+
+### 4. Close out the relay task, in parallel
+- Foreground checks and cleanup:
+  - `git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive status --porcelain`: must be empty.
+  - `herdr agent get wgka`: must be idle and not focused. Then `herdr tab close <wgka tab_id>`.
+  - `git worktree remove …/wg-keepalive && git worktree prune && git branch -d feat/wg-keepalive-relay && git -C ~/work/ccs.ansible pull`.
+  - `ps -p 48211 -o pid,lstart,command`: confirm it is the `codex app-server` I started at 21:30, then `kill 48211`, then `ps -p 48211` to confirm it's gone.
+- Docs worktree: `git -C ~/work/ccs.ansible worktree add .claude/worktrees/wg-keepalive-docs -b chore/wg-keepalive-docs origin/main`.
+- Agent tool, Opus, in the background. It gets the worktree's absolute path and `$SCRATCH/evidence/wg-keepalive-ccs-it.txt`. That file holds the deploy log, the `changed=0` re-run, the read-only checks and the operator's ping summary word for word. The subagent's job:
+  - update `projects/ccs/soul/ccs-it.md` from that evidence only;
+  - update the docs the relay affects;
+  - mark the design and plan docs implemented, with PR #165.
+- Then I check every claim against the evidence and run `git grep -nE "code/session_[0-9A-Za-z]"`. After that: commit, push, PR, and `gh pr merge --merge --delete-branch`, since it's docs-only. Then I remove that worktree and delete its branch.
+- I write the memory note and its `MEMORY.md` line. When everything is done: backlog `done`, `docs closed: yes`, republish.
+
+### 5. Message to the operator (in Russian, per §15), then a poll (AskUserQuestion)
+> **Сейчас:** relay-задача: канарейка ccs-it принята вами в 23:10, она и была релизом. Идёт закрытие. Субагент обновляет `ccs-it.md` и доки в отдельном worktree (ещё работает). Потом я сверяю каждую строку с моими логами и сливаю как docs-only. Вкладка wgka закрыта, worktree и ветка удалены, брокер codex (pid 48211) остановлен. RDP audio добавлена в бэклог со статусом `brainstorm`. Два продуктовых советника (gpt-6-astra и Fable 5.1, xhigh) пишут независимые черновики по superpowers:brainstorming (ещё работают).
+> **Дальше:** перекрёстная критика, общий документ, потом голосование 2/2. Каждый выбор внутри идёт отдельным бюллетенем. «К утру» ничего не урезает. Если станет ясно, что к утру не успеваем, спрошу вас: сдвинуть срок или отменить brainstorm.
+> **Проверено:** `changed=0` на повторном прогоне, ваш ping 0%. **Не проверено:** снимок, пока субагент не закончит.
+> **Живые машины:** без изменений после деплоя.
+> **От вас:** один ответ ниже. Бэклог: <link>
+
+Poll: «Ночью Mac может уснуть: это обрывает ходы агентов и блокирует keychain. Что делаем?»
+- «Запусти `caffeinate -dis -t 36000` (рекомендую)»
+- «Я сам не дам Mac уснуть»
+- «Ничего не делать»
+
+### Why
+- **The relay isn't `done` yet.** Acceptance doesn't finish the task: the snapshot, backlog, memory note and cleanup all come first. None of it is risky, so it runs next to the new work instead of being skipped.
+- **Stage 0 comes before any executor.** RDP audio is a new task, so the two product advisors design it first. What `wgka` knows about the roles doesn't count: one tab is one task. The advisors read the repo themselves, so I close `wgka` instead of compacting and reusing it.
+- **The deadline changes nothing.** "By morning" is a wish, and the full brainstorm fits overnight. If it stops fitting, the operator chooses between slipping the date and waiving the brainstorm.
+- **I don't design RDP audio.** The advisors get facts only, with no hints or sketches.
+- **The poll is about caffeinate.** A sleeping Mac would kill the overnight work, and keeping it awake changes the operator's own machine, so it's their call.

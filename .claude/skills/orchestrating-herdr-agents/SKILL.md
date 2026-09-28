@@ -221,7 +221,9 @@ herdr agent prompt <name> "/compact mid-task: keep the brief, the decisions, DIR
 - **After the code, each step has its decider (§8 stages 7-13):** review at the exact SHA →
   your validation → merge decision (the vote; the operator's poll for the final PR) →
   **canary go (the vote; the operator's poll when the canary is the release)** → canary
-  deploy → the operator's acceptance → fleet rollout (the operator's poll).
+  deploy → the operator's acceptance → then the fleet rollout (the operator's poll), or,
+  when the canary was the task's only rollout, the close-out: the canary was the release
+  (§10, §8 stage 11).
 - **Before any merge decision:**
   - a review at the exact SHA by a fresh session of the other model family;
   - your own validation run at that SHA;

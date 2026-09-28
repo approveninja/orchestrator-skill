@@ -1,0 +1,153 @@
+**Decision:** I close out the relay task now, in the background, and start RDP audio at stage 0 with two product advisors in fresh tabs. `wgka` gets closed, not reused. No round is shortened for "by morning".
+
+Placeholders: `$S` is my scratch dir, `$I` my inbox, `T<n>` the next free backlog id, `<sha>` comes from my session records.
+
+## 1. Backlog first
+- **Edit** `orchestrator/backlog.md`:
+  - Relay row: status `docs closed`, decisions `+ operator 2026-09-28 23:10 "accepted"`, docs closed `no: snapshot, design/plan status, memory pending`.
+  - New row: `T<n> | RDP audio | brainstorm | prod-codex, prod-fable | — | — | round 1: drafts | — | operator 2026-09-28: "design by morning" (deadline, waives no gate) | no`.
+- **Bash, foreground:** `bash orchestrator/build-backlog.sh`, then the **Artifact tool** republishes to the same page path.
+
+## 2. Docs close
+**Bash, foreground:**
+```bash
+git -C ~/work/ccs.ansible fetch origin && git -C ~/work/ccs.ansible worktree add \
+  ~/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs -b chore/wg-keepalive-docs origin/main
+```
+**Write** `$S/evidence-wg-keepalive.md` with raw outputs only: merge SHA, deploy log, read-only verification, the `changed=0` re-run, the operator's ping summary and "accepted".
+
+**Agent tool** (`claude-sonnet-5-5`, background):
+```
+Reply in English. You are a prose subagent. Write only inside
+/Users/alexeysilver/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs. Do not commit,
+push or touch any host.
+Source of truth: <S>/evidence-wg-keepalive.md.
+1. projects/ccs/soul/ccs-it.md: update the snapshot to the post-relay state.
+2. Living docs the relay changes (architecture, how-to, runbook): update.
+3. The task's design and plan docs: mark "implemented — PR #165, merge <sha>".
+4. <S>/pr-body-wg-docs.md: PR body, five lines at most.
+State only what the evidence shows; mark the rest "not verified"; ccs-ops is "not
+deployed"; no session links. Report: files changed, and the evidence line behind each
+snapshot claim.
+```
+
+## 3. Stage 0 for RDP audio
+**Bash, foreground:**
+```bash
+mkdir -p $S/brainstorm/T<n>-rdp-audio
+codex plugin list | grep -F superpowers          # skill present for the Codex CLI
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/T<n>-rdp-audio --label prod-codex --env ORCH_INBOX=$I --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/T<n>-rdp-audio --label prod-fable --env ORCH_INBOX=$I --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+herdr agent get prod-codex; herdr agent get prod-fable      # idle, "focused": false
+herdr agent read adv-codex --source visible; herdr agent read adv-fable --source visible
+```
+A voting tab at 50% or more gets compacted now, while idle, as a background call.
+
+**Bash, background, one call per tab** (A writes `draft-A.md`, B writes `draft-B.md`):
+```bash
+herdr agent prompt prod-codex "$(cat $S/brief-T<n>-r1-A.txt)" --wait --timeout 3600000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $I/prod-codex.last
+```
+The brief:
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion,
+never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — RDP audio
+ROUND      1 draft — ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Now the RDP audio thing — I want a design by morning. Go."
+FACTS      - Repo ~/work/ccs.ansible, main @ <sha> (git rev-parse origin/main).
+           - Two KVM hypervisor sites: ccs-it (canary), ccs-ops.
+           - PR #165 (WireGuard keepalive relay) merged today, live on ccs-it only.
+           - I hold no verified evidence on the RDP audio behaviour yet. Ask me for host
+             facts; I collect them read-only and hand them over.
+DECIDED    - <project hard rules from CLAUDE.md, byte for byte>
+           - Deploy only from merged main, canary ccs-it first.
+           - "By morning" is a deadline: it shortens no round and waives no gate.
+MAY        read the repository, upstream sources, the web
+WRITE      <S>/brainstorm/T<n>-rdp-audio/draft-A.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   60 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Status to the operator
+Sent in Russian, the operator-facing language:
+
+> **Статус · 28.09, 23:20**
+>
+> **Сейчас**
+> - **WireGuard keepalive relay** (ретранслятор пакетов, которые не дают VPN-туннелю простаивать и рваться) — принят вами. Выкладка на канарейку `ccs-it` (площадка, где изменения проверяются первой) была единственной выкладкой задачи, то есть релизом. Задача ещё не `done`: субагент обновляет снимок состояния `ccs-it` и документацию, затем уборка — вкладка `wgka`, worktree (отдельная рабочая копия репозитория), ветка, review-брокер.
+> - **RDP audio** — заведена в бэклог как T<n>, статус `brainstorm`. Два продуктовых советника (Codex gpt-6-astra и Claude Fable 5.1) независимо пишут черновики дизайна, раунд 1 из 3. Оба ещё работают — результата пока нет.
+>
+> **Дальше**
+> - Раунд 2 — взаимная критика; раунд 3 — общий дизайн-документ; затем его утверждают два голосующих советника (нужно 2/2). Исполнитель появится только после этого.
+> - «К утру» — срок, а не сокращение процесса: брейншторм идёт целиком. Если станет ясно, что к утру документ утверждён не будет, вы получите опрос: сдвинуть срок или отменить брейншторм для этой задачи.
+>
+> **Что нужно от вас** — ничего. Утром вас будет ждать либо дизайн-документ (Artifact), либо опрос.
+>
+> **Проверено**
+> - Повторный прогон на `ccs-it` — `changed=0` (запускал сам).
+> - Ping через WireGuard, 3 минуты, 0% потерь — ваши данные, я их не перепроверял.
+> - Не проверено: `ccs-ops` — relay туда не выкладывался.
+>
+> **Живые машины** — с прошлого статуса изменений нет; на `ccs-it` работает relay из `main` (PR #165).
+>
+> **Голосования** — новых решений нет. **Бэклог:** <ссылка на Artifact>
+
+In short: the relay is accepted and being closed out; RDP audio is in round 1 of 3 and still running; the brainstorm runs in full; nothing is needed from the operator.
+
+## 5. When the subagent returns
+I check every snapshot claim against the evidence file, then **Bash, foreground:**
+```bash
+cd ~/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs
+git diff --stat; git grep -nE "code/session_[0-9A-Za-z]"     # grep must be empty
+<the docs-only check CLAUDE.md names>
+git add <files in the diff> && git commit -m "docs: close WireGuard keepalive relay" \
+  -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+git push -u origin chore/wg-keepalive-docs
+gh pr create --title "docs: close WireGuard keepalive relay" --body-file $S/pr-body-wg-docs.md
+gh pr merge <n> --merge --delete-branch
+```
+If the docs-only check fails, the PR gets the cross-model review before any merge.
+
+**Write** `memory/wg-keepalive-relay-live.md` (type `project`) plus its `MEMORY.md` pointer: relay live on `ccs-it` only, PR #165, accepted 2026-09-28, `ccs-ops` not deployed, read the snapshot first, plus tonight's traps from the evidence file. Then backlog `docs closed: yes` and republish.
+
+## 6. Cleanup
+**Bash, foreground:**
+```bash
+herdr agent get wgka                                  # idle, "focused": false
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive status --porcelain   # must be empty
+herdr tab list --workspace "$HERDR_WORKSPACE_ID"      # wgka's tab_id
+herdr tab close <tab_id>
+git -C ~/work/ccs.ansible worktree remove .claude/worktrees/wg-keepalive
+git -C ~/work/ccs.ansible worktree remove .claude/worktrees/wg-keepalive-docs
+git -C ~/work/ccs.ansible worktree prune
+git -C ~/work/ccs.ansible pull
+git -C ~/work/ccs.ansible branch -d feat/wg-keepalive-relay chore/wg-keepalive-docs
+git -C ~/work/ccs.ansible worktree list
+ps -ax -o pid,command | grep -i '[c]odex'             # 48211 is my codex app-server
+kill 48211
+```
+Backlog row goes to `done`, republish, one-line status.
+
+## 7. On each advisor notification
+I read `$I/<name>.last`, then `herdr agent get <name>`. Fact questions get evidence. Every choice becomes a neutral ballot sent to `adv-codex` and `adv-fable` at once. Then round 2 and round 3 by file path, both confirmations, and the 2/2 approval ballot.
+
+## Why
+- **The relay is not `done`.** `done` needs docs closed and cleanup finished. "Harmless" and "any time" are how a snapshot stays wrong and gets read later as a record. The cost to me is small: the subagent writes, I check and merge.
+- **RDP audio is a new task.** It enters at `brainstorm`, and no executor exists before the gate. `wgka` is an executor whose context is the relay's working memory, and one tab is one task. What it knows goes into the living docs, where both advisors can read it.
+- **"By morning" waives nothing.** The full brainstorm may fit in the night, so I run it whole. I cannot promise morning, and the status says so. A poll to slip or waive goes out only once it is clear the deadline cannot be met.
+- **I design nothing.** The brief carries the operator's words and verified facts, with no hint about roles or approach.
+- **No ballot or poll was needed.** Every step here is routine or already decided, and the operator's instruction conflicts with no rule.
+- **Nine hours in changes no gate.**
