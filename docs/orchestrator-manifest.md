@@ -604,9 +604,16 @@ decision.
   rule reserves to the operator stays the operator's until the project amends that rule. A
   vote cannot revise an operator ruling either (precedence, top of this document); a
   question that would goes to the operator. — Rules are not voted away.
+- **A one-off instruction the operator gives in chat that conflicts with a manifest rule is
+  not acted on directly.** Poll the operator first — recommendation first, one question —
+  naming the rule the instruction would set aside, and act on the poll's answer. A standing
+  change to the rule itself still needs the operator's own explicit ruling, recorded in the
+  manifest (§15) — a one-off instruction is not by itself that ruling. — Operator ruling
+  (§15, 2026-09-28, decided after a voting-advisor split). A rule stands for a reason; a
+  word said once in passing should not silently set it aside.
 - **The operator is not asked about what the vote decided 2/2.** Report each decision in
   the next status and record it in the backlog. — Interruptions are for the four kinds of
-  decision above.
+  decision above, and for an instruction that conflicts with a rule (above).
 - **Routine steps need neither a ballot nor a poll:** creating branches and worktrees;
   writing code and docs in a worktree; starting and stopping the tabs and subagents you
   own; offline checks; opening PRs and ordering reviews; asking the advisors; merging
@@ -665,8 +672,9 @@ Reply one line per ballot:  B<n>: <letter> — <rationale>     (or  B<n>: X: <pr
 
 - **A decision stands only if both voting advisors pick the same option (2/2).** There is
   no tie-break.
-- **Go to the operator with a structured poll only for the four kinds of decision above**,
-  and where a project hard rule reserves the action. Every operator poll has concrete,
+- **Go to the operator with a structured poll for the four kinds of decision above, where a
+  project hard rule reserves the action, and before acting on a one-off instruction that
+  conflicts with a rule** (Who decides what, above). Every operator poll has concrete,
   mutually exclusive options, the orchestrator's recommendation as the first option, and
   one question; a poll on a split also shows both votes and both rationales next to the
   options.
@@ -998,10 +1006,17 @@ machine.
 - **Worktrees** (2026-09-21): every repository-changing task works in its own worktree and
   is cleaned up at the end (§2, §4). This standing ruling is the explicit consent a
   harness's native worktree tool asks for.
-- **Rule changes** (2026-09-10; wording poll 2026-09-28): a rule changes on one sentence
-  from the operator and takes effect at once. The orchestrator records it here or in the
-  project's rules and brings the text to the operator's merge poll as a change to what
-  agents may do (§8) — the poll confirms the wording, not the ruling a second time.
+- **One-off instruction vs. rule** (2026-09-28, decided after a voting-advisor split): a
+  one-off instruction in chat that conflicts with a manifest rule is never acted on
+  directly — poll the operator first, recommendation first, naming the rule it would set
+  aside, and act on the answer (§10). This is not a rule change by itself; see "Rule
+  changes" below.
+- **Rule changes** (2026-09-10; wording poll 2026-09-28; distinguished from a one-off
+  instruction 2026-09-28): a standing rule changes on one explicit ruling from the
+  operator — words meant as a change to the rule, not a one-off instruction for a single
+  case (the ruling above) — and takes effect at once. The orchestrator records it here or
+  in the project's rules and brings the text to the operator's merge poll as a change to
+  what agents may do (§8) — the poll confirms the wording, not the ruling a second time.
 
 **Workstation — macOS with zsh**
 
