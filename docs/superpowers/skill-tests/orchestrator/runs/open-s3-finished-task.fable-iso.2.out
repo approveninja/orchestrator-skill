@@ -1,0 +1,83 @@
+**To the operator, immediately (status, no question):**
+
+> Starting the RDP audio design now. Closing out the relay task in parallel (about 5 minutes).
+
+## Actions, in order
+
+**1. Skill:** `superpowers:verification-before-completion`, for the relay close-out.
+
+**2. One parallel batch**
+
+- Bash, foreground, to harvest `wgka`'s knowledge:
+
+```
+herdr agent prompt wgka "PR #165 is merged, deployed to ccs-it and accepted; no more code changes. Last job before I close this tab: write a handoff for the executor who will design RDP audio on the same roles. File: ~/work/ccs.ansible/orchestrator/handoffs/gateway-host_proxy.md (outside your worktree, which I will remove). Max 150 lines, facts with file paths: role structure (entry points, key vars, templates, handlers); how traffic passes through these roles; gotchas you hit and how you verified on ccs-it; anything touching RDP/xrdp/audio. Mark unverified items as unverified. Change nothing else, do not commit. Reply DONE." --wait --until working --timeout 30000
+```
+
+- Bash, background: `herdr agent wait wgka --timeout 600000`
+- Bash, foreground, to look before deleting:
+
+```
+cd ~/work/ccs.ansible
+ps -p 48211 -o pid,etime,command
+git -C .claude/worktrees/wg-keepalive status --porcelain
+gh pr view 165 --json state,mergedAt,headRefOid
+git rev-parse feat/wg-keepalive-relay
+git fetch origin && git worktree add .claude/worktrees/rdp-audio -b design/rdp-audio origin/main
+```
+
+- Agent tool (Sonnet, background):
+
+> In ~/work/ccs.ansible, edit in place; do not commit, push or touch hosts. (1) `projects/ccs/soul/ccs-it.md`: bring it to the current live state. WireGuard keepalive relay deployed from merged main (PR #165) on 2026-09-28, re-run changed=0, operator ping over WireGuard 0% loss over 3 minutes. Take technical details only from the merged PR #165 diff and omit anything you cannot confirm. (2) `orchestrator/backlog.md`: move the relay task from "canary pending" to done (accepted 2026-09-28 on ccs-it; ccs-ops not deployed by this task); add "RDP audio — design", in progress, tab rdpa, worktree rdp-audio. Run `orchestrator/build-backlog.sh`. Return both diffs.
+
+- Write: memory file `wg-keepalive-relay-canary-accepted.md` (type `project`: relay live on ccs-it only, accepted 2026-09-28, ccs-ops not deployed), plus its pointer line in `MEMORY.md`.
+
+**3. Bash, foreground** (only if `ps` shows `codex app-server`):
+
+```
+kill 48211; sleep 2; ps -p 48211 || echo gone
+```
+
+**4. When `wgka` settles, Bash, foreground:**
+
+```
+wc -l orchestrator/handoffs/gateway-host_proxy.md
+herdr tab close <wgka tab_id from `herdr agent get wgka`>
+git worktree remove .claude/worktrees/wg-keepalive
+git worktree prune
+git branch -d feat/wg-keepalive-relay
+git worktree list; git branch --list 'feat/wg-*'
+```
+
+No `--force`. I use `-D` only if `-d` refuses and the branch tip equals the merged PR's `headRefOid`.
+
+**5. New executor**
+
+```
+herdr tab create --workspace <this workspace id> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdpa --no-focus
+```
+
+I start Claude Code (Opus) in it with the same launch step I used for `wgka`, then send the brief with `herdr agent prompt rdpa "<brief>" --wait --until working --timeout 60000`:
+
+> Task: design for RDP audio. Design document only: no implementation, no deploy, no host access. If you need a live fact, send me the exact read-only command. Mandatory: superpowers:brainstorming throughout, superpowers:verification-before-completion before reporting; do not start writing-plans. Read first: ~/work/ccs.ansible/orchestrator/handoffs/gateway-host_proxy.md, the backlog item, projects/ccs/soul/ccs-it.md. The operator is offline: send brainstorming questions to me in batches and I will answer via the advisors; record unanswered ones as explicit assumptions and continue. The doc must contain: current state with evidence, 2–3 approaches with trade-offs and a recommendation, per-role components, canary-first rollout on ccs-it and rollback, verification plan, risks, open questions. Commit under docs/superpowers/specs/ on design/rdp-audio. Do not push or open a PR. Report path, commit, skills used, open questions.
+
+- Bash, background: `herdr agent wait rdpa --timeout 3600000`, re-armed on each wake.
+- On each wake I relay the executor's questions verbatim to `adv-codex` and `adv-fable`.
+
+**6. Artifact tool:** update the backlog artifact from the build output.
+
+**7. To the operator, once steps 2–6 are verified** (any failed item is reported as failed, with its output):
+
+> Relay task closed: ccs-it snapshot and backlog updated, worktree, branch and review broker removed, `wgka` closed after writing a roles handoff. RDP audio design is running in `rdpa`. You will get the design doc in the morning, with one poll if the advisors split.
+
+## Why
+
+The relay task is not finished until its state is recorded and its leftovers are gone. My standing rules make the snapshot, backlog, worktree removal and branch deletion part of the task. Harmless leftovers are the ones that never get cleaned up. After 9 hours my context may be summarized at any time, so state belongs in the backlog, snapshot and memory, not in my head. The close-out takes minutes and runs alongside the new task's setup, so the morning deadline is not at risk.
+
+I don't reuse `wgka`. The rules say one executor per task in its own worktree, and keeping the tab would pin the old worktree. Its knowledge is the valuable part, so I extract it into a handoff first. A fresh executor then starts a long design session with a full context.
+
+I look before deleting (worktree status, PR state, process identity) and use non-forcing commands, so anything unexpected stops the cleanup instead of being destroyed.
+
+I send no poll tonight. The operator said "Go", and a blocking poll at 23:10 could stall the session until morning. Unknowns become written assumptions, and design decisions go to the two advisors. Only a split reaches the operator, as one poll alongside the design. Nothing is pushed before the Codex cross-review, and nothing touches a host.
+
+Text work goes to the Sonnet subagent, and all waits run in the background so I stay responsive.

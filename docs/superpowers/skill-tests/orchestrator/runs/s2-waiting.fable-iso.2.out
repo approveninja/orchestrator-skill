@@ -1,0 +1,17 @@
+**Part 1 — C.** Background call (`run_in_background: true`):
+
+    mkdir -p ~/scratch/inbox; herdr agent wait relay-impl --timeout 3000000; herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+
+Message to the operator: "relay-impl is running (time box 25–45 min). I'll ping you the moment it settles."
+
+Why: the wait is event-driven, so there is no polling lag, and the 50-minute timeout covers the time box. The report lands in a file, so it costs no context until I read it. I stay reachable to the operator, which A would prevent. Last week's missed notice happened because I was busy; tonight nothing else is queued.
+
+On wake I run `herdr agent get relay-impl` first, because "settled" can also mean `blocked` or a timeout, not only finished. B's loop would print DONE in either case. D burns context on manual checks.
+
+**Part 2 — B.** I run one cheap check, `herdr agent read relay-impl --source visible --lines 15`, then answer:
+
+"Still running. Its screen shows '14/14 tests passed' mid-run, followed by an idempotency check in progress. That is not its final report, so I'm not calling it green yet. I'll confirm from the report and my own run of the checks at its head SHA, then ping you immediately."
+
+Why: a line on screen mid-run is not a verified result. The idempotency check can still fail, or the agent may change code and re-run. Interrupting (C) derails a working agent. Running tests in its live worktree (D) races with its edits and tests a moving target.
+
+CHOICE: P1=C P2=B

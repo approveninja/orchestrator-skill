@@ -1,0 +1,59 @@
+## Now (01:40), in this order
+
+**1. Bash, foreground (returns in seconds)**: ballot B8 to the idle advisor.
+```bash
+herdr agent prompt adv-fable "$(cat <<'EOF'
+BALLOT B8 — read-only, change no file. Reply in English.
+Worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, plan step 6.
+Subject: the nginx location relaying a WireGuard client's keepalive (PUT /key/wg/...) to the Pritunl console on 127.0.0.1:9700.
+Question: upstream read timeout of that location.
+Option 1: proxy_read_timeout 5s. Argument: Pritunl answers in milliseconds; an abandoned keepalive never holds a worker.
+Option 2: nginx default (60 s). Argument: simpler, same as every other location in the role.
+Vote independently. First line exactly "B8: 1" or "B8: 2", then at most six lines: reason and main risk.
+EOF
+)" --wait --until working --timeout 15000
+```
+
+**2. Bash, foreground**: unblock the executor.
+```bash
+herdr agent prompt wgka "$(cat <<'EOF'
+Your question is ballot B8; result in about 25 minutes. Do not wait.
+Proceed with step 6 on your own recommendation (proxy_read_timeout 5s) as a PROVISIONAL value, kept in one template line and one test assertion. Then continue the plan.
+Use superpowers:test-driven-development for step 6 and superpowers:verification-before-completion before reporting.
+Gate: no PR and no cross-review request until I send "B8 closed".
+Reply in English.
+EOF
+)" --wait --until working --timeout 15000
+```
+
+**3. Bash, background:** `herdr agent wait adv-fable --timeout 900000`
+
+**4. Bash, background:** `herdr agent wait adv-codex --timeout 900000`. I send nothing to `adv-codex` while B7 is running.
+
+**5. Backlog:** edit `orchestrator/backlog.md` to add "B8 OPEN", "wgka: step 6 on provisional 5s, review gated" and "ccs-it acceptance: PENDING OPERATOR". Then Bash, foreground, `./orchestrator/build-backlog.sh`, and an Artifact update.
+
+## On the wake-ups
+
+- **`adv-fable` settles:** `herdr agent read adv-fable --source recent-unwrapped --lines 40`.
+- **`adv-codex` settles:** read its B7 result, send it the identical B8 text, wait in the background, then read the vote.
+- **2/2:** I send `wgka` "B8 closed 2/2: Option N is final. Gate open. Reply in English." A split vote waits for the operator's morning poll.
+
+## Acceptance
+
+I send the operator nothing now. After the canary run on ccs-it, I check the listener and the keepalive `200`s through `-J root@88.99.219.20` with `HostKeyAlias=ccs-it-gw`. A Sonnet subagent writes the report, which I publish as an Artifact.
+
+My last call of the night, once every tab is idle, is this AskUserQuestion poll:
+
+> **Canary acceptance, ccs-it.** The WireGuard keepalive relay lets your VPN client's "I'm alive" request reach Pritunl, so the tunnel stops rebuilding every ~45 s. It is live on ccs-it and my hypervisor-side checks pass (report: ‹artifact›). The last check needs your own WireGuard profile: connect to ccs-it, run `ping -i 0.2 172.27.96.2` for 3 minutes, then Ctrl-C. What did you see?
+> 1. Passed: 0% loss, no reconnect
+> 2. Failed: loss or a reconnect
+> 3. Not run yet: keep the canary, ask me later
+
+## Why
+
+- **The ballot still decides.** The timeout is trivia for the operator, but my standing rule is that I decide nothing myself. My agreement and last night's precedent are not votes.
+- **The ballot costs no time.** The executor works on a one-line, reversible value, and the gate keeps the reviewed SHA final.
+- **B7 stays clean.** Prompting `adv-codex` mid-review would contaminate it.
+- **My session stays free.** Background waits keep me responsive to every tab.
+- **Acceptance is the operator's alone.** I must not use the VPN path and I don't hold their profile. My hypervisor checks support their test but never replace it.
+- **The poll goes last.** A poll blocks my session until answered and the operator is asleep. Until they answer, I report the canary as "deployed, acceptance pending", never "accepted".

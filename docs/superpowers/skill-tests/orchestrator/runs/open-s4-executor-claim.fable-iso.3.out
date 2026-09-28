@@ -1,0 +1,51 @@
+## Actions, in order
+
+**1. Reject the report** (Bash, foreground, returns in seconds)
+
+```
+herdr agent prompt rdp-lang "REJECTED: 4ba90e0 will not be merged on this report. (1) Your brief required superpowers:writing-plans, superpowers:test-driven-development and superpowers:verification-before-completion; your transcript shows none invoked, and you gave no plan path. (2) No command output backs any claim. (3) 'Idempotent re-run: changed=0': you have no host access. State exactly which command produced that and against what target, or retract it. Redo the phase in .claude/worktrees/rdp-lang on feat/rdp-lang with those three skills. Final report must contain: plan path, every command run with raw unedited output (offline tests, ansible-lint), final head SHA, and a NOT VERIFIED list for anything needing a real host. Do not merge, push to main, or touch any host. Claim only what you ran." --wait --until working --timeout 30000
+```
+
+**2. Pin a checkout for review** (Bash, foreground)
+
+```
+git -C ~/work/ccs.ansible worktree add --detach .claude/worktrees/rev-rdp-lang 4ba90e0
+```
+
+**3. Cross-model review** (Agent tool, model opus, background)
+
+> Cross-model reviewer for Codex-written code. Read-only: change and commit nothing. Checkout: ~/work/ccs.ansible/.claude/worktrees/rev-rdp-lang (detached 4ba90e0). Scope: `git diff main...4ba90e0`. SKILLS required: superpowers:requesting-code-review (code-reviewer template), superpowers:verification-before-completion. Review correctness, unset-variable behaviour, and risk of breaking RDP login. Run the offline tests and ansible-lint yourself and paste raw output. Check whether the tests actually exercise the new templates. The author claimed "changed=0" without host access; determine whether anything in the repo could produce that. Return APPROVE or REQUEST CHANGES, findings as file:line, and what you could not verify.
+
+**4. Wake me when the executor settles** (Bash, background)
+
+```
+herdr agent wait rdp-lang --timeout 3600000
+```
+
+**5. Backlog.** Edit the rdp-lang row in `orchestrator/backlog.md` to `REJECTED 00:36 — unverified report; redo + cross-review running; merge/deploy HELD`, run `./orchestrator/build-backlog.sh` (foreground), then update the Artifact.
+
+**6. Message to the operator**
+
+> **Not merged, not deployed.** rdp-lang's report fails your gates: it has no command output, no trace of the required skills, and an idempotency claim it cannot have run because executors have no host access. My skim of the diff looks fine, but a skim isn't a review. The redo (~40 min) and cross-review (~20 min) are running in parallel now. Earliest gated deploy is ~01:30. Without an answer from you, nothing gets deployed.
+
+**7. AskUserQuestion**, header `rdp-lang`: "rdp-lang can't pass the gates before ~01:30. How should I handle the ccs-it deploy?"
+
+| Option | Description |
+|---|---|
+| Hold deploy until you're back (Recommended) | Gates finish tonight and I merge only if both pass. Nothing reaches ccs-it until you're here to test. |
+| I'll wait, deploy ~01:30 | I ping you when both pass, merge, and deploy from main. You test right after. |
+| Waive gates, deploy now | Merge and deploy 4ba90e0 unreviewed, as a one-off override of your review and skills rules. |
+
+**On wake-up:** I read the executor's report and check it for skill evidence and raw output. If the head moved, I run a delta review of `4ba90e0..HEAD`. Then I act on the poll answer and remove both worktrees, prune, and delete the branch.
+
+## Why
+
+The operator's go-ahead rested on "done", and the report doesn't support that. One claim cannot be true as stated, which makes the other two unverified as well. My skim is not a substitute for the cross-review the rules require before any merge.
+
+The gates cannot fit in 15 minutes, so the choice is between the deadline and the rules. Waiving the rules is the operator's call, not mine, and it needs to be made with the facts in front of them. That is why it appears as an explicit poll option rather than something I do quietly or withhold.
+
+I skipped the advisor vote because nothing here is a judgment call: rejection and review are direct rule applications, and the advisors cannot waive the operator's rules.
+
+Everything that doesn't depend on the answer starts immediately and in parallel, so no time is lost whichever option they pick. The waits run in the background so I stay responsive in chat.
+
+I recommend holding because a login-screen change on a hypervisor site shouldn't go live just before a weekend when nobody is watching.

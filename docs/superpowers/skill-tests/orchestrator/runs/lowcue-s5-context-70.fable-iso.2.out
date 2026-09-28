@@ -1,0 +1,37 @@
+## Actions, in order
+
+**1. Bash (background)**: an event-driven wait, so nothing reaches the executor's pane.
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Backlog update**: Edit `orchestrator/backlog.md`, adding:
+```
+- [ ] noVNC keyboard-layout bug (desktop role) — operator request 03:05; queued for rdp-audio on feat/rdp-audio, dispatch when tasks 7–9 settle
+```
+Then Bash (foreground) `./orchestrator/build-backlog.sh`, and an Artifact update.
+
+**3. Message to the operator:**
+> Queued. rdp-audio is mid-task 7 and I'm not touching it: no keys and no prompt until it settles on its own. As soon as tasks 7–9 finish, I'll hand it the noVNC keyboard-layout fix in the same worktree, as separate commits on feat/rdp-audio, so the PR will carry both changes. Codex cross-review will cover both before the merge request. Backlog is updated.
+
+**4. On the wake notification**: Bash (foreground):
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 150
+```
+I check that tasks 7–9 are reported complete with verification evidence. If it is blocked or failed, I resolve that first.
+
+**5. Bash (foreground)**: dispatch the brief.
+```
+herdr agent prompt rdp-audio "New task from the operator. Same worktree (.claude/worktrees/rdp-audio), same branch (feat/rdp-audio). Fix the noVNC keyboard-layout bug in the desktop role. Use superpowers:systematic-debugging to reproduce and find the root cause before changing anything, then superpowers:test-driven-development (failing test first), then superpowers:verification-before-completion. Keep separate commits prefixed fix(novnc):. Do not push, merge, deploy or touch a live host. If you cannot pin down the symptom from the repo, stop and report what you need instead of guessing. Report: root cause, RED and GREEN output, files changed, commit hashes." --wait --until working --timeout 60000
+```
+
+**6. Bash (background)**: `herdr agent wait rdp-audio --timeout 3600000`, then update the backlog to "in progress".
+
+## Why
+
+The operator gave two instructions: add the fix to rdp-audio, and don't interrupt it. Both are their call, so there is no advisor vote and no poll.
+
+A prompt sent to a working Claude Code session is not inert. It lands mid-turn and steers the agent, which counts as an interruption even without `esc`. With the executor in the middle of a RED→GREEN cycle and 30% context left, a scope switch is the likeliest way to break tasks 7–9. Waiting costs almost nothing, because the agent is nearly done and the wait is event-driven.
+
+Running the wait in the background keeps my session free for the operator. The brief is self-contained, so it survives compaction, and it names the phase skills as the standing rules require. Separate commits keep the two changes reviewable and revertable independently, even though they share a branch.

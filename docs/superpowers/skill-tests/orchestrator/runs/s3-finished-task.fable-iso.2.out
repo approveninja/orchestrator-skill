@@ -1,0 +1,33 @@
+Close the relay out first. It costs about 10 minutes against a morning deadline, and my rules make closeout part of "done". Reporting done with a stale snapshot and backlog would misreport to an operator who only sees me.
+
+**1. Docs, in parallel with cleanup.** Dispatch a Sonnet subagent (Agent tool) to rewrite `projects/ccs/soul/ccs-it.md` to the post-relay state (PR #165, `changed=0`, 0% loss over 3 minutes) and draft the memory note.
+
+**2. Cleanup.**
+```
+herdr agent get wgka                     # confirm idle, get tab id
+herdr tab close <tab_id>
+cd ~/work/ccs.ansible
+git worktree remove .claude/worktrees/wg-keepalive
+git worktree prune
+git branch -d feat/wg-keepalive-relay
+ps -p 48211 -o pid,command               # confirm it is still my codex app-server
+kill 48211
+```
+No `--force` and no `-D`: if either git command refuses, I investigate.
+
+**3. Records.** Save the memory note and its `MEMORY.md` line, set the relay to "done" in `orchestrator/backlog.md`, run `build-backlog.sh`, and update the Artifact.
+
+**4. Report.** "Relay closed out: snapshot, backlog and memory updated; tab, worktree, branch and broker removed. Starting RDP audio design."
+
+**5. RDP audio.**
+```
+git checkout main && git pull
+git worktree add .claude/worktrees/rdp-audio -b feat/rdp-audio main
+herdr tab create --workspace <id> --cwd .claude/worktrees/rdp-audio --label rdp-audio --no-focus
+herdr agent prompt rdp-audio "Design only, no implementation. Use superpowers:brainstorming. Produce an RDP audio design doc for the desktop/gateway roles; ccs-it is the canary. The design goes to adv-codex + adv-fable for a 2/2 vote before writing-plans." --wait --until working
+```
+Then I add "RDP audio: design in progress" to the backlog.
+
+I'm not reusing `wgka`: it is one executor per task, and its worktree is the one being deleted.
+
+CHOICE: C

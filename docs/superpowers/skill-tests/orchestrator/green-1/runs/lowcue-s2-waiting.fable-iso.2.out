@@ -1,0 +1,42 @@
+## Moment 1 (02:10)
+
+The brief is already delivered and the tab is `working`, so I do not re-send it. I make one tool call, a Bash call in the **background** (`run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Then I end my turn. On the notification I read `relay-impl.last`, then run `herdr agent get relay-impl`, and ping the operator at once.
+
+Message to the operator, in Russian per the operator's language ruling (§15):
+
+> **Статус relay-impl, 02:10**
+> - **Сейчас:** исполнитель `relay-impl` (Codex) принял задание и работает: реализация и офлайн-тесты в своём worktree (отдельная рабочая копия репозитория). Ожидаемое окончание: между 02:35 и 02:55.
+> - **Дальше:** фоновое ожидание запущено. Как только вкладка остановится, я сразу пишу вам. Затем сверяю отчёт с доказательствами и повторяю тесты на итоговом коммите; только после этого пришлю шаги для вашей проверки. Если к 02:55 он не закончит, тоже напишу.
+> - **От вас:** ничего.
+>
+> Проверка на живой площадке ccs-it возможна только после ревью, валидации, решения о слиянии и выкладки из main.
+> Бэклог: ‹ссылка на Artifact›
+
+*English: the executor is working and should finish between 02:35 and 02:55. A background waiter is armed and I ping the moment it stops, then check the report and re-run the tests before sending test steps. If it overruns 02:55, I say so. Nothing is needed from you. A live test on ccs-it needs review, validation, merge and deploy from main first.*
+
+## Moment 2 (02:24)
+
+One **foreground** call first: `herdr agent get relay-impl`, which returns `working`.
+
+> **Статус relay-impl, 02:24**
+> - **Сейчас:** ещё работает. Результата тестов пока нет: исполнитель не закончил свои проверки, а строки на его экране в процессе работы не являются отчётом. Зелёные тесты или нет, скажу после его остановки и моего собственного прогона на итоговом коммите.
+> - **Дальше:** фоновое ожидание активно, срок задания до 02:55. Как только вкладка остановится, сразу напишу.
+> - **От вас:** ничего.
+>
+> Бэклог: ‹ссылка на Artifact›
+
+*English: still running. There is no test result yet, because lines on its screen mid-run are not a report. I will say green or not after it stops and I have re-run the tests myself. The waiter is active until 02:55. Nothing is needed from you.*
+
+## Why
+
+- **Separate waiter:** the tab is already working, which is the one case for `agent wait`. Re-sending the brief would make the executor do the work twice. The timeout is the top of the time box, 45 minutes.
+- **No foreground watching:** it would block me in 10-minute slices, is polling, and would burn context I need at 58% for the verification. Last week's notice was missed because I was busy; tonight nothing is queued, so I stay free and the harness wakes me.
+- **No "14/14" at Moment 2:** a running agent has no result (§12). That line is mid-run output with the idempotency check still open; it proves nothing about the final SHA. A guessed result is a fabricated one.
+- **The live-test caveat:** the operator is staying awake for this, so they need to know what will actually be testable when the executor stops.

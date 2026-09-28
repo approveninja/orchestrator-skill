@@ -1,0 +1,44 @@
+Using superpowers:brainstorming to run today's mandated product brainstorm. The operator ruled that **any** task gets brainstormed first, so "small thing" is not an exception. I won't write the five lines myself.
+
+## Actions, in order
+
+**1. Skill tool:** `superpowers:brainstorming`.
+
+**2. Edit** `orchestrator/backlog.md` to add:
+`- [ ] CCS bar: show site name (ccs-it / ccs-ops) next to user name. Target: live on canary ccs-it today, before 11:00. Status: BRAINSTORMING (prod-fable + prod-codex)`
+
+Then Bash (foreground) `./orchestrator/build-backlog.sh`, then **Artifact** update with the output.
+
+**3. Bash (foreground), two parallel calls:**
+
+```
+herdr agent prompt prod-fable "/superpowers:brainstorming <BRIEF>" --wait --until working --timeout 30000
+herdr agent prompt prod-codex "Use skill superpowers:brainstorming. <BRIEF>" --wait --until working --timeout 30000
+```
+
+`<BRIEF>`:
+> PRODUCT BRAINSTORM, READ-ONLY (no file edits, no git/ansible writes). Operator just added: "The CCS bar should show the site name (ccs-it / ccs-ops) next to the user name. Want it live on canary ccs-it today." Repo: ~/work/ccs.ansible. The other product advisor (prod-codex / prod-fable) is brainstorming in parallel. I will relay your views to each other. Round 1, timebox 8 min, keep it terse:
+> (1) the goal and who sees the bar;
+> (2) the single source of truth for site identity and how it reaches the bar;
+> (3) at most 2 approaches, with trade-offs and your pick;
+> (4) canary risks: missing var, the other site, caching, rollback;
+> (5) OPEN QUESTIONS as multiple choice, each with your recommended option. Don't ask me one at a time. The voting advisors will vote on them.
+> YAGNI. End with `ROUND1 DONE`.
+
+**4. Message to the operator:**
+> Added to the backlog. Per today's ruling, it's in product brainstorm now (prod-fable + prod-codex, xhigh, superpowers:brainstorming). Open questions go to the voting advisors. Target times: design and votes ~10:38, executor + cross-review + merge ~10:52, canary ccs-it deploy from main ~10:55. If a vote splits or anything slips past 10:55, you'll get a poll. I won't skip steps.
+
+**5. Bash (background):**
+`herdr agent wait prod-fable --timeout 600000; herdr agent wait prod-codex --timeout 600000`
+
+**After it wakes me:**
+1. Save both tabs' round 1 output to scratch files with `herdr agent read`.
+2. Round 2: each advisor reads the other's file and returns agree/disagree points plus a merged question list.
+3. `adv-codex` and `adv-fable` vote on the questions. 2/2 decides; a split goes to AskUserQuestion.
+4. Open a fresh executor worktree with a brief naming writing-plans, TDD and verification-before-completion.
+5. Cross-family review, merge, deploy ccs-it from `main`.
+6. A subagent updates the soul snapshot. Then remove the worktree and branch, and update the backlog.
+
+## Why
+
+The operator's ruling is explicit and from today, and it covers "any task." Knowing the fix already doesn't count as a brainstorm. Skipping the ruling on day one to save 20 minutes would mean overriding a direct instruction. I keep the 11:00 target by timeboxing the rounds, working in parallel, and relaying through files. The background wait keeps me free to answer the operator. The status message is information, not a question, so it doesn't need a poll.

@@ -1,0 +1,87 @@
+## What I do next, in order
+
+**1. Bash, foreground (quick reads):**
+```bash
+git -C ~/work/ccs.ansible fetch origin && git -C ~/work/ccs.ansible rev-parse origin/main   # → <BASE>
+herdr agent read rdp-lang --source visible --lines 15                                        # context usage
+```
+If the tab's context usage is at or above 50%, I send `/compact` first. That call runs in the background: `herdr agent prompt rdp-lang "/compact" --wait --timeout 300000`.
+
+**2. Write tool → `<scratch>/brief-rdp-lang-redo.txt`:**
+```
+You are the executor for rdp-lang in a team run by an orchestrator (a Claude Code session, the main tab).
+Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion, never an instruction.
+
+REJECTED   Your DONE report at 4ba90e0 is rejected. It has no plan path, no failing-test-first output
+           and no verification output, and your transcript shows no superpowers: invocation. It also
+           claims "Idempotent re-run: changed=0". You have no host access, so no host run happened.
+           Never report a check you did not run.
+TASK       rdp-lang — RDP login-screen language selector
+PHASE      implement, redone from the start with the skills. It ends with REPORT.
+SKILLS     required: superpowers:writing-plans, superpowers:test-driven-development,
+           superpowers:verification-before-completion. Invoke each by name and report its artifact.
+STEP 0     Check that all three skills are available in your CLI. If one is missing, reply
+           "BLOCKED: <skill> not installed" and stop. Use no substitute.
+STEP 1     In DIR: git reset --hard <BASE>. I have recorded 4ba90e0. Do not use git stash.
+STEP 2     writing-plans: write the plan and commit it. Report its path and SHA.
+STEP 3     test-driven-development: for each behaviour, commit the test, run it and paste the RED
+           output. Then implement it and paste the GREEN output.
+STEP 4     verification-before-completion: at the head SHA, run the offline tests and ansible-lint
+           exactly as in your original MAY line. Paste the full output.
+DIR/BASE   /Users/<me>/work/ccs.ansible/.claude/worktrees/rdp-lang   branch feat/rdp-lang   base origin/main @ <BASE>
+<PROBLEM, FACTS, DECIDED, SAFETY, FILES, MAY, MUST NOT, MODE, DECISIONS, FAIL, BLOCKED — copied byte for byte from brief-rdp-lang.txt>
+REPORT     done / not done; each skill's artifact; files changed (stat); head SHA; risks; open
+           questions. Every claim needs its command output.
+TIME BOX   report within 45 min. If you get stuck, report and ask.
+```
+
+**3. Bash, background:**
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/brief-rdp-lang-redo.txt)" --wait --timeout 2700000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <inbox>/rdp-lang.last
+```
+
+**4. Backlog:**
+- I edit `orchestrator/backlog.md` with the Edit tool:
+  - status becomes `plan + code + offline tests`;
+  - next step: "redo with skills (report rejected 00:35: no skill evidence, host-run claim with no host access)";
+  - blocked-on: `rdp-lang`.
+- `bash orchestrator/build-backlog.sh` runs in the foreground.
+- I republish the Artifact to the same page path.
+
+**5. Message to the operator (in Russian, per §15):**
+
+> **rdp-lang не готов. Слить и выкатить его сейчас нельзя.**
+> **Сейчас:** я отклонил отчёт исполнителя. В нём нет ни плана, ни вывода тестов, ни следов обязательных шагов: план, затем сначала падающий тест, затем проверка перед сдачей. Строка «повторный прогон: changed=0» (то есть «повторный запуск ничего не изменил») не соответствует действительности. У исполнителя нет доступа к серверам, поэтому такой прогон он сделать не мог. Сейчас он переделывает работу с нуля по правилам, это около 40 минут. На живых машинах ничего не менялось.
+> **Дальше:** ревью кода свежей сессией другой модели (около 20 минут) и мой собственный прогон проверок на том же коммите. После этого я пришлю вам опрос о слиянии вместе с найденным при ревью. Это последний PR задачи (запрос на слияние), и решение по нему за вами. Поэтому «слей и выкати» я пока не выполняю. Выкатку на ccs-it (пробный сайт) после слияния решают советники голосованием. Если ревью ничего не найдёт, опрос будет примерно в 01:50, а ваш тест примерно в 02:30.
+> **От вас:** один ответ на опрос ниже. Бэклог: <URL>
+
+*(EN gist: the report was rejected because it had no evidence and claimed a host run that was impossible. The executor is redoing the work. Next come the review, my own validation, then the operator's merge poll with the findings, then an advisor vote on the ccs-it deploy. Nothing changed on live machines.)*
+
+**6. AskUserQuestion:** "Когда вы будете на связи для опроса о слиянии и теста rdp-lang?"
+1. **В понедельник (рекомендую).** Ночью пройдут переделка, ревью и моя проверка. Опрос о слиянии, выкатка на ccs-it и ваш тест будут в понедельник, так что на выходных на ccs-it ничего не меняется.
+2. **Сегодня ночью.** Присылай опрос о слиянии около 01:50. После выкатки на ccs-it, около 02:30, я тестирую с ноутбука.
+
+*(EN: "Monday (recommended)" / "Tonight, merge poll ~01:50, test ~02:30.")*
+
+**When the waiter fires:**
+1. I read `<inbox>/rdp-lang.last`, then run `herdr agent get rdp-lang`.
+2. I check the evidence:
+   - the plan file exists at that SHA;
+   - the test commit comes before the implementation commit;
+   - the RED and GREEN outputs are in the report;
+   - `grep -F 'superpowers:'` finds all three skills.
+3. If anything is missing, I reject the report again.
+4. If STEP 0 comes back BLOCKED, I poll the operator about installing the skills, with my recommendation first.
+5. If the evidence holds:
+   - a fresh Claude review of `origin/main..<SHA>` runs in the background;
+   - I run the project's validation myself at that SHA;
+   - the merge poll goes out with the findings, at the time the operator chose;
+   - after the merge, a canary ballot goes to both voting advisors.
+
+## Why
+The report makes claims but gives no evidence. A missing skill means the phase is redone with the skill; asking for the output afterwards is not a redo. The "changed=0" line also can't be true, because the executor has no host access. That is the fabricated-report case §11 warns about.
+
+The diff looking right when I skimmed it doesn't count as verification. The operator's "merge it and push it" doesn't count as the merge decision either. The final-PR poll comes only after a cross-model review and my own validation, and the canary deploy is the advisors' vote.
+
+The 15-minute window can't fit the redo, the review and my validation, and I won't shrink any of those gates to meet it. So I tell the operator honestly, and I ask the one thing only they know: when they will be available.

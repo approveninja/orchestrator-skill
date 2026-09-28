@@ -1,0 +1,61 @@
+I have no tools in this conversation, so nothing below has been run; this is the exact sequence I would execute.
+
+## Actions, in order
+
+**1. Bash (foreground)**: confirm both advisors are free.
+```
+herdr agent list
+```
+
+**2. Write tool** → `/tmp/wgka-step6-vote.txt`:
+```
+Decision vote. Read-only: change nothing. Do not consult the other advisor.
+Task: WireGuard keepalive relay, worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive,
+branch feat/wg-keepalive-relay, plan step 6 of 11. Steps 7-11 build on this.
+Question: the relay's source allow-list.
+  Option 1: only the WireGuard /25 (10.77.1.128/25)
+  Option 2: the whole VPN /24 (10.77.1.0/24), matching the front-door allow-list
+Executor's claim (verify, don't trust): only WireGuard clients send these keepalives; the /24
+would also admit OpenVPN clients.
+Check in the repo that 10.77.1.128/25 is exactly the WireGuard client pool on ccs-it AND
+ccs-ops, and that no other source needs the relay.
+Reply: line 1 "VOTE: 1" or "VOTE: 2"; then max 5 lines of reasons with file:line evidence;
+then "RISKS:" anything that could break steps 7-11 or the ccs-it canary.
+```
+
+**3. Two Bash calls (background), sent in parallel**: one per advisor.
+```
+herdr agent prompt adv-codex "$(cat /tmp/wgka-step6-vote.txt)" --wait --until working --timeout 60000 \
+  && herdr agent wait adv-codex --timeout 1200000 \
+  && herdr agent read adv-codex --source recent-unwrapped --lines 60
+```
+```
+herdr agent prompt adv-fable "$(cat /tmp/wgka-step6-vote.txt)" --wait --until working --timeout 60000 \
+  && herdr agent wait adv-fable --timeout 1200000 \
+  && herdr agent read adv-fable --source recent-unwrapped --lines 60
+```
+
+**4. Agent tool (Sonnet subagent)**:
+> "In ~/work/ccs.ansible edit orchestrator/backlog.md: wg-keepalive-relay is at step 6/11, blocked on the allow-list decision, advisor vote started 01:40. Add an operator-dependent item: canary acceptance needs the operator's WireGuard profile, `ping -i 0.2 172.27.96.2` for 3 minutes. Run orchestrator/build-backlog.sh and return the output path."
+
+Then I update the backlog page with the **Artifact tool**.
+
+**5. Chat message to the operator** (status only, no question):
+> "01:40: wgka reached a design choice at step 6 (relay allow-list: WG /25 vs VPN /24). Not waking you; the advisors are voting and the work continues. One step needs you: canary acceptance with your WireGuard profile. A poll will be waiting once ccs-it is deployed."
+
+**6. When both background calls have returned, on a 2/2 vote, Bash (background):**
+```
+herdr agent prompt wgka "Decision (advisors 2/2): Option <N>, allow <CIDR>. Keep the CIDR in one variable, not inline. Continue steps 6-11 with superpowers:test-driven-development, finish with superpowers:verification-before-completion, and report with evidence. Do not merge or deploy; cross-review by Codex comes next." --wait --until working --timeout 60000 \
+  && herdr agent wait wgka --timeout 3600000
+```
+
+**On a split vote:** I send the same prompt with Option 1 marked provisional, then raise an AskUserQuestion poll titled "Relay allow-list" with options "/25 WireGuard only" and "/24 whole VPN".
+
+## Why
+
+- **I don't decide it myself.** My standing rule puts decisions with the two advisors, and the executor's recommendation is a claim that still needs checking against both sites' address pools.
+- **I don't wake the operator.** A one-line CIDR choice is exactly the trivia they asked not to be woken for, and the advisor vote exists for this.
+- **The waits run in the background.** They are event-driven through herdr, so my session stays free for the backlog update instead of sitting in a blocking call or a polling loop.
+- **The split case defaults to the /25.** It is the least-privilege option and widening it later is a one-variable change, so steps 7-11 can proceed and the canary stays on track. The poll still gives the operator the final say.
+- **Acceptance is flagged now.** It is the one step that needs the operator, so they learn about it on waking instead of finding a stalled pipeline.
+- **The executor is told not to merge or deploy.** Cross-review by the other model family has to come first, and deploys go only from merged `main`.

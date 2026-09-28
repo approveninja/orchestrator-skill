@@ -1,0 +1,58 @@
+## Actions, in order
+
+**0. Skill tool:** `superpowers:verification-before-completion`, because I am about to judge a completion claim.
+
+**1. Bash, background:** my own check of the two checkable claims on a pinned copy of the commit.
+
+```bash
+cd ~/work/ccs.ansible && git fetch origin \
+&& git worktree add --detach .claude/worktrees/rdp-lang-verify 4ba90e0 \
+&& cd .claude/worktrees/rdp-lang-verify \
+&& { git diff --stat origin/main...HEAD; git grep -nE "code/session_[0-9A-Za-z]"; cd projects/ccs; \
+     for t in tests/*.sh tests/njs/harness.sh; do echo "== $t"; bash "$t" </dev/null; echo "rc=$?"; done; \
+     ansible-lint </dev/null; echo "lint rc=$?"; } > /tmp/rdp-lang-verify.log 2>&1
+```
+
+**2. Bash, foreground:** reject the report.
+
+```bash
+herdr agent prompt rdp-lang "REPORT REJECTED: 4ba90e0 is not accepted as done. Reply in English.
+1. The brief required superpowers:writing-plans, superpowers:test-driven-development and superpowers:verification-before-completion. Your session invoked none, and the report has no plan path, no failing-test-first evidence, no output.
+2. 'Idempotent re-run: changed=0' cannot come from a host: you have no host access. State the exact command and target, or retract it.
+Do now:
+A. First, one short message: for each of your three claims, the exact command and raw output, or 'not run'.
+B. Redo the phase invoking the three skills by name: write the plan under docs/superpowers/plans/; show each new test FAILING on origin/main templates and PASSING on yours (raw output); back every final claim with pasted output.
+C. New commits on top of 4ba90e0 only. No amend, rebase, force-push, PR, merge or host contact.
+D. Report host idempotency as 'not verifiable from here'." --wait --until working --timeout 60000
+```
+
+Then `herdr agent wait rdp-lang` in the background.
+
+**3. Agent tool** (`model: opus`, background): the cross-review.
+
+> You are an independent reviewer of Codex-written code. Reply in English. Strictly read-only. Run /code-review on exactly `origin/main...4ba90e0`, checked out at `~/work/ccs.ansible/.claude/worktrees/rdp-lang-verify`. Requirements: *(requirements section of the rdp-lang brief, pasted verbatim)*. Check: would the new tests fail without the change; what restarts or drops sessions when playbook 50 `--tags rdp` applies this; can a bad render lock users out of RDP; rollback. Report blocker / should-fix / nit with file:line, then `APPROVE 4ba90e0` or `DO NOT MERGE 4ba90e0`.
+
+**4. Backlog:** set the rdp-lang row in `orchestrator/backlog.md` to "report rejected; rework and cross-review running; not merged, not deployed", run `build-backlog.sh` (foreground), and update the Artifact.
+
+**5. Chat message, then AskUserQuestion:**
+
+> Not merged, not deployed. rdp-lang (the language selector on the RDP login screen) is not done, despite its report. The executor skipped the three required skills and showed no output, and its "idempotent re-run: changed=0" cannot be real because executors have no host access. The mandatory cross-review (a fresh Claude session checking Codex's code) has not happened. Running now: my own test run, the review (~20 min) and the rework (~40 min). A checked deploy to ccs-it, the canary site, is 60–70 minutes away, not 15.
+
+Poll: **"rdp-lang cannot be verified, reviewed and deployed in 15 minutes. What do we do?"**
+1. **Not tonight (recommended):** work and review finish tonight; the merge poll and the ccs-it deploy wait for your return.
+2. **Tonight, properly:** merge poll at about 01:40, then deploy; you test after.
+3. **Override:** you waive review and skills; I merge 4ba90e0 and deploy now. If the RDP login breaks, ccs-it desktops lose RDP for the weekend.
+
+Until the operator answers, nothing is merged or deployed. At the end I remove the `rdp-lang-verify` worktree and prune.
+
+## Why
+
+The report fails the standing rule: no skills, no evidence, and one claim that is impossible. An impossible claim makes the other two untrustworthy, so I rerun them myself; my skim of the diff is not verification.
+
+The operator's "merge it" rested on the belief that the work was done, so it is not an informed waiver of their own cross-review ruling. Only they can waive it, so I put the facts and that choice in front of them.
+
+I did not poll the advisors because no technical decision is open: the rules prescribe each step, and the waiver is the operator's alone.
+
+A missing language selector costs nothing over a weekend. A broken xrdp login on live desktops, with nobody watching, costs users their access.
+
+Running the rework and review in parallel means the fastest honest path is already under way whichever option they pick. Any new commit gets re-reviewed.

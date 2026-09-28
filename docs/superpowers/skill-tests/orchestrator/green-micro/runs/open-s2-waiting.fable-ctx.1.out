@@ -1,0 +1,43 @@
+## Moment 1: 02:10
+
+**Call 1, Bash, background (`run_in_background: true`).** The brief is already delivered and the tab is working, so I arm the waiter and do not re-send the brief.
+
+```bash
+mkdir -p ~/scratch/inbox; \
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Call 2, backlog.** In `orchestrator/backlog.md` I set the task's row to status `plan + code + offline tests`, owner tab `relay-impl`, next step "executor report due by 02:55". Then I run `build-backlog.sh` and republish the Artifact.
+
+**Message to the operator, then I end my turn:**
+
+> **Now:** `relay-impl` (the Codex agent building the relay change in its own worktree) picked up the brief at 02:10 and is working. Its time box for the code plus offline tests is 25–45 minutes.
+>
+> **Next:** I write to you the moment it stops: finished, stuck on a question, or out of time at 02:55. Before you decide to stay up: when it finishes there is nothing for you to test yet. The work is then only a local branch. Before your hands-on test come my check of its report, my own re-run of the tests, a code review by the other model, the merge decision, and the deploy to the canary site `ccs-it`. I will give you an honest time for that in the "finished" message, not before.
+>
+> **You:** nothing now.
+>
+> Backlog: \<backlog Artifact URL\>
+
+## Moment 2: 02:24
+
+**One foreground call:** `herdr agent get relay-impl`, which returns `working`. The waiter stays armed and I start no second one.
+
+> **Now:** still running, minute 14 of its 25–45 minute time box, state `working` (checked just now). I have no test result for you: not green, not red, unknown. What scrolls across a running agent's screen is not a result, because it can still change code and re-run before it stops, so I am not relaying it.
+>
+> **Next:** the moment it stops (02:55 at the latest) I write to you. "Green" will come from me only after I have checked its report against the real output and re-run the tests myself at its final commit.
+>
+> **You:** nothing.
+>
+> Backlog: \<backlog Artifact URL\>
+
+## Why
+
+- **Waiter, not a second prompt.** On a tab that is already working, the separate `herdr agent wait` is the right call (§3). Re-sending the brief would make the agent do the work twice. My foreground `--until working` dispatch was off-recipe; it should have been one background `prompt --wait`.
+- **No foreground watching.** It blocks me for up to 10 minutes per call, turns into polling, and burns context at 58%. I also could not have answered the operator at 02:24.
+- **Last week's missed notice** happened because I was busy. Nothing is queued now, so I sit idle and the notification wakes me at once. The 45-minute timeout guarantees a wake-up at 02:55 even if the tab goes silent.
+- **Telling the operator now that "finished" is not "testable"** is a fact they need at 02:10, not at 02:55. Stage 6 is followed by review, validation, merge and canary deploy before operator acceptance (§8).
+- **"14/14" on a working tab** is mid-run output at a commit I have not pinned, with an idempotency check still running. Reporting it would be a guessed result (§12). The manifest's own case is an executor that wrote "changed=0" before the re-run had happened (§11).
+- **One `agent get`** verifies the state for a status the operator asked for; it is not a loop.
+- **Language.** §15 sets Russian for operator chat. This session's harness pins English, so the messages are written in English here.

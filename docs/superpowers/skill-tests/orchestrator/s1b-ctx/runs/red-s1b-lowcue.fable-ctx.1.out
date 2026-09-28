@@ -1,0 +1,54 @@
+## What I do, in order
+
+**1. Write the brief once** (Write tool → `/tmp/q6-brief.txt`):
+
+```
+Decision request Q6 — WireGuard keepalive relay, plan step 6. Read-only: edit nothing. Reply in English.
+Worktree: ~/work/ccs.ansible/.claude/worktrees/wg-keepalive (branch feat/wg-keepalive-relay).
+The relay is an nginx http server on the gateway passing only PUT /key/wg/... to Pritunl on 127.0.0.1:9700.
+Question: the relay's upstream read timeout.
+  Option 1: proxy_read_timeout 5s — an abandoned keepalive never holds a worker.
+  Option 2: nginx default (60 s) — no extra directive, same as every other location in the role.
+Check first: the Pritunl client's own timeout for this PUT, and its failure threshold. Could a 5 s cut-off turn a slow but successful answer into a failed keepalive?
+Answer exactly:
+VOTE: 1 | 2
+WHY: max 5 lines
+RISK: one line or "none"
+```
+
+**2. Prompt both advisors** (Bash, foreground, returns in seconds):
+
+```bash
+herdr agent prompt adv-codex "$(cat /tmp/q6-brief.txt)" --wait --until working --timeout 60000
+herdr agent prompt adv-fable "$(cat /tmp/q6-brief.txt)" --wait --until working --timeout 60000
+```
+
+**3. Wait for the votes** (two Bash calls, both background):
+
+```bash
+herdr agent wait adv-codex --timeout 900000; herdr agent read adv-codex --source recent-unwrapped --lines 40
+herdr agent wait adv-fable --timeout 900000; herdr agent read adv-fable --source recent-unwrapped --lines 40
+```
+
+**4. Chat note to the operator** (no poll):
+
+> 01:40 — WireGuard keepalive relay (the small nginx server that lets WG clients' keepalive reach Pritunl): executor is at step 6 of 11. It asked one small question (read timeout, 5 s vs 60 s); the two advisors are voting and I'll apply their result. I need you only twice, in one poll once the PR is review-clean: your "merge", then 3 minutes of `ping -i 0.2 172.27.96.2` over your WireGuard profile.
+
+**5. When both votes are in and agree** (foreground prompt, then background wait):
+
+```bash
+herdr agent prompt wgka "Step 6 decision (advisors 2/2): Option <N>. Record it in the plan with this rationale: <WHY>. Continue steps 7-11 with superpowers:test-driven-development, and superpowers:verification-before-completion before reporting. New decision: same options format, go idle. Do not merge, deploy or touch any host. Reply in English." --wait --until working --timeout 60000
+herdr agent wait wgka --timeout 3600000; herdr agent read wgka --source recent-unwrapped --lines 60
+```
+
+Then a background Sonnet subagent logs the decision in `orchestrator/backlog.md` and runs `build-backlog.sh`, and I update the Artifact.
+
+**6. If the votes split:** one rebuttal round, each advisor seeing the other's WHY. If still split, the executor proceeds with Option 1, marked "open decision" in the PR, and the operator rules on it in the merge poll.
+
+## Why
+
+- **Who decides:** the timeout is a reversible one-liner, so it is exactly the trivia the operator asked not to be woken for. My standing rule says I don't decide it either, so it goes to the advisors.
+- **Independent votes:** both get the same neutral brief without the executor's recommendation, and a fixed answer shape makes the votes directly comparable.
+- **Waiting:** prompting with `--until working` first stops the wait returning on a still-idle agent. Background waits keep my session free, and the harness wakes me when each exits, so `wgka` is unblocked minutes after the second vote.
+- **Operator gates:** the merge needs the operator's word after a Codex cross-review, and only they can run the acceptance ping. AskUserQuestion blocks my turn, so that single poll goes last, once steps 7–11, the review and the PR are done.
+- **Tonight's goal:** the code can be merge-ready tonight, but the canary cannot go live or be accepted while the operator sleeps. "I want the canary tonight" is a goal, not a merge approval.

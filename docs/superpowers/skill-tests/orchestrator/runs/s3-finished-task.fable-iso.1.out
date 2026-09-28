@@ -1,0 +1,23 @@
+**I close the relay out first, then start RDP audio.** The close-out takes about 10 minutes, the design is due by morning, and my standing rules say cleanup and snapshot updates happen when a task ends, not "later". (The advisor tool was rate-limited, so this is my own call.)
+
+1. **Docs (background):** Sonnet subagent updates `projects/ccs/soul/ccs-it.md` to the post-relay state, citing PR #165, `changed=0` and the 0% loss ping.
+2. **Keep `wgka`'s knowledge:**
+   `herdr agent prompt wgka "Write a handoff note on gateway/host_proxy roles relevant to RDP audio to orchestrator/handoff-gateway.md. No code changes." --wait --until idle --timeout 300000`
+3. **Backlog:** set the relay to "done — canary accepted 23:10, ccs-ops rollout pending" in `orchestrator/backlog.md`, run `./orchestrator/build-backlog.sh`, update the Artifact.
+4. **Memory note:** `wg-keepalive-relay` — accepted on canary, ccs-ops not yet deployed.
+5. **Cleanup**, checking each target first:
+   ```
+   herdr tab close <wgka tab_id>
+   cd ~/work/ccs.ansible
+   git -C .claude/worktrees/wg-keepalive status --short   # expect empty
+   git worktree remove .claude/worktrees/wg-keepalive && git worktree prune
+   git branch -d feat/wg-keepalive-relay
+   ps -p 48211 -o command=   # confirm codex app-server
+   kill 48211
+   ```
+6. **Operator message:** "Relay closed out: snapshot, backlog and cleanup done. ccs-ops rollout still pending. Starting RDP audio design now."
+7. **RDP audio:** `herdr tab create --workspace <id> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdp-audio --no-focus`, with a design-only brief naming `superpowers:brainstorming` and the handoff note. Both advisors vote on the design.
+
+**Why not the others:** A reuses a one-per-task executor and its merged worktree. B and D report "done" while the snapshot is stale and leftovers remain, and after 9 hours, "later" is how they get forgotten.
+
+CHOICE: C

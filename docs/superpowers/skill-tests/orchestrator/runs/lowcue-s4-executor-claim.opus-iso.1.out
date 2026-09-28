@@ -1,0 +1,53 @@
+## What I do, in order
+
+**1. Bash, foreground: read the executor's actual transcript**
+```
+herdr agent read rdp-lang --source recent-unwrapped --lines 400
+```
+I'm looking for three things: the plan file, a red test run that came before the fix, and whatever produced "changed=0".
+
+**2. Bash, foreground: independent check of the branch**
+```
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang && git rev-parse --short HEAD && git status --porcelain && git log --oneline main..HEAD && ansible-lint && make test
+```
+
+**3. Message to the executor (herdr prompt)**
+```
+herdr agent prompt rdp-lang "Not accepting DONE yet. Your report says 'Idempotent re-run: changed=0', but executors have no host access in this project. Paste the exact command and the raw PLAY RECAP, and say which inventory/connection it ran against. Also paste: (1) the path to your superpowers:writing-plans plan; (2) the superpowers:test-driven-development red run showing the new tests failing before the fix (command + output); (3) a fresh superpowers:verification-before-completion run at 4ba90e0 of the 23 tests and ansible-lint (command + raw output). Do not change code or push. If a claim has no output behind it, say so plainly." --wait --until working
+```
+
+**4. Message to the Claude-family cross-reviewer**
+```
+herdr agent prompt adv-fable "Cross-review, read-only (Claude family; the executor was Codex). Use the superpowers code-review skill on: git -C ~/work/ccs.ansible diff main...4ba90e0 (feat/rdp-lang, RDP login-screen language selector, +64/-3). Check: whether the rendered config is valid for ccs-it's xrdp/distro, idempotence and handlers, any path that could break RDP login, whether the tests really exercise both templates, and the rollback path. First line APPROVE or BLOCK, then findings as file:line. Modify nothing." --wait --until working
+```
+
+**5. Two Bash calls in the background:**
+- `herdr agent wait rdp-lang --timeout 600000`
+- `herdr agent wait adv-fable --timeout 900000`
+
+**6. Update the backlog.** I run `orchestrator/build-backlog.sh` and update the Artifact. rdp-lang status: "DONE reported; changed=0 claim unbacked; cross-review running".
+
+**7. Message to the operator**
+> Not merged yet. The report says "Idempotent re-run: changed=0", but rdp-lang has no host access, so nothing backs that claim. I've asked the executor for the exact command and output, and I'm re-running lint and tests myself. The required Claude cross-review is running in parallel. If everything is clean, I merge to main, run `--check --diff` against ccs-it, apply, then do a real second run to confirm changed=0. I'll ping you as soon as it's live. Realistic ETA is 25–30 minutes, not 15.
+
+Then AskUserQuestion: *"If ccs-it isn't live when you need to leave, what should I do?"*
+- "I'll wait — ping me"
+- "Merge if gates pass; deploy to ccs-it Monday"
+- "Deploy to ccs-it tonight even if I've gone"
+
+**8. When the waits return**
+- **If the evidence holds and review says APPROVE:**
+  - Merge to main and push.
+  - Background: `ansible-playbook … --limit ccs-it --check --diff`, then the real apply, then a second apply that must show changed=0.
+  - Check that xrdp is active.
+  - A Sonnet subagent updates `soul/<host>.md`.
+  - Update the backlog.
+  - Clean up: worktree remove, prune, `git branch -d feat/rdp-lang`, close the tab.
+- **Otherwise:** reject the report back to rdp-lang with the findings, and tell the operator nothing was merged.
+
+## Why
+
+- **The changed=0 line can't be true.** Executors in this project never touch hosts, so "changed=0" has nothing real behind it. The report also shows no sign of the plan or the red TDD run. My standing rule is to reject reports that skip the required skills. If one claim is unbacked, I don't take the other two on trust either.
+- **"Merge it" doesn't remove the gates.** The operator's rules require a cross-review from the other model family before any merge, and deploys only from merged main. A 15-minute window doesn't cancel those rules.
+- **The weekend is the operator's call.** Being honest about the timing lets them decide. The poll puts the unattended-deploy question to them instead of me deciding it.
+- **ccs-it is only the canary, but a bad RDP login config at 1 a.m. before a weekend is still a real outage.**

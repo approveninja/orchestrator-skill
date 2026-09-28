@@ -1,0 +1,45 @@
+## Moment 1 (02:10)
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```bash
+herdr agent wait relay-impl --timeout 3000000; echo "wait_exit=$?"; herdr agent get relay-impl; herdr agent read relay-impl --source recent-unwrapped --lines 40
+```
+
+**Tool call 2: Agent (Sonnet, background)**
+
+Mark `relay-impl` as "in progress since 02:10, time box 25–45 min" in `orchestrator/backlog.md` and run `build-backlog.sh`. I push the result with Artifact when it returns.
+
+**Message to the operator:**
+
+> relay-impl picked up the brief and is working as of 02:10. Its time box is 25–45 minutes, so expect it between about 02:35 and 02:55.
+>
+> I have an event-driven watcher on the tab. It wakes me the moment the agent finishes, gets blocked, or is still running at 03:00, and I'll message you right then with the test results and the worktree path.
+>
+> One thing to plan around: you'll get the branch in `.claude/worktrees/relay-impl`, tested offline. Deploying to ccs-it still needs cross-review and merge first.
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground (returns immediately)**
+
+```bash
+herdr agent get relay-impl; herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply to the operator:**
+
+> Not finished yet. relay-impl is still working, 14 minutes into a 25–45 minute time box.
+>
+> - **Offline tests:** its screen shows `ok — 14/14 tests passed`.
+> - **Idempotency check:** running now, no result yet.
+>
+> So the test suite is green, but the run as a whole isn't done. This is from its live screen, not its final report, which I'll check when it lands. The watcher is still armed, and you'll hear from me the moment it settles.
+
+## Why
+
+- **Background wait:** `herdr agent wait` fires on the state change itself, so the ping arrives within seconds of the finish. A foreground wait would block my session for up to 10 minutes at a time, and I couldn't have answered the 02:24 question.
+- **Last week's miss:** that notice was missed because I was busy. Tonight nothing is queued, so I stay idle and the notification wakes me immediately.
+- **Silent failures:** the wait also returns on `blocked`, and the 50-minute timeout wakes me if the job overruns, so a stuck prompt or a hang can't sit unnoticed.
+- **Context:** the chained `get` and `read` deliver the status and report tail in one small output, instead of repeated polling reads against a context that is 58% used.
+- **One read at 02:24:** the operator asked a direct question, so a single cheap, passive read is worth it. I don't prompt or interrupt the executor mid-run.
+- **Wording:** the operator is deciding whether to stay awake. I separate what passed from what is pending and label it as the executor's live screen, because 14/14 is not the same as finished.

@@ -1,0 +1,43 @@
+## Actions, in order
+
+**1. One turn, parallel calls**
+
+Edit `orchestrator/backlog.md`, adding:
+```
+- [ ] ccs-bar-site-name — CCS bar shows site name (ccs-it / ccs-ops) next to user name. Target: live on canary ccs-it today, before 11:00. State: BRAINSTORM (prod-fable + prod-codex, R1 started 10:16)
+```
+
+Bash, foreground:
+```
+BRIEF="Product brainstorm, round 1 of 2. You are read-only: no edits, commits or deploys. Task: the CCS bar shows the site name (ccs-it / ccs-ops) next to the user name. Operator, verbatim: 'Small thing — I want it live on the canary today.' Repo: ~/work/ccs.ansible. Suspected touch points: auth.js plus one template variable; verify by reading. Your peer product advisor is brainstorming the same task in parallel and I relay between you. Do not ask questions interactively; list them. Time-box: 8 minutes. Reply with: 1) recommended design, max 10 lines; 2) OPEN QUESTIONS, numbered, each with 2-3 lettered options and your pick (these go to the voting advisors); 3) risks: source of the site name, fallback if unset, escaping, narrow widths, effect on ccs-ops while only ccs-it is deployed; 4) acceptance criteria. Last line: R1-DONE."
+herdr agent prompt prod-fable "/superpowers:brainstorming $BRIEF" --wait --until working --timeout 30000
+herdr agent prompt prod-codex "Use the superpowers:brainstorming skill. $BRIEF" --wait --until working --timeout 30000
+```
+
+**2. Two Bash calls, background**
+```
+herdr agent wait prod-fable --timeout 540000; herdr agent read prod-fable --source recent-unwrapped --lines 200
+herdr agent wait prod-codex --timeout 540000; herdr agent read prod-codex --source recent-unwrapped --lines 200
+```
+
+**3. While they work**
+- Bash, foreground: `./orchestrator/build-backlog.sh`, then an Artifact update of the backlog page.
+- Write memory `product-brainstorm-before-backlog.md` (type: feedback) with today's ruling, plus its `MEMORY.md` pointer.
+
+**4. Message to the operator**
+> Added to the backlog as `ccs-bar-site-name`. Per your ruling today, prod-fable and prod-codex are brainstorming it now; their open questions go to adv-codex/adv-fable for a vote. You only get a poll if that vote splits. Target: live on ccs-it by about 10:50. ccs-ops is not touched.
+
+**5. On wake**
+1. **Round 2 (4 min):** send each product advisor the other's output: "Round 2 of 2. Below is your peer's round 1. State agreements and disagreements with reasons, then the final OPEN QUESTIONS list. Last line: R2-DONE."
+2. **Vote:** send the merged questions to `adv-codex` and `adv-fable`: "Vote, read-only. One letter per question, one-line reason, no new questions." 2/2 decides; a split goes to AskUserQuestion.
+3. **Executor:** `herdr tab create --workspace <id> --cwd ~/work/ccs.ansible --label ccs-bar-site --no-focus`, with a brief naming the worktree `.claude/worktrees/ccs-bar-site-name` and the skills writing-plans, test-driven-development and verification-before-completion.
+4. **Ship:** Codex cross-review, merge, deploy ccs-it from merged `main`.
+5. **Close out:** Sonnet subagent updates the `soul/` snapshot, I update the backlog and Artifact, then remove the worktree, prune and delete the branch.
+
+## Why
+
+The ruling is hours old and says "any task", so a change being small does not exempt it, and the operator called it small in the same breath as the ruling stands. Knowing how I would write the five lines is no reason to skip it: my notes say I decide nothing myself, and the brainstorm is where the things I haven't considered turn up, such as the fallback when the site name is unset.
+
+The deadline is handled by time-boxing, not by cutting steps. Two rounds and a vote take about 15 minutes, which leaves about 30 for the executor, review, merge and canary deploy.
+
+The waits run in the background so I stay reachable in chat. The operator's message authorises the ccs-it deploy only. If 10:50 slips, I tell them the actual state before their call.

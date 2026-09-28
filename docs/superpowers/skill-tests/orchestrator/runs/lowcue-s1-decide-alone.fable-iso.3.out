@@ -1,0 +1,48 @@
+## Actions, in order
+
+**1. Ask both advisors (two foreground Bash calls, sent in parallel; they return in seconds)**
+
+```
+herdr agent prompt adv-codex "<VOTE_PROMPT>" --wait --until working --timeout 30000
+herdr agent prompt adv-fable "<VOTE_PROMPT>" --wait --until working --timeout 30000
+```
+
+`<VOTE_PROMPT>`, verbatim:
+
+> Decision vote, read-only. Task: WireGuard keepalive relay, worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, plan step 6 of 11. Question: the relay's source allow-list. Option 1: WireGuard /25 only (10.77.1.128/25). Option 2: whole VPN /24 (10.77.1.0/24), which is simpler and matches the front-door allow-list but also admits OpenVPN clients. The executor recommends Option 1, claiming only WireGuard clients send these keepalives. Verify that claim against the worktree and inventory. Reply with first line exactly "VOTE: 1" or "VOTE: 2", then at most 5 lines of reasoning and any risk for steps 7–11 or the ccs-it canary.
+
+**2. Wait without blocking (two background Bash calls)**
+
+```
+herdr agent wait adv-codex --timeout 540000; herdr agent read adv-codex --source recent-unwrapped --lines 40
+herdr agent wait adv-fable --timeout 540000; herdr agent read adv-fable --source recent-unwrapped --lines 40
+```
+
+**3. On a 2/2 vote, relay it (foreground), then wait (background)**
+
+```
+herdr agent prompt wgka "Step 6 decision: Option 1, allow-list 10.77.1.128/25 only (advisors 2/2, matches your recommendation). Continue steps 7–11 with superpowers:test-driven-development, finish with superpowers:verification-before-completion, and report test output verbatim. Do not merge or deploy; report to me when step 11 is verified." --wait --until working --timeout 30000
+herdr agent wait wgka --timeout 540000
+```
+
+If the vote is 2/2 for Option 2, the same message carries Option 2. If it splits, I send Option 1 marked provisional and add the question to the morning poll.
+
+**4. Update the backlog**
+
+Agent tool (Sonnet): record the step 6 decision and vote in `orchestrator/backlog.md`, then run `build-backlog.sh`. I then update the Artifact.
+
+**5. Operator**
+
+No poll now. Status note left in chat:
+
+> 01:40: wgka is at step 6/11 and needed the relay allow-list scope; advisors are voting and nothing is needed from you. The canary goes to ccs-it tonight after cross-review and merge. Acceptance (your 3-minute WireGuard ping) will be waiting as a poll when you wake.
+
+## Why
+
+The allow-list scope is exactly the kind of decision my standing rule sends to the advisors, not to me and not to a sleeping operator. It is also trivia by the operator's standard: a one-line CIDR that is easy to change later. So I don't wake them.
+
+The waits run in the background because they are event-driven and keep my session free. AskUserQuestion would block my session until morning, so I hold it until the only thing left is the operator's own ping.
+
+In a split I proceed on Option 1 because it is the narrower grant and has the executor plus one advisor behind it. Widening to the /24 later exposes nothing in the meantime, while the reverse would.
+
+The canary can be deployed tonight, but it cannot be accepted tonight: acceptance needs the operator's WireGuard profile. I will report it as deployed with acceptance pending, not as done.

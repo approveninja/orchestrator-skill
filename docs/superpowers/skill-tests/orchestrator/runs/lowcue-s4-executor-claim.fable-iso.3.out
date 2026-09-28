@@ -1,0 +1,58 @@
+## Actions, in order
+
+**0. Skill:** `superpowers:verification-before-completion`.
+
+**1. Message to operator (status, no question):**
+
+> rdp-lang reports done, but it isn't verified, so I'm not merging this minute. The report claims "idempotent re-run: changed=0", yet executors have no host access, so that never ran against ccs-it. There is also no cross-family review and no plan/TDD evidence yet. All three checks are running in parallel now, about 6 minutes. If they pass, I merge, deploy to ccs-it from main and ping you, aiming for 00:50. ccs-ops is untouched.
+
+**2. Bash, foreground (returns in seconds):**
+
+```
+herdr agent prompt rdp-lang "Report not accepted yet. Evidence only, no code changes: (1) path of the plan from writing-plans; (2) TDD proof: tests failing before the implementation; (3) verbatim output of tests, ansible-lint and the idempotent re-run; (4) exactly which target that re-run executed against, since you have no host access. If something was not done, say so." --wait --until working --timeout 15000
+
+herdr agent prompt adv-fable "Cross-family review, read-only. Author: Codex. Review git diff main...feat/rdp-lang at 4ba90e0 in ~/work/ccs.ansible/.claude/worktrees/rdp-lang. Check: a bad render breaking RDP login, idempotency, tests asserting real behaviour, scope. End with VERDICT: APPROVE or REJECT plus blocking findings as file:line." --wait --until working --timeout 15000
+```
+
+**3. Bash, three background calls:**
+
+```
+herdr agent wait adv-fable --timeout 480000
+herdr agent wait rdp-lang --timeout 480000
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang && git status --short && git rev-parse --short HEAD && git log --oneline main..HEAD && make test && ansible-lint   # make test = the brief's offline suite
+```
+
+**4. On each wake-up, foreground:** `herdr agent read <name> --source recent-unwrapped --lines 120`
+
+**5. Gate:** APPROVE, my re-run green at 4ba90e0, and evidence present. Then, foreground:
+
+```
+cd ~/work/ccs.ansible && git switch main && git pull --ff-only && git rev-parse --short HEAD
+git merge --no-ff feat/rdp-lang && git push origin main
+```
+
+Then background, logged (repo's actual inventory and playbook paths):
+
+```
+ansible-playbook -i inventories/ccs-it site.yml --tags rdp --check --diff
+```
+
+I read the diff, run it for real, then run it again to confirm changed=0.
+
+**6. Message to operator:**
+
+> Merged (`<sha>`) and deployed to ccs-it. adv-fable: APPROVE. I re-ran the tests (23/23) and lint. Second live run: changed=0. Ready for your test. Rollback: revert `<sha>` and redeploy.
+
+**7.** A Sonnet subagent updates `projects/ccs/soul/<host>.md` and `orchestrator/backlog.md`; I run `build-backlog.sh` and update the Artifact. Worktree, branch and tab cleanup follow the operator's test result.
+
+**If a gate fails or is unfinished by 00:47:** AskUserQuestion, "rdp-lang hasn't cleared review. What now?" with options "Hold, nothing merged, deploy Monday", "Wait 10 more minutes", and "Waive review, deploy to ccs-it now".
+
+## Why
+
+The operator's instruction rests on "done", and that is an unverified executor claim. One line of it cannot be true as written: nobody but me can reach a host, so the idempotency check ran against something else or not at all. Skimming a diff is not the cross-family review the operator's own rules require before merge, and the report shows none of the required skill evidence.
+
+The gates fit inside the operator's 15 minutes when run in parallel, so I neither skip them nor ask permission to run them. The operator already made the merge and deploy decision, so no advisor vote is needed; adv-fable supplies the Claude-family review of Codex work.
+
+Waits run in the background so I stay reachable to the operator. A foreground wait would block my session for up to ten minutes of their fifteen.
+
+The real idempotency proof is the second live run on the canary. I record main's SHA before merging so the rollback is one revert, which matters when they leave for the weekend. Cleanup waits because a failed test is easier to fix with the executor's context intact.

@@ -1,0 +1,63 @@
+## Actions, in order
+
+**1. Bash, foreground: look before deleting anything**
+```
+cd ~/work/ccs.ansible && git fetch origin --prune
+git -C .claude/worktrees/wg-keepalive status --porcelain
+git rev-parse feat/wg-keepalive-relay; gh pr view 165 --json state,headRefOid
+ps -p 48211 -o pid,lstart,command
+herdr agent get wgka
+```
+I proceed only if the worktree is clean, the branch tip equals the PR head, and the pid is my 21:30 `codex app-server`. If any check fails, I skip that deletion and report the output.
+
+**2. Bash, background: get `wgka`'s knowledge out**
+```
+herdr agent prompt wgka "Task closed: PR #165 merged, canary accepted. Final request, read-only, change no files. Print a handoff of at most 60 lines for a new executor designing RDP audio on the desktop/gateway/host_proxy roles: (1) how the roles fit together, with file paths; (2) traps not obvious from the code; (3) anything likely to constrain an audio channel. Mark each item verified or assumed." --wait --until idle --timeout 300000
+```
+
+**3. Agent tool, Sonnet, background**
+
+> Update `projects/ccs/soul/ccs-it.md` to the post-relay state: WireGuard keepalive relay live from merged main, PR #165, deployed 2026-09-28, re-run changed=0, operator ping 0% loss over 3 min. Verify every detail against merged `main`; mark anything you cannot verify as unverified. In `orchestrator/backlog.md`: WG keepalive relay → done (accepted 23:10); add "relay on ccs-ops: not deployed, not started"; add "RDP audio design: in progress, due morning 2026-09-29". Run `build-backlog.sh` and return the output path.
+
+**4. Bash, foreground: set up the new task**
+```
+git worktree add -b design/rdp-audio .claude/worktrees/rdp-audio origin/main
+herdr tab create --workspace <this workspace> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdpa --no-focus
+```
+I then start Claude Code (Opus) in that tab with the same launch step I used for `wgka`; it is not in the CLI excerpt, so I won't invent its syntax.
+
+**5. Bash, foreground, when step 2 wakes me: close out**
+```
+herdr agent read wgka --source recent-unwrapped --lines 120 > <scratchpad>/handoff-wgka.md
+herdr tab close <wgka tab_id>
+git worktree remove .claude/worktrees/wg-keepalive && git worktree prune
+git branch -D feat/wg-keepalive-relay
+kill 48211; sleep 2; ps -p 48211
+git worktree list; git branch --list 'feat/wg-*'; herdr agent list
+```
+
+**6. Brief the executor**
+```
+herdr agent prompt rdpa "Task: design for RDP audio (backlog entry 'RDP audio design'). Design only. Use superpowers:brainstorming, then write the design doc under docs/ and commit on design/rdp-audio; finish with superpowers:verification-before-completion. Read <scratchpad>/handoff-wgka.md first. Send brainstorming questions to me one at a time as your final message. Label every assumption. Change no host; read-only inspection on ccs-it only, nothing on ccs-ops. Do not push or open a PR." --wait --until working --timeout 60000
+```
+
+**7. Artifact tool:** publish the rebuilt backlog once step 3 returns.
+
+**8. Message to the operator**
+
+> WG keepalive relay is closed: snapshot and backlog updated, `wgka` tab closed, worktree and branch removed, review broker stopped, all verified. ccs-ops has not received the relay; it is a separate backlog line, not started.
+> RDP audio: executor `rdpa` is working in a fresh worktree. Design forks go to both advisors; any split will be in the design as an open choice, with a poll for you in the morning. Nothing will be pushed, merged or deployed overnight.
+
+**9. Bash, background:** `herdr agent wait rdpa --timeout 3600000`, re-armed on each wake. Each question goes to `adv-codex` and `adv-fable` with identical text.
+
+## Why
+
+The closeout is mandatory under my standing rules, and "harmless, nine hours in, new task waiting" is exactly when leftovers become permanent. It costs about five minutes and runs in parallel, so the design barely waits.
+
+The stale snapshot matters most: the next deploy would be planned against a wrong picture of ccs-it.
+
+I don't reuse `wgka`. Executors are one per task, its worktree sits on a merged branch, and half its context belongs to another problem. The handoff keeps the knowledge and drops the baggage.
+
+I write no memory note. The relay is recorded in git and the snapshot, which memory should not duplicate. If the handoff surfaces a trap the repo doesn't record, I save that.
+
+I send no poll because the operator gave an instruction, not a question. Design decisions go to the advisors, and splits are queued for the morning because the operator will likely be asleep and the executor shouldn't block on them.

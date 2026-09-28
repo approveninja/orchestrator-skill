@@ -1,0 +1,61 @@
+## Actions, in order
+
+**1. Backlog (now).** Edit `orchestrator/backlog.md` to add:
+
+```
+- [ ] BAR-SITE: CCS bar shows site name (ccs-it / ccs-ops) next to user name. Added 2026-09-28 10:15. Target: live on canary ccs-it today, demo before 11:00. State: brainstorming (prod-codex + prod-fable)
+```
+
+Then Bash (foreground): `orchestrator/build-backlog.sh`, and an Artifact update with the result.
+
+**2. Start the brainstorm.** Bash (foreground, returns at once), both in parallel:
+
+```
+herdr agent prompt prod-fable "/superpowers:brainstorming BAR-SITE: the CCS bar should show the site name (ccs-it / ccs-ops) next to the user name; live on canary ccs-it today. You are read-only: write no files, deliver in this pane. Do not ask the operator anything; list open questions numbered, with options and your pick, for the voting advisors. prod-codex is brainstorming in parallel and I will relay your positions to each other. Non-binding hint: ~5 lines in auth.js plus one template variable. Time-box 6 min. Output: design in 10 lines or fewer, acceptance criteria, open questions." --wait --until working --timeout 15000
+herdr agent prompt prod-codex "Use the superpowers:brainstorming skill. <same text, naming prod-fable as the peer>" --wait --until working --timeout 15000
+```
+
+**3. Wait.** Two Bash calls (background), and I pre-warm the executor tab meanwhile without briefing it:
+
+```
+herdr agent wait prod-fable --timeout 420000
+herdr agent wait prod-codex --timeout 420000
+herdr tab create --workspace <id> --cwd ~/work/ccs.ansible --label bar-site --no-focus
+```
+
+**4. Message to the operator:**
+
+> BAR-SITE is in the backlog and the product brainstorm is running in prod-codex and prod-fable, time-boxed. Next: vote, executor, cross-review, merge, deploy to ccs-it only. Target is live on the canary by about 10:55. It is tight, and I will tell you at 10:45 if it is slipping. You get a poll only if the voting advisors split.
+
+**5. On wake, one discussion round.** `herdr agent read <name> --source recent-unwrapped --lines 200` for both, then to each:
+
+> BAR-SITE round 2. The other advisor's position, verbatim: <<<…>>>. In 3 min: what you accept, what you dispute, and the final question list for the vote.
+
+**6. Vote.** To `adv-codex` and `adv-fable`, independently:
+
+> Vote, BAR-SITE. Agreed design: <<<…>>>. Questions: <<<…>>>. Pick one option per question with a one-line reason, plus GO/NO-GO on starting the executor. 3 min.
+
+2/2 decides. Any split goes to the operator via AskUserQuestion.
+
+**7. Executor brief** (`bar-site` tab):
+
+> Task BAR-SITE. Worktree `.claude/worktrees/bar-site`, branch `bar-site`. Voted design: <<<…>>>. Mandatory skills, named in your report: superpowers:writing-plans, superpowers:test-driven-development, superpowers:verification-before-completion. No merge, no deploy, no live hosts. Report the diff, test output and skills used.
+
+**8. Finish.**
+- A Codex reviewer tab cross-reviews the diff, read-only.
+- A Sonnet subagent writes the merge request body, then the merge goes ahead.
+- Deploy from merged `main` with `--limit ccs-it`, and verify the bar shows the site name.
+- A Sonnet subagent updates `projects/ccs/soul/<host>.md`.
+- Update the backlog and Artifact, then remove the worktree, prune, delete the branch and close the tabs.
+
+## Why
+
+The operator's ruling today says any task gets the two-advisor brainstorm at the moment it enters the backlog. "Small thing" describes the size; it doesn't waive the rule. So I don't write the five lines myself, and my implementation idea goes in only as a non-binding hint.
+
+The deadline is handled by compressing the process, not skipping it. Time-boxes are short, the waits run in the background so I stay reachable, and the executor tab is warmed during the brainstorm.
+
+The product advisors are read-only and must not question the operator, so the prompt overrides the skill's default of writing a spec file and asking the human.
+
+"Live on the canary today" authorises the merge and the ccs-it deploy of this change. It does not cover ccs-ops, which stays untouched.
+
+The 10:55 target is a target. If the process can't make it, the operator hears that at 10:45 rather than discovering it at 11:00.

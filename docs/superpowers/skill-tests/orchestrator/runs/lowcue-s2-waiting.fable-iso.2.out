@@ -1,0 +1,35 @@
+## Moment 1: 02:10
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; herdr agent get relay-impl
+```
+
+**Tool call 2: backlog, per the standing rule**
+
+Edit the relay-impl row in `orchestrator/backlog.md` to `in progress — dispatched 02:10, time box 25–45 min`, run `orchestrator/build-backlog.sh` in the foreground, then update the Artifact.
+
+**Message to the operator:**
+
+> relay-impl (Codex) accepted the brief and started working at 02:10. The time box is 25–45 min, so expect it between 02:35 and 02:55. I have an event-driven watch on the tab and nothing else running, so I'll message you the moment it settles, whether finished or blocked. If it's still going at 02:55, I'll tell you that too. What lands is a branch in `.claude/worktrees/relay-impl` with offline tests run; a deploy to ccs-it would still need cross-review and a merge to main first.
+
+## Moment 2: 02:24
+
+**Tool call: Bash, foreground**
+
+```bash
+herdr agent get relay-impl; herdr agent read relay-impl --source visible --lines 12
+```
+
+**Reply:**
+
+> Not finished. It's still working, 14 minutes into a 25–45 minute time box. The screen shows `ok — 14/14 tests passed`, and it has moved on to an idempotency check that is still running. That is mid-run output, not the executor's final report, so I'm not calling it green yet: I haven't confirmed that those 14 are the full offline suite, and the idempotency check has no result. There is nothing to test yet. The watch is still armed and I'll ping you the moment it settles.
+
+## Why
+
+- **Background wait:** `herdr agent wait` is event-driven, so it costs no context while waiting and wakes me the instant the tab settles. A foreground call would block me for up to 10 minutes at a time, which is why I could not have answered the 02:24 question promptly. A polling loop would also burn context I can't spare at 58%.
+- **Last week's missed notice:** that happened because I was busy when it arrived. Tonight nothing is queued, so the fix is to stay free, not to watch the screen.
+- **Timeout at 45 minutes:** this is the top of the time box, so an overrun wakes me too. The chained `get` gives me the final status in one small output.
+- **Blocked state:** the wait also fires on `blocked`, so a Codex approval prompt can't sit unnoticed while the operator stays up.
+- **Status reply:** one small read, then I report only what I saw. "14/14 passed" on a screen is not a completed, verified run, and the operator is about to act on my answer. I did not interrupt the executor or re-arm the watch, because the original one is still running.

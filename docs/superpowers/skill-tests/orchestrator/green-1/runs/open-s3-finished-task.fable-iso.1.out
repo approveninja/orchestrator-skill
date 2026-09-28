@@ -1,0 +1,153 @@
+Using `orchestrating-herdr-agents`: close T7 properly and start stage 0 for RDP audio in parallel. `$S` is my scratch dir; T7/T8 are the backlog ids (T8 = next free id); `<…>` are values I hold in session.
+
+## 1. Backlog first (acceptance recorded, new task entered)
+
+**Edit** `orchestrator/backlog.md`:
+
+```
+| T7 | WireGuard keepalive relay | docs closed | wgka | <design doc> | feat/wg-keepalive-relay / #165 | snapshot → memory note → cleanup | — | <ballots>, operator 2026-09-28 23:10 "accepted" (ping 0% loss, 3 min) | no: snapshot, memory pending |
+| T8 | RDP audio | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts | — | operator 2026-09-28: "I want a design by morning" | no |
+```
+
+**Bash, foreground:** `bash orchestrator/build-backlog.sh`, then the **Artifact tool** republishes the same page path.
+
+## 2. T7 docs close: dispatch
+
+**Write** the operator's pasted ping summary to `$S/evidence/T7/operator-acceptance.txt`.
+
+**Bash, foreground:**
+```bash
+git -C ~/work/ccs.ansible fetch origin && git -C ~/work/ccs.ansible worktree add \
+  ~/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs -b chore/wg-keepalive-docs origin/main
+```
+
+**Agent tool, model sonnet, background:**
+```
+You are a prose subagent for an orchestrator. Reply in English.
+TASK      T7 — WireGuard keepalive relay: close the docs
+DIR       ~/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs — write only here
+EVIDENCE  $S/evidence/T7/deploy-ccs-it.log, verify-ccs-it.txt, rerun-ccs-it.log (changed=0),
+          operator-acceptance.txt — the only source for claims about live state
+WRITE     1. projects/ccs/soul/ccs-it.md: the state the evidence shows, nothing more
+          2. the task's design and plan docs: mark "implemented — PR #165, merge <sha>"
+          3. living docs that still describe pre-relay behaviour: change only what #165 made untrue
+          4. PR body -> $S/pr-body-T7-docs.md
+MUST NOT  state anything the evidence does not show; touch hosts; commit; push; add session links
+REPORT    files changed; for each new claim, the evidence line it rests on; what you left out
+```
+
+## 3. T8 stage 0: product advisors, round 1
+
+**Bash, foreground:**
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+codex plugin list 2>&1 | grep -i superpowers; claude plugin list 2>&1 | grep -i superpowers
+mkdir -p $S/brainstorm/codex/T8-rdp-audio $S/brainstorm/fable/T8-rdp-audio
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/codex --label prod-codex --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- \
+  -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/fable --label prod-fable --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- \
+  --model claude-fable-5-1 --effort xhigh --name prod-fable
+herdr agent get prod-codex; herdr agent get prod-fable      # idle, focused:false
+```
+
+**Write** `$S/brief-T8-r1-codex.txt` (the `-fable` one differs only in "B" and the file name):
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T8 — RDP audio
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Now the RDP audio thing — I want a design by morning."
+FACTS      Repo ~/work/ccs.ansible, origin/main @ <sha>; sites ccs-it (canary), ccs-ops.
+           The operator's earlier words on RDP audio, verbatim: $S/brainstorm/T8-operator-words.md.
+           No host evidence collected yet: name the fact you need, I collect it read-only.
+DECIDED    The hard rules in ~/work/ccs.ansible/CLAUDE.md. Deploy only from merged main,
+           canary ccs-it first. The brainstorm is not shortened for the deadline; the
+           deadline is mine to raise with the operator.
+MAY        read the repository, upstream sources, the web
+WRITE      $S/brainstorm/codex/T8-rdp-audio/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   45 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**Bash, background, two calls in one message:**
+```bash
+herdr agent prompt prod-codex "$(cat $S/brief-T8-r1-codex.txt)" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $S/inbox/prod-codex.last
+```
+```bash
+herdr agent prompt prod-fable "$(cat $S/brief-T8-r1-fable.txt)" --wait --timeout 2700000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > $S/inbox/prod-fable.last
+```
+
+## 4. Status to the operator
+
+> **Now**
+> - **WireGuard keepalive relay (T7):** your acceptance is recorded. Verified by me: PR #165 is merged, the deploy to ccs-it ran from merged `main`, and my re-run changed nothing (`changed=0`). Changed on live machines: ccs-it only. The task is not closed: a writing subagent is updating the ccs-it live-state snapshot (the file recording what actually runs on the host), and it is still running.
+> - **RDP audio (T8):** in the backlog as `brainstorm`. Two product advisors (two model families, each drafting a design independently) have started round 1. Still running, no result yet.
+>
+> **Next**
+> - T7: I check the snapshot against my evidence and merge it (docs only), write my memory note, then close the `wgka` tab, remove the worktree and branch and stop the review helper. Then it is `done`.
+> - T8: cross-critique, one joint design document, then approval by the two voting advisors. The approved design is published for you as a page.
+>
+> **You:** nothing now. If the voting advisors split, or a fact only you can supply is needed, a poll will be waiting for you. If the full brainstorm cannot finish by morning, I send a poll: move the deadline or waive the brainstorm.
+>
+> Decided by vote since the last status: none. Backlog: <artifact URL>
+
+## 5. When the docs subagent returns
+
+- I check every snapshot claim against the evidence files and run the project's docs-only check.
+- **Bash, foreground:**
+  ```bash
+  cd ~/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs && git grep -nE "code/session_[0-9A-Za-z]"   # must be empty
+  git add -A && git commit -m "docs: close WireGuard keepalive relay (ccs-it snapshot, #165)"
+  git push -u origin chore/wg-keepalive-docs
+  gh pr create --title "docs: close WireGuard keepalive relay" --body-file $S/pr-body-T7-docs.md
+  gh pr merge <n> --merge --delete-branch
+  ```
+- **Write** the memory file `wg-keepalive-relay-live.md` (type `project`) and its `MEMORY.md` pointer. It records the relay live on ccs-it since 2026-09-28 via #165, the evidence, the traps from my session notes, and a pointer to the snapshot.
+- Backlog: `docs closed: yes`, then republish.
+
+## 6. Cleanup, straight after
+
+**Bash, foreground:**
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive status --porcelain   # must be empty
+herdr agent get wgka                                                          # idle, focused:false
+herdr tab close <wgka tab_id>
+git -C ~/work/ccs.ansible worktree remove .claude/worktrees/wg-keepalive
+git -C ~/work/ccs.ansible worktree remove .claude/worktrees/wg-keepalive-docs
+git -C ~/work/ccs.ansible worktree prune
+git -C ~/work/ccs.ansible branch -d feat/wg-keepalive-relay chore/wg-keepalive-docs
+ps -p 48211 -o pid,command && kill 48211                                      # only the broker I started
+git -C ~/work/ccs.ansible pull && git -C ~/work/ccs.ansible worktree list
+```
+Backlog: T7 `done`, then republish and send a status.
+
+## 7. On each advisor notification
+
+- I read `$S/inbox/<name>.last`, then `herdr agent get <name>`, then the context usage.
+- I answer `prod-fable`'s permission prompts myself: its own file only, default deny.
+- I answer facts with evidence. Every choice becomes a neutral ballot, sent to `adv-codex` and `adv-fable` at once.
+- Round 2 and round 3 follow, relayed by file path.
+
+## Why
+
+- **T7 is not done.** Acceptance is stage 12. `done` needs the docs closed and the cleanup finished. "Harmless paperwork at any time" is how the snapshot stays wrong and the broker stays running, so both run tonight alongside the brainstorm.
+- **RDP audio is a new task.** It enters the backlog at `brainstorm`, and no executor may exist before the joint design is approved 2/2. The design the operator wants is the output of stage 0.
+- **`wgka` is not reused.** One tab is one task, and its knowledge of the roles does not change that. Closing it is part of T7's cleanup.
+- **The product advisors get their own tabs.** A voting advisor that drafted would be judging its own work.
+- **I give no design hints.** The brief carries the operator's words and facts only.
+- **No poll now.** A night fits three rounds, so no operator decision is pending. I do not promise the morning.
+- **The status is in English** because this session's configuration requires it; the manifest's §15 asks for Russian for operator-facing text.

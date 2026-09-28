@@ -1,0 +1,28 @@
+**Close the relay out first, then start RDP audio in a fresh tab and worktree.** "Accepted" is the end of the task, so the cleanup and state updates are due now. At hour 9, anything deferred risks being lost, and close-out costs about ten minutes against a whole night.
+
+1. Harvest `wgka`'s knowledge before closing it:
+   `herdr agent prompt wgka "Write a ≤15-line handoff: non-obvious gateway/host_proxy facts from the relay work." --wait --until idle`, then `herdr agent read wgka --source recent-unwrapped --lines 60`.
+2. Dispatch a Sonnet subagent (Agent tool) to update `projects/ccs/soul/ccs-it.md` and `orchestrator/backlog.md` (relay: done, canary accepted), then run `build-backlog.sh` and update the artifact.
+3. Write the memory note `wg-keepalive-relay.md` (type: project, dated 2026-09-28) and add its line to `MEMORY.md`.
+4. Clean up:
+   ```
+   herdr agent get wgka            # confirm idle, get tab id
+   herdr tab close <tab_id>
+   git -C .claude/worktrees/wg-keepalive status --porcelain   # expect empty
+   git worktree remove .claude/worktrees/wg-keepalive
+   git worktree prune
+   git branch -d feat/wg-keepalive-relay
+   ps -p 48211 -o command=         # confirm it is my codex app-server
+   kill 48211
+   ```
+5. Start RDP audio:
+   ```
+   git worktree add .claude/worktrees/rdp-audio -b feat/rdp-audio main
+   herdr tab create --workspace <id> --cwd .claude/worktrees/rdp-audio --label rdp-audio --no-focus
+   ```
+   The brief names `superpowers:brainstorming` then `writing-plans`, asks for a design doc only with no deploy, and includes the `wgka` handoff. Design forks go to the `adv-codex` and `adv-fable` vote.
+6. Message to the operator: "Relay closed out: snapshot, backlog and cleanup done. RDP audio design dispatched in tab `rdp-audio`; design by morning."
+
+Option A reuses a tab and worktree that belong to a finished task. Options B and D report the relay as done while the snapshot, backlog and worktree are still stale.
+
+CHOICE: C

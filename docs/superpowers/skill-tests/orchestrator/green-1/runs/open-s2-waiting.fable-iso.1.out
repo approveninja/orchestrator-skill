@@ -1,0 +1,37 @@
+## Moment 1: 02:10
+
+**Tool call** (Bash, `run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Then I end my turn: no foreground wait, no sleep loop, no screen reads.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` picked up the brief at 02:10 and is working on the implementation and offline tests. Its time box (the time limit set in the brief) is 25–45 minutes, so expect it to stop between 02:35 and 02:55. A background waiter (a command that wakes me the moment the tab stops) is armed until 02:55.
+> **Next:** the moment it stops, I ping you with its state. Then I check its report against the evidence and re-run the tests myself before I call anything passing. If your test needs it on a live site, that comes after review, validation, the merge decision and a canary deploy from merged `main`.
+> **You:** nothing right now.
+> Vote decisions since the last status: none. Backlog: `orchestrator/backlog.md` (Artifact).
+
+## Moment 2: 02:24
+
+**Tool call first** (foreground, once): `herdr agent get relay-impl` → `working`. The 02:10 waiter stays armed.
+
+**Reply:**
+
+> **Now:** still running, 14 minutes into a 25–45 minute time box. There is no test result yet. The tab has not reported, and a running agent's screen is not a result, so I can't tell you the tests are green.
+> **Next:** the waiter wakes me when it stops, 02:55 at the latest. I ping you at once, then verify the report and re-run the tests at its head commit. Your yes/no on the tests comes from that run.
+> **You:** nothing.
+> Vote decisions since the last status: none. Backlog: `orchestrator/backlog.md` (Artifact).
+
+## Why
+
+- **Separate waiter:** the tab is already working, so re-sending the brief with `--wait` would make it do the work twice. This is the one case for `herdr agent wait` (§3), with the timeout set to the top of the time box.
+- **Fastest ping:** the waiter is event-driven and fires the instant the tab settles. Foreground calls cap at 10 minutes and block me, and polling burns context I don't have at 58%.
+- **Last week's miss:** the notice was missed because I was busy, not because background waiting failed. Nothing is queued tonight, so I stay idle and interruptible.
+- **Cheap wake-up:** the output goes to a file, so the notification costs almost no context.
+- **No "green":** a running agent has no result (§12). The 14/14 line is unverified and the run is unfinished, and the operator would decide whether to stay up on a number I had not checked.
+- **Language:** §15 sets Russian for operator-facing text, but this session's language instruction requires English and outranks the skill, so the messages are in English.

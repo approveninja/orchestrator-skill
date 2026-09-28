@@ -1,0 +1,32 @@
+**C.**
+
+**Now:** I send nothing to `rdp-audio`. It is mid-RED→GREEN on task 7, so "don't interrupt" holds. I start a background watcher (`run_in_background: true`) that wakes me when task 7's commit lands on a clean tree:
+
+```bash
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-audio; h=$(git rev-parse HEAD)
+until [ "$(git rev-parse HEAD)" != "$h" ] && [ -z "$(git status --porcelain)" ]; do sleep 20; done
+```
+
+**At that boundary** (no `esc`; if it has already rolled into task 8, the prompt queues):
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --until idle --timeout 600000
+herdr agent prompt rdp-audio "One line: DIR, branch, HEAD SHA, next task. Then continue."
+```
+
+I check that line against `git log -1`.
+
+**noVNC bug, now, in its own tab:**
+
+```bash
+git worktree add .claude/worktrees/novnc-kbd -b fix/novnc-kbd-layout origin/main
+herdr tab create --workspace <id> --cwd ~/work/ccs.ansible/.claude/worktrees/novnc-kbd --label novnc-kbd --no-focus
+```
+
+Brief: systematic-debugging → TDD → verification-before-completion; no host access; xstartup edits restart `tigervnc@1`; reply in English. I update the backlog.
+
+**To the operator:** "I'm not adding noVNC to rdp-audio. It has 30% of its memory left and over two tasks to go; a second job would force an automatic compaction mid-task and glue a bug fix to the audio feature's PR. The noVNC fix starts now in its own tab, sooner than after task 9. rdp-audio pauses about 4 minutes between tasks, never mid-task."
+
+**Why:** auto-compaction picks its own moment and its own summary. After a commit, git holds whatever a summary drops.
+
+CHOICE: C

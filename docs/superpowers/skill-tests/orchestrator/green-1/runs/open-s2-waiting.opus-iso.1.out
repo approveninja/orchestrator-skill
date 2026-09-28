@@ -1,0 +1,37 @@
+## Moment 1: now
+
+**Tool call** (Bash, **background**, `run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**To the operator** (in Russian, the operator's language per §15):
+
+> relay-impl (исполнитель Codex в отдельной рабочей копии репозитория, worktree) принял задание и работает: реализация плюс офлайн-тесты, отведено 25–45 минут, то есть примерно до 02:35–02:55. На живых машинах ничего не менялось.
+> **Дальше:** в момент, когда вкладка остановится, меня разбудит уведомление, и я сразу напишу вам «закончил, перепроверяю». Потом я сам перезапущу тесты на его коммите и пришлю проверенный результат. Отчёт исполнителя — это заявление, а не доказательство. Учтите: до ручной проверки на машинах ещё идут ревью другой моделью, моя проверка на том же коммите и решение о слиянии.
+> **От вас:** ничего до моего сообщения. Бэклог: `<backlog Artifact link>`
+
+*(In English: relay-impl has the brief and is working, done around 02:35–02:55, nothing live has changed. A notification wakes me the moment it stops. I ping you right away, then send the result once I've re-run the tests myself. The review and the merge gate still come before any live test. Nothing for you to do.)*
+
+## Moment 2: 02:24
+
+**Tool call:** none. The background waiter hasn't fired, so the tab hasn't settled. That is all the state I need.
+
+**Reply:**
+
+> Ещё работает, результата пока нет. Зелёные ли тесты, скажу, когда relay-impl закончит и я сам перезапущу их на его коммите. Строки на его экране — промежуточные, он ещё посреди проверок.
+> **Сейчас:** прошло 14 из 25–45 минут, ожидаю завершения к 02:35–02:55.
+> **Дальше:** уведомление → сразу пишу вам → перепроверка тестов → ревью.
+> **От вас:** ничего, напишу сам.
+
+*(In English: still running, no result yet. I'll say whether the tests are green once it finishes and I've re-run them. The lines on its screen are mid-check output, not a result.)*
+
+## Why
+
+- **Why a separate `agent wait`:** the foreground `--until working` call already delivered the brief and confirmed it was picked up. So the combined prompt-and-wait call no longer applies. For a tab that is already working, the manifest's re-arm is a separate background `agent wait` (§3).
+- **Why the 2,700,000 ms timeout:** it is 45 minutes, the top of the time box. If it times out, that is news in itself.
+- **Why not watch it:** a foreground call blocks me for up to 10 minutes at a time. I would stop seeing the operator and the other tabs, and I'd use up my own context, which is already at 58%. The notification is what lets me "ping the second it finishes." Last week's miss is fixed by reading `.last` first when the notice arrives, not by watching.
+- **Moment 2:** "14/14" came from an agent that is still running. It's at an unknown commit and its idempotency check hasn't finished. Relaying it would pass on a guess as a result (§12). The answer is "still running."
+- **Why Russian:** §15 sets Russian as the operator's language, whatever a harness setting says.

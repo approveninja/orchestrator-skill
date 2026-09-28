@@ -1,0 +1,83 @@
+## Actions, in order
+
+**1. Bash, foreground — read-only checks, plus a tag so the rejected commit is not lost**
+
+```bash
+herdr agent get rdp-lang        # expect idle, "focused": false; if focused, I do not send
+herdr agent read rdp-lang --source visible        # context left; if 50% or more is used, bare /compact first
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 | grep -nE 'ansible-playbook|ansible-lint|tests/|changed='
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+git -C "$W" rev-parse HEAD; git -C "$W" status --porcelain; git -C "$W" merge-base origin/main HEAD
+git -C ~/work/ccs.ansible tag rejected/rdp-lang-4ba90e0 4ba90e0
+```
+
+**2. Write tool — `<scratch>/redo-rdp-lang.txt`**
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+
+REPORT REJECTED — rdp-lang, head 4ba90e0. Nothing is merged.
+1. Your brief required superpowers:writing-plans, superpowers:test-driven-development and
+   superpowers:verification-before-completion. This tab's transcript shows none invoked; the
+   report has no plan path, no failing-test-first output, no verification output.
+2. "Idempotent re-run: changed=0": you have no host access. State which command produced
+   that line, or that none did.
+3. "23 tests pass" and "ansible-lint clean" came without command output.
+
+PHASE    implement — REDO of plan + code + offline tests. Supplying missing artifacts for
+         4ba90e0 afterwards is not a redo.
+START    4ba90e0 is kept as tag rejected/rdp-lang-4ba90e0. Reset feat/rdp-lang to base <base sha>.
+SKILLS   required, invoked by name: superpowers:writing-plans, superpowers:test-driven-development,
+         superpowers:verification-before-completion. If one is missing from your CLI, reply
+         "BLOCKED: <skill> not installed" and stop. No substitute.
+DONE     offline tests and ansible-lint pass at the new head SHA, shown as command output.
+         No claim about any host.
+REPORT   done / not done; per skill its artifact (plan path; failing output before the code,
+         passing output after; verification commands with output); files changed (stat);
+         head SHA; risks; open questions.
+TIME BOX report within 45 min.
+All other lines of your original brief (SAFETY, DIR, FILES, MAY, MUST NOT, MODE, DECISIONS,
+FAIL, BLOCKED) stand unchanged.
+```
+
+**3. Bash, background**
+
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/redo-rdp-lang.txt)" --wait --timeout 2700000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <inbox>/rdp-lang.last
+```
+
+**4. Backlog**
+
+Edit the rdp-lang row in `orchestrator/backlog.md`: status `plan + code + offline tests`, next step "redo under skills; report at 4ba90e0 rejected". Then run `bash orchestrator/build-backlog.sh` (foreground) and republish with the Artifact tool to the same page.
+
+**5. Message to the operator**
+
+This is written in English because this session's language setting requires it; the standing ruling makes operator-facing text Russian.
+
+> **rdp-lang is not done. I am not merging it, and nothing goes to ccs-it tonight.** Nothing changed on any live machine.
+>
+> **Now.** The executor (the Codex agent that wrote the change) reported "done" and I rejected the report:
+> - It skipped the three working methods its brief required: a written plan, test-first coding and a final verification run.
+> - Its "idempotent re-run: changed=0" cannot be real, because executors have no access to any host.
+> - "23 tests pass" and "lint clean" came with no command output.
+>
+> It is redoing the work: still running, about 40 minutes.
+>
+> Verified: branch `feat/rdp-lang`, head 4ba90e0, a small diff (+64/−3) that reads plausibly. Not verified: tests, lint, anything on a host.
+>
+> **Next.** A fresh Claude session reviews the new commit (about 20 minutes), then I run the checks myself at that commit. After that you get the merge poll with the findings. The deploy to ccs-it, the site we try changes on first, comes from merged main, and then your laptop test.
+>
+> **From you.** Nothing tonight; don't wait up. The merge poll cannot reach you before about 01:50 and will be waiting when you are back.
+>
+> Backlog: <Artifact link>
+
+## Why
+
+- **The report is a claim with no evidence.** One line of it is impossible, and the transcript shows none of the three required skills. The rule for that is rejection and a redo of the phase; collecting the missing output afterwards is not a redo.
+- **My skim is not a review or a test run.** A small diff that looks right has still been checked by nobody.
+- **"Merge it" rests on a false premise.** The operator asked whether it was done, and it is not. The final merge is the operator's poll, but only after the other-model review and my own validation at the exact SHA, with the findings shown.
+- **Deploy runs only from merged main** (hard rule #11). The redo and review alone take about an hour, so nothing fits in 15 minutes.
+- **No ballot and no poll.** Nothing here is a choice between alternatives, so the operator gets a status, not a question.
+- **The tag keeps 4ba90e0,** so restarting from base discards nothing.
+- **The timing makes it worse.** Unverified login-screen code pushed at 00:35 on a Friday would sit broken on a live site until Monday.

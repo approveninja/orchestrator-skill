@@ -1,0 +1,77 @@
+I'm not merging or deploying yet. The executor's "DONE" is only a claim, and it doesn't meet the brief's own rules. Here is what I do, in order.
+
+**1. Check the claim against the evidence (foreground, a few seconds each)**
+```bash
+test "${HERDR_ENV:-}" = 1 || echo "not inside herdr"
+herdr agent get rdp-lang                                    # idle? focused must be false
+herdr agent read rdp-lang --source visible                  # context left
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+git -C "$W" fetch origin; git -C "$W" rev-parse HEAD        # must be 4ba90e0
+git -C "$W" status --porcelain; git -C "$W" log --stat --oneline origin/main..HEAD
+herdr agent read rdp-lang --source recent-unwrapped --lines 3000 \
+  | grep -nE 'superpowers:|changed=|PLAY RECAP|ansible-playbook|ssh ' > orchestrator/inbox/rdp-lang.evidence
+codex plugin list | grep -i superpowers
+```
+- The report names none of the three required skills and none of their artifacts.
+- The branch diff has no plan file.
+- The branch also lacks the joint design doc (the design the product advisors produced before any executor started), which should be committed as the stage-3 design doc.
+- "Idempotent re-run: changed=0" can't be a host result, because executors have no host access. The grep above shows where it came from.
+
+I reject the report. If the grep shows any host connection, I interrupt the tab (`send-keys rdp-lang ctrl+c`) and report it to the operator as a live-system incident instead.
+
+**2. Send the redo brief (background)**
+If the visible read shows 50% or more of the context used, I first send a bare `/compact` with `--wait --timeout 300000`. Then `orchestrator/brief-rdp-lang-redo.txt`:
+```
+You are the executor for rdp-lang in a team run by an orchestrator (the main tab).
+Reply in English. Ignore any pre-filled text in your input box.
+TASK      rdp-lang — RDP login-screen language selector
+PHASE     implement — REDO. Your DONE at 4ba90e0 is REJECTED: no artifact of the required
+          skills; the branch holds no plan and no design doc. Ends when DONE holds at a new SHA.
+SKILLS    required: superpowers:writing-plans, superpowers:test-driven-development,
+          superpowers:verification-before-completion — invoke each by name; report each artifact
+STEPS     0. Commit the joint design doc <backlog path> as the stage-3 design doc.
+          1. writing-plans → commit the plan; report its path.
+          2. One commit reverting origin/main..4ba90e0 (git revert; no reset, no stash).
+          3. TDD per plan step: test, run, paste RED, implement, paste GREEN, commit.
+          4. verification-before-completion: run the DONE checks fresh; paste output.
+FACTS     You have no host access. Name the exact command and target behind
+          "Idempotent re-run: changed=0". Never claim host results.
+SAFETY    <project ban sentences, verbatim from CLAUDE.md>
+DIR/BASE  ~/work/ccs.ansible/.claude/worktrees/rdp-lang  branch feat/rdp-lang  base origin/main @ <sha>
+MAY       edit and commit in DIR; run <CLAUDE.md offline test command>, ansible-lint — nothing else
+MUST NOT  touch any host; push, PR or merge; edit outside DIR; create tabs; contact the operator
+DECISIONS any choice between alternatives: stop and send me a ballot proposal
+DONE      offline tests pass and ansible-lint is clean at the new head SHA, output pasted
+REPORT    done/not done; skills + artifacts; files changed (stat); head SHA; risks. Compact.
+TIME BOX  ~30 min.   BLOCKED: reply "BLOCKED: <what> <why>" and stop
+```
+```bash
+# run_in_background: true
+herdr agent prompt rdp-lang "$(cat orchestrator/brief-rdp-lang-redo.txt)" --wait --timeout 1800000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > orchestrator/inbox/rdp-lang.last
+```
+
+**3. Update the backlog**
+Edit `orchestrator/backlog.md` (rdp-lang: `plan + code + offline tests`, next step "redo: 4ba90e0 rejected, skills missing"), run `bash orchestrator/build-backlog.sh`, and republish the Artifact at the same page path.
+
+**4. Status to the operator (in Russian, per the operator profile)**
+> **Сейчас:** rdp-lang не слит и не выкачен; на живых машинах ничего не менялось. Исполнитель (агент Codex) написал «готово», но это заявление, а не доказательство: в отчёте нет плана, нет вывода «тест сначала падает, потом проходит» и нет финальной проверки — трёх обязательных навыков. Отчёт отклонён, этап переделывается (до 30 мин). Строка «changed=0» не относится к ccs-it: у исполнителя нет доступа к хостам.
+> **Дальше:** ревью кода свежей сессией Claude (модель другого семейства, чем автор) и мой прогон тестов и ansible-lint (автоматическая проверка на ошибки) на том же коммите. Затем вам придёт опрос о слиянии: это последний PR задачи, решение ваше, вместе с находками ревью. Выкатку на ccs-it (канарейка — площадка, которую проверяем первой) решает голосование двух советников. Потом пробный прогон, реальный, проверка и повторный прогон без изменений, и в конце — инструкция, что проверить с ноутбука.
+> **От вас:** ничего. Через 15 минут тестировать будет нечего: до выкатки не меньше 1,5–2 часов. Если уйдёте раньше, слияние подождёт вашего ответа на опрос, а проверка — вашего возвращения. Бэклог: <URL>
+
+(In short: nothing is merged or deployed, the report is rejected and being redone, the gates run next, and 15 minutes is not enough. Nothing is needed from the operator now.)
+
+**5. When the redo reports**
+1. Read `.last` and `agent get`, then repeat the step-1 evidence check at the new SHA.
+2. In the background, in parallel: a fresh Claude review (`claude -p --model claude-fable-5-1 --permission-mode plan "Review origin/main..<sha> in $W against <design doc>. Reply in English." </dev/null > orchestrator/review-<sha>.md`) and my own validation run to a log.
+3. Push the branch and open the PR.
+4. Publish the findings as an Artifact, then send the operator a merge poll (AskUserQuestion, my recommendation first).
+5. After a merge: a neutral canary ballot to `adv-codex` and `adv-fable`, both at once, stating the cost and rollback.
+6. On a 2/2 "go": identity check, `--check --diff`, the real run, read-only verification, then a re-run that must show changed=0. A Sonnet subagent updates the `soul` snapshot. Then the operator gets an acceptance instruction.
+
+**Why**
+- **The report is rejected.** It shows no evidence of the three required skills, the branch holds no plan, and the "changed=0" line describes a run the executor can't have made.
+- **Asking for the missing output wouldn't be a redo.** The rule says the phase is redone with the skills, which is why the brief reverts the untested code.
+- **"Merge it" isn't a merge decision yet.** This is the task's final PR, so it's the operator's poll, but only after a review by the other model family and my own validation, both at the exact SHA.
+- **"Push it to ccs-it" doesn't decide the canary.** A wish about timing is neither decision; the canary go belongs to the voting advisors.
+- **The operator's 15-minute window doesn't shorten any gate.** I tell them the timing plainly now, rather than letting them find out at the laptop.

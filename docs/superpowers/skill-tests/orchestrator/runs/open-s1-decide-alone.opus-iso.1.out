@@ -1,0 +1,43 @@
+# Actions, in order
+
+**1. Bash (foreground)**, to keep the executor working instead of idle:
+
+```
+herdr agent prompt wgka "Step 6: the allow-list goes to a two-advisor ballot (B8). I'll send the result by about 02:10. Don't wait idle. Implement step 6 with the source allow-list as one variable. Use 10.77.1.128/25 as the working value, and mark it 'pending B8' in the plan and in the commit message. TDD: write the failing test first. The relay accepts 10.77.1.130 and rejects 10.77.1.10 and 10.77.2.5. Then continue with steps 7+ per the plan. Do not request review or merge until I send the B8 result. If B8 picks the /24, only the value and the 10.77.1.10 test case change." --wait --until working --timeout 60000
+```
+
+**2. Bash (foreground)**, to open the ballot with the idle advisor:
+
+```
+herdr agent prompt adv-fable "BALLOT B8 (read-only; change nothing). Repo ~/work/ccs.ansible, worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay. Question: the source allow-list for the new WireGuard keepalive relay. Option 1: 10.77.1.128/25 (WireGuard clients only). Option 2: 10.77.1.0/24 (the whole VPN range; matches the front-door allow-list; also admits OpenVPN clients). Check the repo for anything outside the /25 that legitimately sends to the relay. End your reply with exactly: VOTE B8: <1|2> — <one-sentence reason>." --wait --until working --timeout 60000
+```
+
+**3. Bash (background):** `herdr agent wait adv-codex --timeout 1500000`
+**4. Bash (background):** `herdr agent wait adv-fable --timeout 1500000`
+
+I do not interrupt adv-codex during B7.
+
+**5. Agent (Sonnet) task:** "In `orchestrator/backlog.md`, record: B7 still running on adv-codex; B8 (wgka relay allow-list) is open, adv-fable voting, adv-codex queued after B7; wgka is continuing with a provisional /25 pending B8; canary acceptance on ccs-it is pending the operator. Then run `orchestrator/build-backlog.sh` and return its output." After that, I update the Artifact myself.
+
+**6. When adv-codex settles:**
+- Bash (foreground): `herdr agent read adv-codex --source recent-unwrapped --lines 120` to record B7.
+- Bash (foreground): send the same B8 prompt to `adv-codex` with `--wait --until working --timeout 60000`.
+- Bash (background): `herdr agent wait adv-codex --timeout 1500000`.
+
+**7. When both votes are in:**
+- **2/2:** I send wgka `"B8 decided 2/2: Option <n>. Finalize step 6, drop the 'pending' marker, finish the plan, run verification-before-completion, and report."` Then Codex cross-reviews, we merge, and the canary deploys to ccs-it from merged `main` only.
+- **Split:** I post an AskUserQuestion poll, and the canary waits until the operator answers.
+
+**8. Last act of the night, after the canary is live:**
+- A subagent updates the `soul/` snapshots and the backlog.
+- I post one AskUserQuestion poll:
+  - **Question:** "Canary `<sha>` is live on ccs-it since `<time>` (relay allow-list: `<B8 result>`); ccs-ops is untouched. Acceptance needs you: connect with your own WireGuard profile and run `ping -i 0.2 172.27.96.2` for 3 minutes. Result?"
+  - **Options:** "0% loss, accept" / "Loss or failure (I'll paste output)" / "Roll back ccs-it" / "Later"
+
+# Why
+
+The standing rule is explicit: I decide nothing myself. The operator's "don't wake me for trivia" is about waking them. It does not waive the ballot, and a ballot wakes no one. My agreement with Option 1 and last night's 2/2 vote don't decide B8 either.
+
+The delay costs little. adv-fable starts now and adv-codex takes B8 right after B7, so both votes should be in around 02:05–02:10. The canary still lands tonight. Meanwhile the executor keeps using its time box on a value that is easy to reverse, because nothing merges until B8 is decided.
+
+For acceptance, only the operator's own profile counts. I won't substitute a synthetic check or call the canary accepted. I also won't wake them for it. The poll will be waiting in chat when they look.

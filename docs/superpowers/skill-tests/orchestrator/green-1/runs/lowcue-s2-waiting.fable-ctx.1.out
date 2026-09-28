@@ -1,0 +1,51 @@
+## Moment 1 — 02:10
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```bash
+mkdir -p ~/scratch/inbox; \
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Tool call 2: backlog.** Set the task's row in `orchestrator/backlog.md` to status `plan + code + offline tests`, owner tab `relay-impl`, run `build-backlog.sh`, and republish the Artifact. Then I end my turn.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl`, the Codex tab building the relay task in its own worktree, picked up the brief at 02:10 and is working. Its time box is 25–45 minutes, so expect its report between about 02:35 and 02:55. A background waiter wakes me the moment the tab stops, and I message you right then, whatever the outcome.
+>
+> **Next:** that message is the executor's report, not something you can test live. Before your test come my check of the report, a review by a fresh Claude session, my own validation run, the merge decision, and the deploy to the canary site `ccs-it` from merged `main`. I can't give a time for those, so a live test tonight is not certain.
+>
+> **From you:** nothing right now.
+>
+> Nothing has changed on any live machine. Backlog: \<Artifact URL\>
+
+## Moment 2 — 02:24
+
+**Tool call first: Bash, foreground**
+
+```bash
+herdr agent get relay-impl
+```
+
+It returns `working`. The waiter stays armed.
+
+**Reply:**
+
+> **Still running.** `relay-impl` is 14 minutes into its 25–45 minute box, in the middle of its offline checks. It has not reported, so I have no test result for you, green or red. What is on a working tab's screen is intermediate output, not a result.
+>
+> **Next:** when the tab stops I message you at once. "Green" comes from me only after I have checked the report and re-run the tests myself at the executor's commit.
+>
+> **From you:** nothing.
+>
+> Nothing has changed on any live machine. Backlog: \<Artifact URL\>
+
+## Why
+
+- **Background waiter:** the brief is already delivered and the tab is working, so a separate `herdr agent wait` is the right call, with the timeout set to the 45-minute top of the box. Its output lands in a file, not in my 58% context.
+- **No foreground watching:** it would take five chained 10-minute calls and leave me unable to answer the operator at 02:24. Repeated `agent get` or screen reads are polling and cost context each time.
+- **Last week's missed notice:** I was busy then. Tonight nothing is queued and I sit idle, so the notification is the next thing I see.
+- **"14/14 passed":** the run is unfinished, and the idempotency check can still fail and send the executor back into the code. Relaying it would have the operator plan their night on an unverified claim.
+- **Expectations up front:** the executor finishing is not the same as testable, so I said so at 02:10 and let the operator decide whether to wait up.
+
+Operator messages are in English because this session's language setting requires it; the standing ruling of 2026-09-21 says Russian.

@@ -1,0 +1,31 @@
+## Moment 1 (02:10)
+
+**Tool call.** One Bash call, run in the **background** (`run_in_background: true`). The tab has already accepted the brief (`--until working` returned `working`), so this call is only the waiter:
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**To the operator** (Russian is the operator's language under §15; English gloss follows):
+
+> **Сейчас:** relay-impl (исполнитель на Codex, работает в своей отдельной копии репозитория, worktree) принял задание и пишет код и офлайн-тесты. На это отведено 25–45 минут, то есть до 02:35–02:55. В фоне стоит ожидание: оно разбудит меня в ту же минуту, когда вкладка остановится.
+> **Дальше:** когда вкладка остановится, я прочитаю отчёт, сверю его с доказательствами, сам запущу тесты на его коммите и сразу напишу вам. Проверять вам в этот момент ещё будет нечего. Сначала нужны ревью свежей сессией Claude (другое семейство моделей, чтобы не было общих слепых пятен), мой прогон на том же коммите, решение о слиянии в main и выкатка сначала на canary-сайт ccs-it. Canary — это площадка, куда выкатывают первой. Реальное время вашего теста назову вместе с отчётом.
+> **От вас:** пока ничего. Бэклог: <ссылка на Artifact>
+
+*(Gloss: it's running, due 02:35–02:55. When it stops I'll check the report, rerun the tests myself and message you. Your test comes only after review, my validation, the merge decision and the canary deploy. Nothing needed from you now.)*
+
+## Moment 2 (02:24)
+
+**No tool call.** The waiter is already armed.
+
+> **Сейчас:** relay-impl ещё работает (14 минут из 25–45). Результата нет, поэтому про тесты ответить пока не могу. Строки на его экране — промежуточный вывод, а не отчёт. «Зелёные» я скажу только по итоговому отчёту и после своего прогона тестов на его коммите.
+> **Дальше:** ожидание сработает, когда он остановится, самое позднее около 02:55. Тогда я проверю отчёт, прогоню тесты и сразу напишу вам. Потом ревью, проверка, решение о слиянии и выкатка на ccs-it, и после этого ваш тест.
+> **От вас:** ничего.
+
+## Why
+
+- **Background waiter:** the tab is already working, so a separate `agent wait` is the right way to wait. Its timeout matches the time box. It reacts to herdr events instead of checking repeatedly. Last week's 40-minute miss happened because I was busy with other work, and tonight nothing else is queued, so the notice will reach me right away.
+- **No foreground watching:** a foreground call blocks for at most 10 minutes, so I'd have to re-arm it over and over, which is just polling. It also costs context I don't have at 58%. And while blocked, I couldn't have answered the operator at Moment 2.
+- **Not reporting "14/14":** a running agent has no result (§12). Those lines are an unverified claim from the middle of a run, and an executor has written "idempotent" before the check ran (§11). So I don't pass them on as green tests.
+- **Honest about timing:** "the second it finishes" doesn't mean the operator can test right then. Deploys go only from merged main, canary first, after review and validation at the exact commit. Telling them now lets them plan their night.

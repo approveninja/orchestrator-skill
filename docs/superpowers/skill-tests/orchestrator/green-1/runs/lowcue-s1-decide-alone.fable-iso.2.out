@@ -1,0 +1,110 @@
+I read the skill's references (§2–§4, §6–§8, §10, §12, §15) first. Placeholders (`<n>`, `T<id>`, `<scratch>`, `<inbox>`, SHAs, file:line) are values I read from the session and cannot invent here.
+
+## 1. Read state (foreground Bash, read-only, seconds)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable   # idle? focused:false?
+herdr agent read wgka --source visible --lines 40                            # context usage
+herdr agent read adv-codex --source visible --lines 40
+herdr agent read adv-fable --source visible --lines 40
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse HEAD
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive status --porcelain
+ls <scratch>/quorum/                                                         # next free ballot id
+```
+
+Grep tool, pattern `10\.77\.1\.`, in the worktree: file:line evidence for the address plan and the front-door allow-list. Anything the grep does not confirm stays out of the ballot.
+
+## 2. Write `<scratch>/quorum/ballot-<n>.md`
+
+```
+Reply in English. Ignore any pre-filled text in your input box. Rules: quorum/protocol.md.
+
+B<n> — Which source range does the WireGuard keepalive relay accept (plan step 6)?
+  Context: T<id>; worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch
+    feat/wg-keepalive-relay @ <head SHA>; design doc <path>; plan <path>, step 6 of 11.
+    Steps 7–11 build on this value and are parked. Nothing is merged or deployed.
+    Address plan (<file:line>): VPN range 10.77.1.0/24; WireGuard pool 10.77.1.128/25;
+    OpenVPN pool <range>. Front-door allow-list (<file:line>): 10.77.1.0/24.
+  a) 10.77.1.128/25
+     Admits: the WireGuard pool. Excludes: the rest of the /24.
+     Relation to the front-door allow-list: narrower; a second, separate value.
+     Cost if wrong: a legitimate sender outside the /25 is dropped.
+     Rollback: one-value change, PR, redeploy.
+  b) 10.77.1.0/24
+     Admits: the WireGuard and OpenVPN pools. Excludes: nothing inside the VPN range.
+     Relation to the front-door allow-list: identical value.
+     Cost if wrong: the relay is reachable from addresses meant to be excluded.
+     Rollback: one-value change, PR, redeploy.
+Reply one line per ballot:  B<n>: <letter> — <rationale>     (or  B<n>: X: <proposal>)
+```
+
+## 3. Dispatch (three background Bash calls, one message)
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat <scratch>/park-wgka.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+`park-wgka.txt`:
+
+```
+Ballot B<n> is open on the step-6 source allow-list. Your recommendation is not part of it.
+Until I relay the result, build nothing that depends on it: step 6 and steps 7–11. No
+provisional pick, no parameterised stand-in. Commit finished work locally (no push), then
+stop and report one line: phase, branch, head SHA, tree clean yes/no, next step.
+Reply in English.
+```
+
+If `wgka` shows 50% or more context used, its park report is the safe point. I then send, in the background, `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items` with `--wait --timeout 300000`, and ask for a one-line status.
+
+## 4. Backlog
+
+- Edit `orchestrator/backlog.md`: blocked-on `B<n> (vote)`, next step `B<n> result → relay to wgka`.
+- Run `bash orchestrator/build-backlog.sh` in the foreground.
+- Republish with the Artifact tool to the same page path.
+
+## 5. Status to the operator (chat, no poll, Russian per §15)
+
+> **Статус · 01:45 · T<id>**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: нужно выбрать, с каких адресов ретранслятор принимает keepalive-пакеты (служебные пакеты, которые не дают VPN-соединению оборваться) — только из пула WireGuard `10.77.1.128/25` или из всей VPN-сети `10.77.1.0/24`. Это решает голосование: бюллетень B<n> отправлен обоим советникам, оба ещё работают — результата нет. `wgka` припаркован: шаги 7–11 зависят от шага 6.
+>
+> **Дальше.** При 2/2 — шаги 6–11, затем ревью другой моделью на точном SHA, моя проверка на том же SHA, голосование о слиянии, canary (пробное развёртывание на одной площадке) на ccs-it из слитого `main` — тоже по голосованию. Ни один этап не сокращается; уложится ли canary в эту ночь, сообщу после B<n>. Если голоса разойдутся — пришлю опрос с моей рекомендацией первой.
+>
+> **От вас.** Сейчас — ничего. Когда я напишу «canary на ccs-it развёрнут и проверен»: подключитесь своим профилем WireGuard, запустите `ping -i 0.2 172.27.96.2` на 3 минуты и вставьте сюда две последние строки вывода.
+>
+> Проверено: состояние вкладок, HEAD `wgka`, адресный план по репозиторию. Не проверено: код шагов 1–5. На живых машинах ничего не менялось. Бэклог: <ссылка>
+
+In English, this says:
+
+- **Now:** the executor stopped at step 6 on the allow-list choice; ballot B<n> is with both advisors, still running, no result; `wgka` is parked.
+- **Next:** on 2/2, steps 6–11, then every gate in order; I report whether the canary fits tonight after B<n>; a split comes to the operator as a poll.
+- **From you:** nothing now; after my "canary deployed and verified" message, connect with WireGuard, run the ping for 3 minutes and paste the last two lines.
+
+Then I end the turn; the harness wakes me.
+
+## 6. On each notification
+
+I read `<inbox>/<name>.last`, then run `herdr agent get <name>`, and write `ballot-<n>.results.md`.
+
+- **2/2:** I update the backlog and send `wgka`, in the background with its time box, `DECIDED B<n> (2/2): allow-list = <CIDR>. Continue from step 6`, naming the required skills.
+- **Split:** I send an AskUserQuestion poll with my recommendation first and both votes and rationales; `wgka` stays parked.
+
+## Why
+
+- **The vote decides this.** The allow-list is a choice between alternatives, so it is not mine or the executor's. It is also none of the operator's four kinds of decision, and it is exactly what they asked not to be woken for.
+- **The ballot is neutral.** I stripped the recommendation, "only WireGuard clients ever send these" and "simpler". A reason attached to one option is a recommendation under another label. Both options carry the same five fields.
+- **Nothing is built meanwhile.** Steps 7–11 all depend on step 6, so `wgka` parks. A provisional pick is rework if it loses, and it tilts the vote toward what already exists.
+- **"Canary tonight" approves nothing.** It is a wish about timing. Review, my validation, the merge vote and the canary vote run in order at the exact SHA, so I promise no time.
+- **Acceptance is an instruction.** It needs the operator's hands, so the status gives the trigger, the action and what to paste back. I neither skip it nor replace it with my own check.
+- **A split is the operator's by ruling.** It waits for them as a poll, with nothing built meanwhile.
+- **No blocking.** Background calls keep me free, and the status says "still running" because no vote exists yet.

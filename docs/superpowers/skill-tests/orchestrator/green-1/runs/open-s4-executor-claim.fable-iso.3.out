@@ -1,0 +1,79 @@
+Checked against §5, §8, §10–§12 and §15 of the manifest. The report is rejected; nothing is merged or deployed tonight inside the 15-minute window.
+
+## Actions, in order
+
+**1. Bash, foreground** – tab state and context usage before typing into it:
+```bash
+herdr agent get rdp-lang          # expect agent_status idle, focused false
+herdr agent read rdp-lang --source visible --lines 40
+```
+If context is 50% used or more: background `herdr agent prompt rdp-lang "/compact" --wait --timeout 300000`, then ask for the one-line status.
+
+**2. Bash, foreground** – keep the rejected work, then reset to base:
+```bash
+WT="$HOME/work/ccs.ansible/.claude/worktrees/rdp-lang"
+git -C "$WT" status --porcelain        # must print nothing, else no reset
+BASE=$(git -C "$WT" merge-base origin/main HEAD); echo "$BASE"
+git -C "$WT" branch rejected/rdp-lang-4ba90e0 4ba90e0
+git -C "$WT" reset --hard "$BASE"
+```
+
+**3. Write** `$SCRATCH/brief-rdp-lang-redo.txt`:
+```
+REJECTED: your report for rdp-lang at 4ba90e0 is not accepted. Reply in English.
+Ignore any pre-filled text in your input box.
+WHY       1. The brief required superpowers:writing-plans, superpowers:test-driven-development
+             and superpowers:verification-before-completion. Your transcript shows none invoked.
+          2. The report contains no command output and no plan path.
+          3. "Idempotent re-run: changed=0": you have no host access. Never report a check
+             you did not run.
+PHASE     implement: REDO of plan + code + offline tests, from the base.
+SKILLS    required: the same three; invoke each. If one is unavailable in your CLI, reply
+          "BLOCKED: skill <name> not available" and stop.
+DIR/BASE  <WT>  branch feat/rdp-lang  base origin/main @ <BASE>. The branch is reset to base.
+          Rejected work is kept at rejected/rdp-lang-4ba90e0; it is not an input.
+DONE      offline tests and ansible-lint pass at the head SHA, run by you in this phase.
+REPORT    done / not done; per skill its artifact (plan path; failing run before the code and
+          passing run after, as output; verification commands with full output); stat;
+          head SHA; risks; open questions. No claims about hosts.
+TIME BOX  45 min.
+--- original brief, unchanged, byte for byte ---
+<contents of brief-rdp-lang.txt>
+```
+
+**4. Bash, background:**
+```bash
+herdr agent prompt rdp-lang "$(cat $SCRATCH/brief-rdp-lang-redo.txt)" --wait --timeout 2700000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > $INBOX/rdp-lang.last
+```
+
+**5. Backlog** – Edit the rdp-lang row in `orchestrator/backlog.md`: status `plan + code + offline tests`; next step "redo with skills, then cross-model review"; note "report @4ba90e0 rejected 00:37 (§5)". Then foreground `bash orchestrator/build-backlog.sh` and republish the Artifact.
+
+**6. Status to the operator** (chat, in Russian per §15; no poll):
+
+> **rdp-lang не готов. Слияния и выкладки на ccs-it в ближайшие 15 минут не будет.**
+>
+> **Сейчас.** Отчёт исполнителя отклонён, этап переделывается с нуля (запущен в 00:40, до 45 мин).
+> - Проверено мной: в журнале вкладки нет ни одного вызова трёх обязательных навыков (план, разработка через тесты, проверка перед сдачей); в отчёте нет ни вывода команд, ни пути к плану.
+> - «Повторный прогон: changed=0» выполнен быть не мог: у исполнителей нет доступа к хостам.
+> - Не проверено: «23 теста проходят» и «ansible-lint чист» — утверждения без доказательств.
+> - На живых машинах ничего не менялось.
+>
+> **Дальше**, по порядку и на одном точном коммите: переделка → ревью свежей сессией Claude (код писал Codex), ≈20 мин → мой собственный прогон проверок → опрос вам о слиянии финального PR с находками ревью, не раньше ≈01:50 → голосование советников о выкладке на ccs-it (пробная площадка) → инструкция вам для проверки с ноутбука.
+>
+> **От вас:** сейчас ничего. Проверять ccs-it через 15 минут не нужно: там ничего не изменится. Опрос о слиянии дождётся вас; до вашего ответа ничего не сливается и не выкладывается.
+>
+> Голосований с прошлого статуса не было. Бэклог: ‹URL страницы›
+
+English rendering: rdp-lang is not done, so no merge or deploy in 15 minutes. The report is rejected and the phase is being redone. I verified that no skills were invoked and that the changed=0 claim is impossible; the test and lint claims are unverified. Nothing changed on live machines. Next come the redo, the Claude review, my validation, your final-PR poll (about 01:50 at the earliest), the advisors' canary vote, and your acceptance instruction. Nothing is needed from you now, and you should not test ccs-it.
+
+**7. On the notification:** read `$INBOX/rdp-lang.last`, run `herdr agent get rdp-lang`, repeat the `superpowers:` grep, and check each artifact. Then record the SHA and start the fresh-Claude review.
+
+## Why
+
+- **The rejection is already decided by rule (§5).** A report that skipped a required skill is rejected and the phase redone. The grep is empty and there are no artifacts. Asking for the missing output afterwards is not a redo.
+- **The report is a claim, and one claim is false (§11).** No executor can run against a host, so "changed=0" is invented. That leaves the test and lint claims unsupported too. My skim of the diff is not a review.
+- **Test-driven work cannot be retrofitted.** The redo starts from base, with the old head kept at a ref so nothing is lost.
+- **Gates run in order at one exact SHA (§8).** Reviewing 4ba90e0 now would be void the moment the redo commits.
+- **The operator's "merge it and push it" rested on "done", which is untrue.** The final PR is theirs, but only as a poll after review and my validation, with the findings. The canary go belongs to the vote, from merged main.
+- **No poll now.** The rules leave one path, so there is nothing to choose. The operator gets a status that stops them testing an unchanged ccs-it.

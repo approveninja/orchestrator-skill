@@ -1,0 +1,125 @@
+**Shorthand:** `S` = my scratch dir, `I` = `$S/inbox`, `T` = `$S/brainstorm/T<n>-novnc-layout`, `<n>` = next free backlog id. Operator-facing text is in English because this session's language instruction requires it.
+
+## Actions, in order
+
+**1. Bash, foreground: read-only checks**
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+herdr agent list      # rdp-audio must be focused:false before I type; confirms no prod-* tabs exist
+grep -n -i -E 'novnc|keymap|keyboard' orchestrator/backlog.md    # an existing entry gets cited in the brief
+codex plugin list </dev/null | grep -F superpowers               # brainstorming skill present for Codex
+```
+
+**2. Bash, foreground: queue the safe point (no `esc`, no `--wait`)**
+```bash
+herdr agent prompt rdp-audio "Finish the current step (task 7 to GREEN), commit, then stop and report: phase, branch, head SHA, next step. Do not start task 8. Reply in English."
+```
+
+**3. Bash, background: waiter**
+```bash
+herdr agent wait rdp-audio --timeout 1800000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$I/rdp-audio.last"
+```
+
+**4. Backlog.** Edit `orchestrator/backlog.md`:
+- New row: `| T<n> | noVNC keyboard-layout bug | brainstorm | prod-codex, prod-fable | — | — | stage 0 round 1 | — | — | no |`
+- `rdp-audio` row, next step: `safe point after task 7 → compact → tasks 8–9`
+
+Then `bash orchestrator/build-backlog.sh` (foreground) and the Artifact tool republishes the same page.
+
+**5. Bash, foreground: product-advisor tabs**
+```bash
+mkdir -p "$T"
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm" --label prod-codex --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- \
+  -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm" --label prod-fable --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- \
+  --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+**6. Write `$T/brief-r1-A.txt`** (`-B.txt` differs only in the letter and `draft-B.md`):
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — noVNC keyboard-layout bug
+ROUND      1 draft — ends when your draft file exists and your open questions are listed
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "have rdp-audio also fix the noVNC keyboard-layout bug — it's the same desktop role"
+FACTS      - CLAUDE.md, In-VM stack item 5: xstartup runs `setxkbmap -layout us,ru`; a managed
+             X keymap (roles/desktop tasks/vnc_keymap.yml, ccs-vnc-keymap) is on only where
+             ccs_vnc_keymap / ccs_vnc_keymap_hosts enables it.
+           - Same section: editing the xstartup template restarts tigervnc@1 and drops the
+             user's live X session.
+           - main f2a5305 merges PR #169 (feat/novnc-keys).
+           - NOT KNOWN: the symptom and the desktop the operator means. Asked; I relay the answer.
+DECIDED    CLAUDE.md hard rules bind, in particular 7, 9, 14, 17. The task gets its own
+           worktree and tab; branch feat/rdp-audio is another task and not a base.
+MAY        read the repository, upstream sources, the web
+WRITE      <T>/draft-A.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   45 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+Two Bash calls, **background**, one per tab:
+```bash
+herdr agent prompt prod-codex "$(cat "$T/brief-r1-A.txt")" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$I/prod-codex.last"
+```
+```bash
+herdr agent prompt prod-fable "$(cat "$T/brief-r1-B.txt")" --wait --timeout 2700000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$I/prod-fable.last"
+```
+
+**7. Status to the operator (chat)**
+
+> **Now**
+> - `rdp-audio` (the tab building RDP sound) is **still running**, so there is no result yet. It is on task 7 of 9: the test fails as intended and the code is being written.
+> - I did not interrupt it: no Esc, nothing in flight is cut. I queued one message it picks up between steps: finish task 7, commit, pause. Its working memory (context) is 70% full with tasks 8–9 still ahead; I tidy it (compact) for about five minutes, then it continues.
+> - The noVNC bug is a new task, T\<n\>, not an add-on to that tab. It is in the design stage: two advisors (Codex and Claude) each draft a design, criticise the other's, then merge them.
+>
+> **Why not the same tab:** your rulings are one task per tab and worktree (2026-09-21) and every task designed first (2026-09-28). A fix on `feat/rdp-audio` could also only be reviewed, merged and released together with RDP sound.
+>
+> **Next:** `rdp-audio` finishes tasks 8–9, then review and my own validation. The T\<n\> design goes to the voting advisors, then to you as an Artifact with a sign-off poll (hard rule 9).
+>
+> **From you:** one answer, below. Verified: the tab's screen and state at 03:05. Not verified: any test result.
+> Backlog: \<page URL\>
+
+**8. AskUserQuestion**
+
+> **Which noVNC keyboard fault do you mean?**
+> 1. Cyrillic letters are dropped or stop typing in the browser desktop (my best guess: the known fault, fixed only on the canary desktop so far)
+> 2. Switching between us and ru does not work
+> 3. Keys type the wrong characters
+> 4. Something else — I will describe it
+
+The answer goes to both advisors as a file path.
+
+**9. On the `rdp-audio` notification**
+
+Read `$I/rdp-audio.last`, run `herdr agent get rdp-audio`, and check `git -C .claude/worktrees/rdp-audio log --oneline -3` and `status --short` against the report. Then three background calls in sequence, each followed by the same `agent read > $I/rdp-audio.last`:
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+herdr agent prompt rdp-audio "One line: phase, branch, head SHA, next step." --wait --timeout 120000
+herdr agent prompt rdp-audio "Continue the plan: tasks 8-9, same brief and skills. Report as the brief says." --wait --timeout 3600000
+```
+
+## Why
+
+- **New work is a new task.** A second bug fix is new user-visible behaviour, so it enters the backlog and the design stage and gets its own tab and worktree. The operator asked for a tab, not a waiver of the design stage, and no deadline forces one.
+- **"Same role" is not "same task".** A tab's context carries the first task's assumptions, and one branch would tie two releases together.
+- **Context is at 70% used**, past the 50–60% compaction point, with two more TDD tasks to come. Automatic compaction would hit mid-task and keep the wrong things.
+- **A tab working through a plan never goes idle**, so I create the safe point with a queued message. It arrives at a tool boundary, which honours "don't interrupt": no Esc, no lost step.
+- **Every wait is a background call**, so I keep supervising instead of blocking or polling.
+- **"Almost done" is not what the screen shows.** I report task 7 of 9 and "still running", and claim no result.
+- **I design nothing.** The brief carries the operator's words and documented facts only.
+- **The symptom is a fact only the operator has.** I ask it now, as a poll, while they are present, rather than let the advisors stall on it.

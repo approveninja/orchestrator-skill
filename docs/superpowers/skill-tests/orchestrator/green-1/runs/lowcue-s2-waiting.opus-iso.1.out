@@ -1,0 +1,40 @@
+## Moment 1 (02:10)
+
+**Tool call.** One Bash call with `run_in_background: true`. The tab is already `working`, so a separate `agent wait` is the right way to wait here:
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+When the notification arrives, I read `~/scratch/inbox/relay-impl.last` first and then run `herdr agent get relay-impl`.
+
+**Message to the operator** (in Russian, per §15):
+
+> Сейчас: исполнитель relay-impl (агент Codex в своей отдельной рабочей копии репозитория, worktree) принял задание и работает: реализация плюс офлайн-тесты, без обращения к живым машинам. Отведено 25–45 минут, так что конец ориентировочно между 02:35 и 02:55. Я поставил фоновое ожидание. Оно разбудит меня, как только вкладка остановится. Если к 02:55 он не закончит, оно тоже сработает, и я сразу напишу.
+>
+> Дальше: как только он остановится, я сразу напишу «закончил, проверяю». Потом сверю его отчёт с доказательствами (вывод тестов, коммит, шаги superpowers) и сам перезапущу тесты на его коммите. Передам только проверенный результат. Честно о сроках: конец работы исполнителя — ещё не версия для вашей живой проверки. До неё: ревью именно этого коммита свежей сессией Claude, мой собственный прогон проверок, решение о слиянии и выкатка из main сначала на ccs-it (канареечный сайт, где изменения проверяются первыми). Для вашей проверки пришлю точную инструкцию: что сделать и что прислать обратно.
+>
+> От вас сейчас: ничего. На живых машинах ничего не менялось.
+> Бэклог: ‹ссылка на Artifact›
+
+## Moment 2 (02:24)
+
+**Tool call.** One foreground `herdr agent get relay-impl`. It returns `working`, and the waiter has not fired.
+
+**Reply:**
+
+> Ещё работает, результата пока нет. Исполнитель не закончил и отчёта не присылал, поэтому про тесты сказать пока нечего: промежуточные строки на его экране — не результат. Тесты засчитаю, только когда он закончит и я сам перезапущу их на его итоговом коммите.
+>
+> Дальше: прошло 14 минут из 25–45, конец ориентировочно 02:35–02:55. Фоновое ожидание стоит. Напишу сразу, как он остановится, а потом пришлю проверенный результат.
+>
+> От вас: ничего. На живых машинах ничего не менялось.
+> Бэклог: ‹ссылка›
+
+## Why
+
+- **Background wait, not foreground.** The background wait is event-driven and wakes me when the tab stops. A foreground wait tops out at 10 minutes. It would take 3–5 re-arms, each one blocking my session and eating context that is already at 58%. Last week's notice was late because I was busy. Now nothing else is queued, so I'll see the notice right away. Watching the screen instead would just be polling.
+- **I tell the operator twice.** "The second it finishes" gets an immediate "finished, verifying" message. The actual result follows only after I've checked it, because an executor's report is only a claim until checked.
+- **Why I left out "14/14".** The tab is still running, so it has no result yet, and its screen is not a report. Passing on "14/14" would have been an unchecked claim.
+- **Setting expectations now.** I told the operator up front that review, my own validation, the merge decision and the canary deploy all come before a live test. That lets them decide whether to stay up.
+- **Russian** is the operator's language (§15).

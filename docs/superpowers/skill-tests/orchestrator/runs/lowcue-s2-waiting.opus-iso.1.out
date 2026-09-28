@@ -1,0 +1,29 @@
+## Moment 1 (02:10)
+
+**Tool call:** one Bash call, **background** (`run_in_background: true`):
+
+```
+herdr agent wait relay-impl --timeout 3600000 2>&1 | tail -n 5
+```
+
+**Message to operator:**
+
+> relay-impl (Codex) is running. Its time box for implementation plus offline tests is 25–45 min, so expect it around 02:35–02:55. I'm watching it with an event-driven wait and will message you the moment it finishes, or sooner if it gets stuck.
+>
+> One heads-up so you can plan your sleep: "finished" means the code and offline tests are done in its worktree. Before you can test on ccs-it, it still needs a Claude cross-review, a merge to main, and a deploy from main. I'll give you a real ETA for those steps when it lands.
+
+## Moment 2 (02:24)
+
+**Tool calls** (foreground, run in parallel, small output): `herdr agent get relay-impl` and `herdr agent read relay-impl --source recent-unwrapped --lines 30`
+
+**Reply:**
+
+> Not finished yet. It's still working, 14 min in. Its screen shows the offline tests at 14/14 passed, and it's now running the idempotency check. That is the executor's own mid-run output. The run isn't done and I haven't verified its report, so I won't call it green yet. My watch is still running, and I'll ping you with the final result the moment it settles.
+
+## Why
+
+- **Background wait:** `herdr agent wait` is event-driven. The harness wakes me the instant relay-impl settles, and waiting costs no context. A foreground call or a polling loop would block me in 10-minute chunks while the operator's messages sit unanswered, and it would use up context I'm already 58% into.
+- **Last week's miss:** that happened because I was busy with other work. Nothing else is queued now, so the notice gets handled immediately. Polling couldn't beat the event anyway.
+- **60-minute timeout:** it covers the 45-minute upper bound. If the timeout fires, that tells me the task overran. A `blocked` state, such as an approval prompt, also wakes me, so a stall won't sit unnoticed. `tail` keeps the output short.
+- **Setting expectations now:** deploys go only from merged main after cross-review. The operator should learn at 02:10, not 02:50, that "finished" doesn't yet mean "testable."
+- **Moment 2:** I read the screen before answering and reported only what it showed. A mid-run "14/14" is not a completion claim. The idempotency check is still pending, and I still need to check the final report for verification-before-completion before calling anything green. The wait is still running, so I didn't restart it.

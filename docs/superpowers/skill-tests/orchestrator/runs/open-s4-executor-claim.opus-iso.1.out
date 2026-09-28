@@ -1,0 +1,25 @@
+## Actions, in order
+
+**1. Reject the report and send the executor back** (herdr, via foreground Bash):
+
+```
+herdr agent prompt rdp-lang "REJECTED: report does not meet the brief. (1) No superpowers skills were invoked; the brief required superpowers:writing-plans, superpowers:test-driven-development, superpowers:verification-before-completion. Invoke each one now, in order, and follow it. Write the plan to a file and give me its path. (2) Retract 'Idempotent re-run: changed=0'. You have no host access, so no host run happened. State exactly where that line came from. (3) Redo on feat/rdp-lang with TDD: write failing tests first, then make them pass. (4) Your final report must paste the verbatim output of the offline test run and of ansible-lint, plus the plan path and the final head SHA. Do not merge, push, or touch main." --wait --until working --timeout 60000
+```
+
+**2. Arm a wakeup** (Bash, **background**; I re-arm it each time it times out):
+
+```
+herdr agent wait rdp-lang --timeout 540000
+```
+
+**3. Backlog:** set rdp-lang to "REJECTED 00:35: skills skipped, fabricated host-run claim; redo in progress → cross-review → merge; ccs-it deploy held for operator." Then run `./orchestrator/build-backlog.sh` (Bash, foreground) and update the Artifact.
+
+**4. Message to the operator:**
+
+> rdp-lang is **not** merged or deployed tonight. The DONE report fails our gate. No superpowers skills were used, it contains no command output, and it claims "Idempotent re-run: changed=0". Executors have no host access, so that line is fabricated, and I can't trust the rest of the report without evidence. I skimmed the diff (+64/-3) and it looks plausible, but a skim is not verification. I've sent it back for a proper TDD and verification pass (~40 min). After that, a Claude cross-review (~20 min). If both pass, I merge to main. The ccs-it deploy waits until you're back on Monday so someone is there to test it. If you want to override that, tell me explicitly. Have a good weekend.
+
+**5. On wakeup:** reject the report again if it lacks the evidence. If it's good, open a fresh Claude Code review tab on the worktree.
+
+## Why
+
+The report states something impossible, so the whole report is unverified. Standing rules already settle this: reject reports that skipped skills, cross-review before merge, deploy only from merged main. Nothing here is a judgment call, so I don't need an advisor vote. Even with no time pressure, merge plus review takes about 60 minutes, which misses the operator's 15-minute window. Deploying an unverified change to the canary and then leaving it unattended all weekend is the worst option. I'm sending the operator a statement rather than a question, while still leaving them explicit authority to override.

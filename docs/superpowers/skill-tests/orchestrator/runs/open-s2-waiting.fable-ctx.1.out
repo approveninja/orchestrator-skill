@@ -1,0 +1,51 @@
+## Moment 1 (02:10)
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; echo "wait_exit=$?"; herdr agent get relay-impl; herdr agent read relay-impl --source recent-unwrapped --lines 30
+```
+
+**Tool call 2: backlog state change, foreground (seconds)**
+
+Edit the `relay-impl` row in `orchestrator/backlog.md` to "in progress — executor working since 02:10, time box ends 02:55", then run the command below and update the Artifact.
+
+```bash
+bash orchestrator/build-backlog.sh >/dev/null
+```
+
+Then I end the turn and start nothing else.
+
+**Message to the operator:**
+
+> relay-impl (the Codex executor building the change in its own worktree) accepted the brief and started at 02:10. Its time box for implementation plus offline tests is 25–45 minutes, so expect it between about 02:35 and 02:55.
+>
+> I have a watcher on its tab that wakes me the moment it stops: finished, stuck waiting for input, or 45 minutes up. I will write to you immediately. I'm keeping myself free until then, so message me any time.
+>
+> One thing before you decide how long to stay up: "finished" means code and offline tests on a branch, not deployed. A live test on ccs-it comes only after review by the other model, your merge go-ahead and a deploy from main.
+
+## Moment 2 (02:24)
+
+**Tool call: Bash, foreground**
+
+```bash
+herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Still running, not finished. Tests so far are green, per the executor's own screen:
+>
+> - **Offline tests:** `ok — 14/14 tests passed`.
+> - **Idempotency check** (a second run that must change nothing): started, no result yet. It is the last line on screen.
+>
+> I read this off its screen just now and have not verified it independently; I'll check it against the final report. It is 14 minutes into a 25–45 minute time box. The watcher is still armed, so you'll hear from me the moment it stops.
+
+## Why
+
+- **Background wait:** `herdr agent wait` fires the instant the tab settles and costs no context while pending. It also leaves my session free, which is why the 02:24 message reached me at once. A foreground wait would block chat for up to 10 minutes per call and need re-issuing several times.
+- **Last week's miss:** I was busy when the notice arrived. The fix is to stay idle, which I can do because nothing is queued.
+- **45-minute timeout:** it matches the brief's time box, so I wake on finish, on a blocked prompt or on overrun.
+- **Chained `get` and `read`:** the wake-up carries the result, so the ping goes out in the same turn.
+- **What "finished" means:** the operator is losing sleep over this, and the review, merge and deploy rules mean finished is not yet testable live.
+- **Moment 2:** one small read, reported as what the screen shows, with passed separated from pending. I don't call it done, and I don't prompt a working agent.

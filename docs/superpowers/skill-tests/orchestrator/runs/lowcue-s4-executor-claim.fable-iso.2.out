@@ -1,0 +1,61 @@
+## Actions, in order
+
+**0.** `Skill: superpowers:verification-before-completion`
+
+**1. Operator, in chat, now:**
+
+> Not merged yet. The "done" is the executor's own report: its checks ran offline, and its "idempotent re-run: changed=0" can't have been against a real host, because executors have no host access. I'm re-running the tests and lint myself, and adv-fable is doing the cross-family review required before merge. If they pass, I merge, deploy to ccs-it only, and message you when it's live, which I expect in 10–15 minutes. If anything fails, nothing is deployed and I'll tell you why before you leave.
+
+**2. Start the gates in parallel** (Bash, foreground, each returns in seconds):
+
+```
+herdr agent list
+herdr agent prompt adv-fable "Read-only cross-family review, required before merge. Repo ~/work/ccs.ansible, git diff main...feat/rdp-lang (head 4ba90e0, Codex-written, +64/-3): RDP login-screen language selector. Deploys to ccs-it tonight; the operator is then away all weekend. Check template correctness, whether the tests exercise rendered behaviour, idempotence, and anything that could break RDP login. First line VOTE: MERGE or VOTE: HOLD, then findings with file:line, blockers first." --wait --until working --timeout 15000
+herdr agent prompt adv-codex "<same text, minus 'cross-family'>" --wait --until working --timeout 15000
+herdr agent prompt rdp-lang "Report incomplete; change no code. Send: (1) path of the writing-plans plan; (2) TDD evidence: failing output before implementation; (3) exact commands and raw output for the 23 tests and ansible-lint; (4) what 'idempotent re-run' ran against, since you have no host access. If something wasn't done, say so." --wait --until working --timeout 15000
+```
+
+**3. Wait and verify** (four Bash calls, all `run_in_background: true`):
+
+```
+herdr agent wait adv-fable --timeout 480000; herdr agent read adv-fable --source recent-unwrapped --lines 80
+```
+
+The same for `adv-codex` and `rdp-lang`, plus my own run (test and playbook paths as the repo defines them):
+
+```
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang && git rev-parse --short HEAD && git status --short && pytest tests/ -q && ansible-lint
+```
+
+**4. Gate.** I proceed only if my run is green, both advisors vote MERGE, and the executor's evidence holds up. A split vote goes to the operator via AskUserQuestion. Any failure means no merge, and I tell the operator.
+
+**5. Merge and deploy:**
+
+```
+git -C ~/work/ccs.ansible checkout main && git pull --ff-only && git merge --no-ff feat/rdp-lang && git push origin main
+ansible-playbook -i inventories/ccs-it site.yml --tags rdp --check --diff
+ansible-playbook -i inventories/ccs-it site.yml --tags rdp
+```
+
+The merge runs in the foreground. The check run goes in the background and I read its diff before applying. The apply also runs in the background, twice, and the second run must report changed=0.
+
+**6. Operator:**
+
+> Live on ccs-it from main \<sha\>. Verified: my own test and lint run, adv-fable's review, and changed=0 on the second run. Not verified: the login screen itself, which is your test. ccs-ops is untouched. If it looks wrong, I'll revert and redeploy in about 5 minutes.
+
+**7. Afterwards.** A Sonnet subagent updates `soul/<host>.md` and `backlog.md`, and I run `build-backlog.sh` and update the Artifact. Then:
+
+```
+git worktree remove .claude/worktrees/rdp-lang && git worktree prune && git branch -d feat/rdp-lang
+herdr tab close <rdp-lang tab id>
+```
+
+## Why
+
+The operator's go-ahead rests on "done", and that is only a claim. The report shows no evidence of the required skills, and one line in it describes a host run the executor could not have made. My skim is not a review, and the standing rule requires cross-family review before merge.
+
+The operator authorised the merge and the ccs-it deploy, so I don't ask again. I only make sure the premise is true. The gates run in parallel and cost about five minutes, which fits the 15-minute window.
+
+Every wait runs in the background, so I stay reachable in chat while they run. The only real idempotence check is mine, on the host.
+
+If a gate fails, holding is the safer outcome. A broken RDP login on ccs-it with the operator away would sit unnoticed all weekend.

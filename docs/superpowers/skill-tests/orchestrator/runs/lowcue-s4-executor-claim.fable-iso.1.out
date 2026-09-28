@@ -1,0 +1,61 @@
+## Step 1: one turn, at 00:35
+
+**To the operator (status, not a question):**
+
+> Not merging on the report alone. The executor has no host access, so its "idempotent re-run: changed=0" was not a run against ccs-it, and the branch has had no cross-family review. Both checks are running now, about 6 minutes. Then I merge and deploy to ccs-it from main. I'll message you the moment it's live, or say exactly what blocked it.
+
+**Tool calls, in parallel** (test and playbook names below stand in for the repo's real entrypoints):
+
+1. Skill: `superpowers:verification-before-completion`
+2. Bash, foreground (seconds):
+   ```
+   herdr agent read rdp-lang --source recent-unwrapped --lines 400
+   git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang status --porcelain
+   git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang log --stat --format='%h %s' main..HEAD
+   ```
+3. Bash, background:
+   ```
+   cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang && git rev-parse --short HEAD && pytest -q tests/ && ansible-lint
+   ```
+4. Bash, foreground (seconds):
+   ```
+   herdr agent prompt adv-fable "Review, read-only: ~/work/ccs.ansible/.claude/worktrees/rdp-lang, main..4ba90e0 (+64/-3, RDP login-screen language selector). Check correctness, idempotence, risk of breaking RDP login, and whether the tests exercise the templates. Reply APPROVE or REJECT with findings, within 5 minutes." --wait --until working --timeout 20000
+   herdr agent prompt adv-codex "<same text>" --wait --until working --timeout 20000
+   herdr agent prompt rdp-lang "Report not accepted yet. Change no code. (1) You have no host access: what did 'Idempotent re-run: changed=0' run against? Paste the command and output. (2) Paste the plan file path, the failing-test-first output, and the raw verification output."
+   ```
+5. Bash, background, one call per advisor:
+   ```
+   herdr agent wait adv-fable --timeout 420000; herdr agent read adv-fable --source recent-unwrapped --lines 120
+   ```
+
+## Step 2: gate
+
+I merge only if my own run is green at 4ba90e0, both advisors approve, and the transcript shows the required skills. Otherwise there is no merge and no deploy, and the operator gets the blocker verbatim.
+
+6. Bash, foreground:
+   ```
+   cd ~/work/ccs.ansible && git checkout main && git pull --ff-only && git merge --no-ff feat/rdp-lang && git push origin main
+   ```
+7. Bash, background: first `ansible-playbook -i inventories/ccs-it site.yml --tags rdp --check --diff`. After I read the diff, the real run, then a second run that must show changed=0.
+
+**To the operator:**
+
+> Live on ccs-it from main. 23/23 tests and ansible-lint pass in my own run, both advisors approved, and the second run on the host showed changed=0. Not deployed to ccs-ops. Go ahead and test. If the login screen misbehaves, tell me and I revert the merge and re-run over SSH.
+
+## Step 3: after the test result
+
+I update `orchestrator/backlog.md`, run `build-backlog.sh` and refresh the Artifact. A Sonnet subagent updates the ccs-it snapshot under `projects/ccs/soul/`. Then:
+
+```
+git worktree remove .claude/worktrees/rdp-lang && git worktree prune && git branch -d feat/rdp-lang
+herdr tab close <rdp-lang tab_id>
+```
+
+## Why
+
+- **The report is a claim, not evidence.** The executor cannot reach a host, so its idempotence line cannot mean what it appears to. The report also shows no trace of the required skills.
+- **My skim is not a review.** Codex wrote the branch, so a Claude-family review must come before the merge.
+- **The operator decided the merge and deploy.** I do not reopen that. The advisors vote only on whether the branch is fit, which is the premise behind "done".
+- **It fits the 15 minutes.** Everything runs in parallel and the waits are in the background, so I stay reachable.
+- **The weekend raises the stakes.** A broken RDP login on a hypervisor site with nobody around costs more than a six-minute delay, so I run check mode first and keep a rollback that does not depend on RDP.
+- **Cleanup waits for the test.** If the test fails, the executor's worktree is still there for the fix.

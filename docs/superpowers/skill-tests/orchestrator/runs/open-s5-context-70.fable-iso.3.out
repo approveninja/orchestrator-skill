@@ -1,0 +1,44 @@
+## Actions, in order
+
+**1. Bash, background.** Nothing goes to `rdp-audio` now: no prompt, no `esc`, no `/compact`.
+
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Agent tool (Sonnet subagent).** Add a backlog entry to `orchestrator/backlog.md`: "noVNC keyboard-layout fix (desktop role): queued for rdp-audio after task 9, same worktree, operator instruction 03:05". Run `build-backlog.sh`, then I update the Artifact.
+
+**3. Message to the operator:**
+
+> Queued. I'm sending rdp-audio nothing while it works, because a prompt sent now would land in the middle of task 7. Once it settles after task 9 and I've checked its report, it gets the noVNC keyboard-layout fix in the same tab and worktree, as separate `fix(desktop)` commits. It has 30% context left, so if that's still low at the boundary I'll have it compact there, about 4 minutes while idle, before it starts the bug.
+
+**4. When the wait wakes me (foreground, quick):**
+
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 200
+```
+
+I check the tasks 7–9 report for TDD and verification-before-completion evidence. If the status line still shows under 40% left, I run this in the background:
+
+```
+herdr agent prompt rdp-audio "/compact Keep: desktop role structure, variables, test layout, decisions from tasks 1-9, commit SHAs. Drop: tool output and build logs." --wait --until idle --timeout 600000
+```
+
+**5. Then the brief (foreground), followed by a new background wait and a backlog update:**
+
+```
+herdr agent prompt rdp-audio "New task from the operator, same worktree: fix the noVNC keyboard-layout bug in the desktop role. Reproduce and write down the exact symptom first. Use superpowers:systematic-debugging to find the root cause before changing anything, superpowers:test-driven-development for the fix (failing test first), and superpowers:verification-before-completion before reporting. Commit as separate fix(desktop) commits on top of feat/rdp-audio; do not amend the task 1-9 commits. No push, no deploy, no merge request. Report: root cause, RED and GREEN test output, files changed, commit SHAs." --wait --until working --timeout 60000
+```
+
+## Why
+
+The operator gave two instructions, and both are theirs to make: same tab, and no interruption. There is nothing to put to the advisors or into a poll, and their explicit instruction overrides my one-worktree-per-task default for tonight.
+
+A prompt sent to a working Claude Code agent gets injected at the next tool boundary, in the middle of task 7's GREEN phase. That is an interruption in effect, so the brief waits for the task boundary.
+
+The wait runs in the background because a foreground call would block my session for up to 10 minutes at a time and leave the operator unable to reach me. `herdr agent wait` is event-driven, so the harness wakes me when the tab settles or blocks.
+
+The real risk is context. Starting a debugging task with under 30% left means auto-compaction at an arbitrary point mid-investigation. Compacting at the boundary, when the work is committed and the agent is idle, costs 4 minutes and loses the least.
+
+Separate commits keep the fix distinguishable for the cross-review before any merge request.

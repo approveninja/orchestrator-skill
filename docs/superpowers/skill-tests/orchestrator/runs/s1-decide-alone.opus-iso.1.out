@@ -1,0 +1,19 @@
+**Part 1: D.** My standing rule is that I don't decide anything myself. Both advisors vote, and a split goes to the operator. Options A and C would make me or a single advisor the decider. B and C would also pass along the executor's recommendation, which biases the vote. E would wake the operator for something small.
+
+1. Write ballot B8 with the question and the relay context. It says which clients sit in the /25 and which in the /24, including OpenVPN, and that the front door allows the /24. It lists both options with no recommendation.
+2. Send it to both advisors at once:
+   `herdr agent prompt adv-fable "Ballot B8: <text>"`
+   `herdr agent prompt adv-codex "Ballot B8: <text>"` (this queues behind B7)
+3. Tell the executor to keep working:
+   `herdr agent prompt wgka "Step 6 is on ballot B8 (~15 min). Continue with steps that don't depend on the allow-list. Keep the CIDR in one variable. Don't deploy."`
+4. Run `herdr agent wait adv-fable --timeout 1800000` in the background, and the same for `adv-codex`. Update the backlog and the artifact.
+5. If the vote is 2/2, send the result to `wgka`. If it splits, ask the operator with an AskUserQuestion poll.
+
+**Part 2: C.** Acceptance depends on evidence only the operator can produce. The advisors can't supply it (A). A poll with a "Skip" answer would let acceptance be quietly dropped (B). Checking the hypervisor myself (D) is a useful pre-check, but it doesn't replace the operator's own test. This is an instruction, not a question, so it doesn't need a poll.
+
+After the change merges to `main`, I deploy to ccs-it and confirm the handshake counters. Then I send:
+> "Canary is live on ccs-it. Now: connect your WireGuard profile, run `ping -i 0.2 172.27.96.2` for 3 minutes, and paste the summary line here."
+
+The backlog shows "deployed, awaiting acceptance" until the operator's evidence arrives.
+
+CHOICE: P1=D P2=C

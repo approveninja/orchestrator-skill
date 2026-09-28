@@ -1,0 +1,34 @@
+## Moment 1 (02:10)
+
+**Tool call.** One Bash call, run in the **background** (`run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 3600000; herdr agent get relay-impl
+```
+
+**Message to the operator:**
+
+> relay-impl is running. It started at 02:10 with a 25–45 min time box, so expect it around 02:35–02:55. I have an event-driven wait on it that wakes me the moment it goes idle, done, or blocked. Nothing else is running on my side, so I'll ping you right then, including if it gets stuck on a prompt. Heads-up: "finished" means the executor is done. Before anything touches ccs-it, it still needs my check of its report, a Claude-side cross-review, and a merge to main.
+
+## Moment 2 (02:24)
+
+**Tool call.** One Bash call, run in the **foreground** (it returns instantly). The background wait stays armed.
+
+```bash
+herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Not finished yet. relay-impl is still working. Its screen shows the offline tests at 14/14 passed, and it's now running the idempotency check. That is the executor's own live output, not its final report, and I haven't verified it yet. So: unit tests pass so far, idempotency is pending. It's still inside the time box (≈02:35–02:55). My wait is still armed, and I'll ping you the moment it settles.
+
+## Why
+
+- **Background wait, not foreground polling.** `herdr agent wait` returns on herdr's socket event, so I learn about the finish with almost no delay.
+- **Last week's miss doesn't apply here.** I missed that notice because I was busy. Tonight nothing else is queued, so the wake-up gets handled immediately.
+- **Foreground would cost more and block me.** The 10-minute cap means 3–5 re-arms for a 45-minute job, each one spending context I'm short on (58%). It would also lock me out of the chat, so the operator's Moment-2 question would sit unanswered.
+- **The 60-minute timeout** covers the upper time box plus slack. If it fires, that tells me the job overran.
+- **Waking on "blocked" matters.** A Codex executor stalled on an approval prompt is exactly what the operator would want to hear about at 2 a.m.
+- **At Moment 2, one small read (15 lines)** is enough to answer. A long scrollback dump would waste context.
+- **I don't say "green" as a verified claim.** The screen is the executor's mid-run self-report, and idempotency hasn't finished. The honest answer is "14/14 per its output, idempotency pending, not yet verified."
+- **I leave the wait running.** The Moment-2 check doesn't touch it, so the finish ping stays instant.

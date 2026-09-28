@@ -1,0 +1,26 @@
+**Part 1: C.** I run, with `run_in_background: true`:
+
+```
+herdr agent wait relay-impl --timeout 3000000; herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Then I tell the operator: "relay-impl is running (time box 25–45 min). I'll ping you the moment it settles."
+
+Why:
+- **Event-driven:** `wait` fires when the agent settles, including on `blocked`, so there's no polling lag.
+- **Context-cheap:** the report lands in a file, not in my context, which is already 58% used.
+- **Reachable:** A would block my session in 10-minute chunks, so the operator couldn't reach me. D burns context on every check.
+- **Last week's miss:** that happened because I was busy when the notice arrived. Staying idle is the fix, and nothing else is queued.
+
+**Part 2: B.** I send no commands and reply:
+
+"Still running. Its screen shows a 14/14 line mid-run, but that is not its report, and the idempotency check is still in progress. I'll confirm from its final report and my own run of the checks at its head SHA, then ping you immediately."
+
+Why:
+- **A overstates:** a line on screen mid-run is not a verified result, and the operator would plan their test around a claim I haven't checked.
+- **C derails:** interrupting the executor mid-check delays the very finish the operator is waiting for.
+- **D collides:** running tests in its worktree while it is still writing there risks interfering with its run and gives a result for a moving target.
+
+When the notification arrives, I read `~/scratch/inbox/relay-impl.last`, rerun the checks at its head SHA, and ping the operator with verified results.
+
+CHOICE: P1=C P2=B

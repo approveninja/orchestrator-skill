@@ -1,0 +1,90 @@
+I act on my own view of the timeout nowhere: the question goes to the two voting advisors as ballot B8, and the operator gets an instruction rather than a question. Operator texts are in English because this session is set to English; §15 would send them in Russian. Values in `<…>` come from command output I cannot run here.
+
+## Actions, in order
+
+**1. Foreground Bash (read-only, seconds)**
+
+```bash
+herdr agent get wgka                         # expect idle, "focused": false
+herdr agent read wgka --source visible       # context usage
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse HEAD
+```
+
+**2. Write `quorum/ballot-8.md`** (recommendation, my view and last night's precedent stripped)
+
+```
+B8 — Upstream read timeout of the WireGuard keepalive relay location
+Reply in English. Read-only. Vote independently.
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <head SHA>;
+    plan step 6 (<plan path>, <design doc path>).
+    Not measured: Pritunl's keepalive response time; the client's own request timeout.
+  a) `proxy_read_timeout 5s` in the relay location
+     + an upstream that does not answer releases the request after 5 s
+     − differs from every other location in the role; an answer slower than 5 s is cut off
+     cost if wrong / rollback: keepalives fail while the upstream is slow; delete the line, re-render, reload
+  b) no directive — nginx default 60 s
+     + nothing extra; same as every other location; a slow answer still gets through
+     − an upstream that does not answer holds each request up to 60 s
+     cost if wrong / rollback: requests pile up while the upstream hangs; add the line, re-render, reload
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**3. Background Bash — park the dependent step in `wgka`**
+
+```bash
+herdr agent prompt wgka "$(cat <scratch>/msg-wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+`msg-wgka-b8.txt`:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+Your step-6 question is ballot B8 with the voting advisors. It is OPEN; I will relay the result.
+Until then build nothing that depends on it: no proxy_read_timeout directive, no provisional
+value, no variable standing in for the choice, no test asserting either value.
+Continue with the plan steps that do not depend on it, same brief, local commits only.
+If none is left, reply "PARKED: waiting for B8" and stop.
+REPORT: steps completed, head SHA, test output, what stays blocked on B8. TIME BOX 30 min.
+```
+
+**4. Backlog** — set the task's `blocked-on` to "B8 (step 6 only)", then foreground `bash orchestrator/build-backlog.sh` and republish the Artifact.
+
+**5. Chat status to the operator (no poll)**
+
+> **Status 01:40 — WireGuard keepalive relay** (the listener that lets the VPN client's "I'm alive" request reach Pritunl). Backlog: <Artifact link>
+> **Now:** the executor raised one choice, how long the relay waits for Pritunl's answer. It is ballot B8 for the two advisors. B7 is still running.
+> **Next:** B8, step 6, cross-review, my validation, merge vote, canary vote, canary on ccs-it.
+> **From you:** nothing now. One hand action once I post "CANARY LIVE". Nothing changed on live machines.
+
+**6. On B7's existing waiter notification** — read `<inbox>/adv-codex.last`, run `herdr agent get adv-codex`, and record `quorum/ballot-7.results.md`. Then send two background Bash calls in one message:
+
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+**7. On both votes** — write `quorum/ballot-8.results.md`.
+- **2/2:** background prompt to `wgka`: `DECIDED B8 (2/2): <option>. Resume step 6, same brief. REPORT head SHA + test output.` Then update the backlog.
+- **Split:** step 6 stays parked and the operator gets an AskUserQuestion poll, my recommendation first, both votes and rationales shown.
+
+**8. When the canary is verified live — chat instruction**
+
+> **CANARY LIVE ccs-it <HH:MM> — acceptance, your hands, 3 minutes.**
+> 1. Connect with your **ccs-it WireGuard** profile (not OpenVPN, not ccs-ops).
+> 2. Run `ping -i 0.2 172.27.96.2` for 3 full minutes, then Ctrl-C.
+> 3. Paste here the last three lines (sent/received, loss %, min/avg/max) and whether the client reconnected.
+>
+> When: first thing when you are back at the keyboard. The ccs-ops rollout waits for this.
+
+## Why
+
+- **The vote decides.** The timeout is a choice between alternatives, so §10 gives it to the advisors. My agreement, the executor's recommendation and a precedent on a different timeout are one-sided inputs, so they are stripped.
+- **No operator poll.** It is none of the operator's four kinds of decision, which also honours "don't wake me for trivia".
+- **No provisional pick.** Work built on a guess is rework if it loses, and it tilts the vote.
+- **Both advisors at once, after B7.** The result cannot arrive before `adv-codex` votes, so holding `adv-fable` costs no wall-clock time. It also avoids queueing into a review mid-turn.
+- **Acceptance is the operator's hands.** Hard rule #17 bars me from the VPN path, so it is an instruction with what, when and what to paste back. It is issued when the canary is live, and the release rests on that evidence.

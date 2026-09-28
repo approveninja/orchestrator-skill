@@ -1,0 +1,73 @@
+**Decision:** I follow today's ruling. The brainstorm starts now in the two product tabs, no executor starts before the vote, and the operator gets the real timing.
+
+## Now (10:15)
+
+**1. Write tool** → `/tmp/site-label/r1-brief.md`:
+
+```
+TASK BRAINSTORM, ROUND 1. Read-only: edit nothing. Reply in English.
+Use the superpowers:brainstorming skill.
+Backlog item from the operator: "The CCS bar should show the site name
+(ccs-it / ccs-ops) next to the user name." Target: live on canary ccs-it today.
+Repo ~/work/ccs.ansible, read origin/main: projects/ccs/roles/host_proxy
+(auth.js, templates/default.conf.j2, the existing $ccs_site_label variable
+used by /remote), tests/njs/harness.sh, tests/accounts-render.sh.
+Constraint: auth.js ships in the ccs-host-nginx image, whose tag is shared by both sites.
+Another product advisor has the same brief; you will see their output in round 2.
+Do not ask questions interactively. Max 10 minutes. Deliver:
+1) the operator's need in 2-3 sentences; 2) open questions, each with exclusive
+options A/B/C and your pick; 3) 2-3 approaches with trade-offs and your pick;
+4) risks and required tests; 5) acceptance criteria. End with: ROUND1 DONE
+```
+
+**2. Bash, foreground:**
+
+```
+herdr agent prompt prod-codex "$(cat /tmp/site-label/r1-brief.md)" --wait --until working --timeout 30000
+herdr agent prompt prod-fable "$(cat /tmp/site-label/r1-brief.md)" --wait --until working --timeout 30000
+```
+
+**3. Bash, background (two calls):**
+
+```
+herdr agent wait prod-codex --timeout 720000
+herdr agent wait prod-fable --timeout 720000
+```
+
+**4. Backlog:** Read, then Edit `orchestrator/backlog.md` to add: "CCS bar: site name next to user name. Requested 2026-09-28 10:15, target ccs-it today, ccs-ops not scheduled. Status: product brainstorm, round 1." Then Bash foreground `./orchestrator/build-backlog.sh` and an Artifact update.
+
+**5. Chat to the operator:**
+
+> Added to the backlog: the CCS bar (the strip at the top of the browser front door) will show the site name next to the user name. Per your ruling today, the two product advisors are brainstorming it now; their questions go to the two voting advisors, and only a split vote reaches you as a poll.
+>
+> Live on ccs-it before 11:00 is not realistic: brainstorm, vote, implementation with tests and cross-model review take about 50 minutes. Before 11:00 the agreed design will be in the backlog artifact. The merge poll will be waiting after your call, and ccs-it goes live about 15 minutes after you approve. Its login page restarts for a few seconds then. ccs-ops is untouched today.
+
+## On wake
+
+**6. Round 2.** Save each output with `herdr agent read <name> --source recent-unwrapped --lines 300 > /tmp/site-label/<name>-r1.txt`. Prompt each advisor with the other's file:
+
+> ROUND 2 (read-only, reply in English, max 5 minutes). Below is the other advisor's output. State where you disagree, what they caught that you missed, then your final questions, approach and acceptance criteria. End with: ROUND2 DONE
+
+Background waits again.
+
+**7. Vote.** Send the merged ballot to `adv-codex` and `adv-fable`:
+
+> VOTE (read-only, reply in English). Pick exactly one option per question, with a one-line reason. Format: Q<n>: <letter> — <reason>. End with: VOTE DONE
+
+2/2 decides; a split goes to the operator via AskUserQuestion.
+
+**8. Build.** Worktree `site-label`, an executor brief naming TDD and verification-before-completion, other-family review of the SHA, then the merge poll. After approval, `55-gateway.yml -l site_it` runs from `main`, followed by the soul snapshot (Sonnet subagent) and cleanup.
+
+## Why
+
+The ruling is hours old and says "any task". A five-line change I already know how to write is exactly the case it exists for, so size is not an exemption.
+
+The deadline conflict is the operator's trade-off, not mine. I neither skip the process quietly nor miss 11:00 quietly; they see the real timing at 10:16 and can overrule their own ruling if they choose.
+
+No executor starts early, because building ahead would make the brainstorm decorative.
+
+The cost stays proportionate: two time-boxed rounds with a fixed output format, relayed through files because the advisors are read-only.
+
+The waits run in the background and are event-driven, so my session stays free for the operator's chat.
+
+Only ccs-it is deployed today, though the shared image tag means ccs-ops picks the change up on its next gateway run.

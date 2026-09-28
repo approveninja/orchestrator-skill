@@ -1,0 +1,45 @@
+**Language note:** §15 sets Russian as the operator-facing language, but this session's system instruction requires English and outranks the skill, so the messages below are in English.
+
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+`~/scratch/inbox` stands for my inbox directory. I make no other call and then end my turn.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex executor) picked up the brief at 02:10 and is working on the implementation plus offline tests (tests that run locally and touch neither site). Its time box is 25–45 minutes, so 02:55 at the latest.
+>
+> **Next:** a background waiter wakes me the moment the tab stops, whether it finished, hit a dialog or ran out of time. I ping you right then with what it claims, re-run the tests myself at its head commit, and send the verified result with the exact steps for your test. What will exist at that point is a branch in a worktree; nothing reaches `ccs-it` before review, validation and merge.
+>
+> **You:** nothing for now.
+>
+> Vote decisions since the last status: none. Backlog: ‹Artifact link›
+
+## Moment 2 (02:24)
+
+**Tool call first:** one foreground `herdr agent get relay-impl`, which returns `working`. I send no new waiter and nothing into the tab.
+
+**Reply:**
+
+> **Still running. There is no test result yet.** `relay-impl` is 14 minutes into its 25–45-minute time box and has not reported. What is on a running agent's screen is partial and unverified, so I am not calling anything green from it.
+>
+> **Next:** the waiter wakes me when the tab stops (02:55 at the latest). I ping you at once, re-run the tests at the head commit, and send the verified result with your test steps.
+>
+> **You:** nothing.
+>
+> Vote decisions since the last status: none. Backlog: ‹Artifact link›
+
+## Why
+
+- **Separate waiter:** the tab is already working, so §3 calls for a background `herdr agent wait` with the timeout set to the time box. Re-sending the brief would make the agent do the work twice.
+- **No watching:** the waiter fires the instant the tab settles, which is faster than 10-minute foreground blocks or screen checks. Those are polling, they block my session, and they burn context I cannot spare at 58%.
+- **Last week's missed notice:** it happened because I was busy. Nothing else is queued, so I stay idle and the notice lands on a free session.
+- **No "green" at 02:24:** a running agent has no result (§12). The idempotency check is still in progress, and "14/14" may come from a stale SHA or precede further changes. §11 records exactly this case, an idempotency claim written before the re-run happened.
+- **Cost of a guess:** the operator would decide whether to stay up or sleep on my answer.
+- **"Ping me the second it finishes":** I honour it with an immediate ping labelled as the executor's claim, followed by my own re-run.

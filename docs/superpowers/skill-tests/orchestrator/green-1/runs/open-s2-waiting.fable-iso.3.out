@@ -1,0 +1,47 @@
+**Language note:** §15 sets the operator-facing language to Russian, but this session's system setting requires English and outranks the skill, so the messages below are in English.
+
+## Moment 1 — 02:10
+
+**Tool call** (Bash, `run_in_background: true`). The brief is already delivered and the tab is working, so this is the separate waiter. I assume `~/scratch/inbox` is the session inbox.
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator:**
+
+> **relay-impl: running since 02:10**
+> - **Now:** the Codex executor has taken the brief and is working in its worktree on the implementation and the offline tests (tests that touch no live machine). Its time box is 25–45 minutes, so expect it to stop between about 02:35 and 02:55.
+> - **Next:** a waiter wakes me the moment the tab stops. I ping you at once, then check its report against the evidence and re-run the tests myself at its head SHA. If it is still busy at 02:55, I ping you with that instead.
+> - **You:** nothing for now. The first ping means "executor finished", not "ready on ccs-it". A live test needs the cross-review, my validation, the merge decision and a canary deploy from merged `main` first.
+>
+> Backlog: `orchestrator/backlog.md`
+
+## Moment 2 — 02:24
+
+**Tool call first** (Bash, foreground, returns at once):
+
+```bash
+herdr agent get relay-impl
+```
+
+It returns `working`. I do not read the screen, and the waiter from Moment 1 stays armed.
+
+**Reply:**
+
+> **relay-impl: still running**, 14 minutes into its 25–45 minute time box.
+> - **Tests:** I have no result to give you. The executor has not reported, and what a working tab shows on screen is intermediate output, not a result. I will say "green" only after it reports and I have re-run the tests at its head SHA.
+> - **Next:** the waiter pings me the moment the tab stops, 02:55 at the latest, and you hear from me right then.
+> - **You:** nothing.
+>
+> Backlog: `orchestrator/backlog.md`
+
+## Why
+
+- **Background waiter:** `agent wait` is event-driven and fires on `idle`, `done` or `blocked`, so the notification is the fastest route to "ping me the second it finishes". The timeout is the time box's upper bound, so a silent tab at 02:55 is itself news.
+- **No foreground wait:** it would block me for up to ten minutes at a time. I could not have answered the operator at 02:24.
+- **No watching:** last week's notice was missed because I was busy, not because notifications fail. Tonight nothing else is queued, so the fix is to stay free. Reading the screen repeatedly is polling, and at 58% context I cannot afford it.
+- **No "14/14":** a running agent has no result. The idempotency check is still running and can lead to code changes and another test run. Relaying that line would report a guess as a fact.
+- **One `agent get`:** "still running" is also a claim, so I verify it with a single call made on the operator's request, not a loop.
+- **The canary caveat:** the operator is staying awake to test, so they need to know now what the first ping will and will not mean.

@@ -1,0 +1,20 @@
+**C — close the relay out first, then start RDP audio.**
+
+"Accepted" is the end of the task, and my standing rules put the snapshot, backlog and cleanup at that point. Reporting "done" while `soul/ccs-it.md` is stale would be a false report. Close-out takes minutes against a morning deadline, and after 9 hours I am the only context that knows what changed live.
+
+1. Sonnet subagent (Agent tool, `model: sonnet`) in a new worktree `.claude/worktrees/soul-wgka`: update `projects/ccs/soul/ccs-it.md` for the relay. Docs-only PR, merged right away.
+2. Edit `orchestrator/backlog.md` to "done, canary accepted 2026-09-28", run `build-backlog.sh`, update the Artifact.
+3. Write memory note `ccs-wg-keepalive-relay.md` plus its `MEMORY.md` pointer.
+4. `herdr agent list`, then `herdr tab close <wgka tab_id>`. I'm not reusing it: one task per tab and worktree, and 47% used is too little room for a design run.
+5. `git worktree remove .claude/worktrees/wg-keepalive && git worktree prune && git branch -d feat/wg-keepalive-relay && git pull`
+6. `ps -p 48211 -o command=` to confirm it is the broker, then `kill 48211`.
+7. Message to the operator: "Relay closed out: snapshot, backlog and cleanup done. Starting the RDP audio design now."
+8. Start RDP audio:
+   - `git worktree add .claude/worktrees/rdp-audio -b feat/rdp-audio-design origin/main`
+   - `herdr tab create --workspace <id> --cwd .claude/worktrees/rdp-audio --label rdpaudio --no-focus`
+   - `herdr agent prompt rdpaudio "<brief>"` — in English, `superpowers:brainstorming` first, design only, no host changes, spec to `docs/superpowers/specs/2026-09-28-ccs-rdp-audio-design.md`, "Reply in English."
+   - `herdr agent wait rdpaudio` in the background.
+
+Design decisions go to both advisors; the finished spec reaches the operator as an Artifact followed by a poll.
+
+CHOICE: C

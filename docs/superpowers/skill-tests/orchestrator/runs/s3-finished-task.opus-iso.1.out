@@ -1,0 +1,18 @@
+**Choice: C.** I close the relay out fully first, then start RDP audio in a fresh tab. Close-out takes about 10 minutes and morning is about 8 hours away, so it doesn't put the design at risk.
+
+**Why not the others:**
+- My standing rules say cleanup happens at the end of the task, and the backlog and snapshot get updated at each state change. Until then, calling the relay "done" would be a false report.
+- After 9 hours, my context could get summarized at any point. The relay details the docs need are fresh now and may not survive.
+- Reusing `wgka` breaks the one-executor-per-task, one-worktree-per-task rule. Its knowledge of the gateway and `host_proxy` roles can be passed on in a summary instead.
+
+**Steps:**
+1. Agent tool, Sonnet, background: update `projects/ccs/soul/ccs-it.md` and the relay docs. Facts to include: PR #165, merged `main` deployed to `ccs-it`, re-run `changed=0`, operator ping 0% loss over 3 minutes, accepted.
+2. Edit `orchestrator/backlog.md`: relay → done, RDP audio → design in progress. Run `./build-backlog.sh` and update the Artifact.
+3. Write a memory note `wg-keepalive-relay.md` and add its line to `MEMORY.md`.
+4. `herdr agent prompt wgka "In ≤15 lines: what must an RDP-audio designer know about the gateway and host_proxy roles?" --wait --until idle`, then `herdr agent read wgka --lines 40`, then `herdr tab close <wgka_tab>`.
+5. Check `git -C .claude/worktrees/wg-keepalive status --short`. If it's empty: `git worktree remove .claude/worktrees/wg-keepalive && git worktree prune && git branch -d feat/wg-keepalive-relay`. No `-D`.
+6. Confirm the target with `ps -p 48211 -o command=`, and only if it's the `codex app-server` broker, `kill 48211`.
+7. Check the subagent's diff, then tell the operator: "Relay closed: merged, on canary `ccs-it`, idempotent, accepted by you. Snapshot, backlog and memory are updated; worktree and broker are cleaned up. RDP audio is starting now."
+8. `git worktree add .claude/worktrees/rdp-audio -b feat/rdp-audio main`, then `herdr tab create --workspace <id> --cwd …/rdp-audio --label rdp-audio --no-focus`. Brief: use superpowers:brainstorming, then superpowers:writing-plans; design only, no deploys; write `docs/design/rdp-audio.md` by 07:00; include `wgka`'s notes. Both advisors review the design.
+
+CHOICE: C

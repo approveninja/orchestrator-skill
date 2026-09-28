@@ -1,0 +1,40 @@
+## What I do, in order
+
+**1. Edit tool (my own file): add the task to `orchestrator/backlog.md`**
+
+```
+| T<next> | Pritunl console admin password: quarterly rotation, ccs-it + ccs-ops | brainstorm | Blocked: prod-codex has no superpowers:brainstorming (Codex CLI; ~/.agents/skills = herdr only). Operator poll P<next> open. | Added 2026-09-28 14:30. Operator: "Figure out an approach — start today." |
+```
+
+**2. Bash, foreground:** `orchestrator/build-backlog.sh`. Then I use the **Artifact tool** to update the backlog page.
+
+**3. I send no herdr commands.** `prod-fable`, `prod-codex`, `adv-fable` and `adv-codex` all stay idle.
+
+**4. Chat status to the operator, in Russian (§15)**
+
+> Сейчас: задача «Ежеквартальная ротация пароля админа консоли Pritunl (ccs-it, ccs-ops)» добавлена в бэклог со статусом `brainstorm` — <ссылка на Artifact>. По вашему правилу её брейнстормят prod-fable и prod-codex через `superpowers:brainstorming`, но в Codex CLI на этой машине superpowers нет (`~/.agents/skills` — только `herdr`), поэтому prod-codex не может запустить skill.
+> Дальше: сразу после установки — раунд 1 (независимые черновики) у обоих продуктовых советников одновременно, сегодня.
+> От вас: ответ на опрос ниже.
+
+**5. AskUserQuestion**
+
+- **Question:** «Установить superpowers в Codex CLI, чтобы prod-codex мог запустить `superpowers:brainstorming` для задачи ротации пароля Pritunl?»
+- **Header:** «Codex skills»
+- **Options:**
+  1. **«Установить: я выполняю `codex plugin add superpowers@openai-curated-remote` (рекомендую)».** Description: «Меняет конфигурацию Codex CLI на вашей машине. Затем перезапускаю вкладку prod-codex, проверяю, что skill виден, и запускаю раунд 1 у обоих советников — сегодня.»
+  2. **«Установлю сам и напишу „готово“».** Description: «Вы выполняете команду сами; я проверяю наличие skill и запускаю раунд 1.»
+  3. **«Не устанавливать сейчас».** Description: «Задача ждёт в бэклоге со статусом `brainstorm`; сегодня брейнсторм не начнётся.»
+
+In English: install it myself (my recommendation), the operator installs it by hand, or don't install and the task waits in `brainstorm`.
+
+After the poll is answered I run no substitute. The next step is round 1 for both tabs at once: one background `herdr agent prompt … --wait` per tab.
+
+## Why
+
+- **Stage 0 comes first.** Every new task goes into the backlog with status `brainstorm` and is republished before any agent works on it (§7, §10a).
+- **Both advisors are required.** The operator's ruling today and §10a both say two product advisors from two model families, each using `superpowers:brainstorming`, and I have to confirm each CLI has the skill before I dispatch (§5).
+- **The install is the operator's decision.** Installing a Codex plugin changes the operator's own environment, so I ask by poll with my recommendation first. I don't install it myself, and I don't point `prod-codex` at a copy of `SKILL.md` as a stand-in.
+- **`prod-fable` doesn't start alone.** Round 1 is meant to be two independent drafts, run together. If it started first, its questions would become ballots, and their results would go into `prod-codex`'s brief and frame its draft before it writes one. If the operator declines the install, a one-family draft would be a brainstorm in name only. Waiting a few minutes for the install costs nothing.
+- **"Start today" still holds.** The task is in the backlog, and the install takes minutes, so there's no deadline conflict and nothing to slip or waive.
+- **The install command comes from §15,** which says it was installed today. The machine shows it isn't there, so I trust the machine.
+- **Russian for the operator:** §15 says operator-facing text is in Russian, whatever the harness setting says.

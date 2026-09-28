@@ -1,0 +1,33 @@
+## Actions, in order
+
+**1. Bash, background** (nothing is sent to the tab):
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Agent tool (Sonnet subagent):** "In `orchestrator/backlog.md`, set the noVNC keyboard-layout item to `queued → rdp-audio, starts after task 9 (operator request 03:05)`, then run `build-backlog.sh`." I then publish the result with the Artifact tool.
+
+**3. Message to the operator:**
+> Queued. rdp-audio is mid-task 7, so I'm sending it nothing now. As soon as it reports tasks 7–9 done, it gets the noVNC keyboard-layout fix as its next brief, in the same tab and worktree. Backlog updated.
+
+**4. On the wake notification, Bash, foreground:**
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 120
+```
+If the wait timed out, I re-arm step 1. If the agent is `blocked`, I resolve only that block and re-arm.
+
+**5. Once it is idle and the 7–9 report checks out (skills named, tests green), Bash, foreground:**
+```
+herdr agent prompt rdp-audio "New task from the operator, now that tasks 7–9 are done. In this same worktree and branch (feat/rdp-audio), fix the noVNC keyboard-layout bug in the desktop role (see the noVNC item in orchestrator/backlog.md). Use superpowers:systematic-debugging first (reproduce and find the root cause before any fix), then superpowers:test-driven-development (failing test first), then superpowers:verification-before-completion. Keep it in separate commits from the audio work. Do not deploy or touch live hosts. Report: root cause, RED/GREEN test output, commits, skills used." --wait --until working --timeout 60000
+```
+Then I run step 1 again in the background.
+
+## Why
+
+- **No prompt now:** text sent to a working Claude Code agent is injected at its next tool boundary, mid-task 7. That is the interruption the operator ruled out, and it would break the RED→GREEN cycle.
+- **Background wait:** it is event-driven, so there is no polling, and my session stays free for the operator.
+- **No advisor vote or poll:** the operator already decided who does the fix and when.
+- **Same worktree, separate commits:** this follows "while it's there" and keeps the fix separable for cross-review before any merge.
+- **Context:** the executor will be below 30% context by then. I'm relying on auto-compaction, which is why the brief is self-contained and points to the backlog item.
+- **Assumption:** the bug is already described in the backlog. If it isn't, I'll paste the operator's description into the brief rather than invent details.

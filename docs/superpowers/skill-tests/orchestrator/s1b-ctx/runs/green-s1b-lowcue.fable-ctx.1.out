@@ -1,0 +1,93 @@
+## Actions, in order
+
+**1. Bash, foreground** (read-only, takes seconds)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+WT=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+herdr agent list                                    # wgka, adv-codex, adv-fable: idle, focused=false
+herdr agent read wgka --source visible --lines 30   # context left
+git -C $WT rev-parse --short HEAD; git -C $WT status --short
+grep -n -i 'timeout' $WT/docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md
+grep -rn 'proxy_read_timeout' $WT/projects/ccs/roles/host_proxy/
+ls ~/work/ccs.ansible/orchestrator/quorum/ | tail -3
+```
+
+The ballot goes out only if the spec fixes no value; if it does, that value is already decided and I relay it instead.
+
+**2. Write** `orchestrator/quorum/ballot-17.md` (B16 is the last id I know of; step 1 confirms):
+
+```
+Reply in English. Ignore any pre-filled text in your input box. Rules: quorum/protocol.md.
+
+B17 — Upstream read timeout of the WireGuard keepalive relay location
+  Context:
+  - Worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, HEAD <sha, step 1>.
+    Plan step 6 of 11; steps 7-11 build on it.
+  - The location relays PUT /key/wg/<org>/<user>/<server> to http://127.0.0.1:9700.
+  - The spec sets no read timeout (grep, step 1).
+  - proxy_read_timeout values already in roles/host_proxy: <grep output, step 1>.
+  - Not measured: Pritunl's response time for this PUT; the client's own request timeout.
+  - The options differ only when the upstream takes longer than 5 s to answer.
+  a) proxy_read_timeout 5s in the relay location.
+     Upstream silent: the request ends with 504 and frees its connection after 5 s.
+     Upstream answering in 5-60 s: the keepalive fails.
+     One more directive to render and pin in tests.
+     Cost if wrong: keepalives fail while Pritunl is slow but alive.
+     Rollback: one-line template change, re-run playbook 55 on the gateway.
+  b) No directive; nginx default 60 s.
+     Upstream silent: each request holds its connection for up to 60 s.
+     Upstream answering in 5-60 s: the answer is relayed.
+     No new directive.
+     Cost if wrong: connections to a hung upstream accumulate.
+     Rollback: the same one-line change and run.
+Reply one line:  B17: <letter> — <rationale>     (or  B17: X: <proposal>)
+```
+
+**3. Bash, three background calls in one message** (`run_in_background: true`)
+
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-17.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-17.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/park-wgka-b17.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+`park-wgka-b17.txt` reads:
+
+> Ballot B17 is open on the step-6 read timeout. Two voting advisors decide it and I relay the result. Your recommendation is recorded as a proposal, not a decision. Until then, do not write step 6 and do not start steps 7-11: no provisional value, and no variable or default standing in for the choice. Commit finished work locally, then stop and report: phase, branch, head SHA, `git status --short`, next step. Reply in English. Ignore any pre-filled text in your input box.
+
+If step 1 shows `wgka` at 50% context used or more, its park report is followed by a background `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items`.
+
+**4. Backlog.** Edit the task's row in `orchestrator/backlog.md`: next step "step 6 after B17", blocked-on "B17 (vote)", decisions "+B17 open". Then run `bash orchestrator/build-backlog.sh` in the foreground and republish the Artifact at the same page.
+
+**5. Status to the operator** (no poll):
+
+> **Now:** the executor stopped at step 6 of 11 on one choice: how long the relay waits for Pritunl's answer before giving up (5 s or nginx's default 60 s). That is ballot B17, now with both voting advisors. Nothing that depends on it is being built. Nothing has changed on live machines.
+>
+> **Next:** on 2/2 I relay the decision and steps 6-11 continue. Then come the Codex review at the exact SHA, my own validation run, the merge vote, the canary-go vote and the deploy to ccs-it from merged main. None of that needs you. I cannot yet say whether it lands tonight. A split on B17 would wait for you as a poll.
+>
+> **You:** nothing now. Acceptance is yours: once you see my "canary live on ccs-it" status, connect with your own WireGuard profile for ccs-it, run `ping -i 0.2 172.27.96.2` for 3 minutes, and paste the closing summary lines (sent/received, loss, round-trip). The fleet rollout does not start before that.
+>
+> **Not verified:** the executor's claim that Pritunl answers in milliseconds; it has not been measured.
+>
+> Backlog: claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+This status is in English because this session's language setting requires it; the standing ruling asks for Russian.
+
+**6. On each notification:** read the `.last` file, then `herdr agent get <name>`, and write `quorum/ballot-17.results.md`. A 2/2 result goes to `wgka` as `DECIDED B17` in a background prompt with a time box.
+
+## Why
+
+- **The choice is the vote's.** A choice between alternatives that changes the outcome is not mine to make, and it is not one of the operator's four kinds of decision. "No trivia" and the manifest agree: a 2/2 result is reported, not asked.
+- **The ballot is neutral.** The executor's recommendation and its two supporting claims are stripped. "Matches every other location" is replaced by the grep output, because `CLAUDE.md` records 3600 s on the WebSocket locations. The response-time claim is listed as unmeasured.
+- **The executor parks.** Steps 7-11 all build on step 6, so there is no independent work. A provisional 5 s would be rework if it loses, and would tilt the vote toward what already exists.
+- **"Canary tonight" approves nothing.** It is a wish about timing, so every gate still runs in order at the exact SHA. I promise no time I cannot verify.
+- **Acceptance is an instruction.** It needs the operator's own profile and hands, and hard rule #17 forbids me the end-user path. It is written now, so it costs them nothing until they are back.
+- **Background waiters.** Both advisors get the ballot at once so neither sees the other's vote, and I stay free to supervise.

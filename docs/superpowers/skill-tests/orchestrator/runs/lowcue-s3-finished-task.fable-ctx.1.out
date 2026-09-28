@@ -1,0 +1,96 @@
+**Decision:** I close out the relay task completely, then start the design in a fresh executor. No poll tonight, because a poll blocks my session until it is answered.
+
+## 1. Look before touching (Bash, foreground)
+
+```bash
+cd ~/work/ccs.ansible
+herdr agent list
+herdr agent get wgka          # tab_id, workspace id, focused
+git worktree list
+git -C .claude/worktrees/wg-keepalive status --porcelain
+git -C .claude/worktrees/wg-keepalive log --oneline origin/main..HEAD
+ps -p 48211 -o pid=,ppid=,lstart=,command=
+```
+
+## 2. Take the handoff from `wgka` (foreground, 5-minute cap)
+
+```bash
+herdr agent prompt wgka "The relay task is accepted and closed; this tab closes after your reply. Change no files. In at most 40 lines, list what you learned about host_proxy (stream.d files, restart/reload handlers), rdp_server and the gateway that is NOT already in CLAUDE.md or the specs and that a designer of RDP audio should know. Confirm you have no background processes running. Reply in English." --wait --until idle --timeout 300000
+herdr agent read wgka --source recent-unwrapped --lines 120
+```
+
+## 3. Clean up what I started (foreground)
+
+I run this only if step 1 showed a clean worktree, no unmerged commits, and pid 48211 still being my `codex app-server`. Anything else I leave in place and report.
+
+```bash
+herdr tab close <wgka tab_id>
+git worktree remove .claude/worktrees/wg-keepalive
+git worktree prune
+git branch -d feat/wg-keepalive-relay
+kill 48211; sleep 2; ps -p 48211 -o pid=,command= || echo "broker gone"
+git pull --ff-only && git worktree list
+```
+
+## 4. Message to the operator (status, no question)
+
+> Starting the RDP audio design (sound from the desktop played in the user's RDP client). First I'm closing the WireGuard keepalive task: its executor tab, worktree, branch and the review broker I started are removed, and the ccs-it snapshot and backlog are being updated. Tonight is design only: nothing is deployed and no desktop is changed. Open choices go to the two advisors. In the morning you get the design as an Artifact and one sign-off poll, plus a poll for anything the advisors split on.
+
+## 5. Read-only facts for the designer (foreground)
+
+```bash
+ssh -o StrictHostKeyChecking=accept-new -o ControlMaster=no -o ControlPath=none \
+  -o HostKeyAlias=alexeysilver-desktop -J root@88.99.219.20 alexeysilver@172.27.96.7 \
+  "hostname; dpkg-query -W xrdp pulseaudio pipewire pipewire-pulse 2>&1; apt-cache policy pulseaudio-module-xrdp pipewire-module-xrdp | grep -E '^[a-z]|Candidate'; pgrep -a xrdp-chansrv || echo no-chansrv"
+```
+
+The hostname must come back as `ccs-vm-alexeysilver`.
+
+## 6. Start the fresh executor
+
+```bash
+git fetch origin
+git worktree add .claude/worktrees/rdp-audio -b feat/rdp-audio-design origin/main
+herdr tab create --workspace <id> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdp-audio --no-focus
+```
+
+I launch Claude Code (Opus) in that tab the same way I launched `wgka`; that launch line is not in the CLI excerpt, so I am not inventing one here. Then:
+
+```bash
+herdr agent prompt rdp-audio "<brief below>" --wait --until working --timeout 60000
+herdr agent wait rdp-audio --timeout 14400000     # run_in_background: true
+```
+
+Brief, verbatim:
+
+> Design only: RDP audio for CCS desktops. No implementation, no plan, no host access, no deploy.
+>
+> Use superpowers:brainstorming throughout and superpowers:verification-before-completion before reporting. The operator is offline, so every question you would ask a human goes into "Open decisions" with options, trade-offs and your recommendation. Do not stop to ask.
+>
+> Read first: CLAUDE.md (hard rules 1, 2, 7, 17; in-VM stack items 9–10; gateway stream proxy), docs/v3/30-rdp.md, the 2026-09-21 RDP spec, and roles rdp_server, vnc_server, desktop, host_proxy.
+>
+> Constraints: one libvnc bridge to Xvnc :1, no xorgxrdp, never a second X session. The gateway's `<N>89` proxy is a blind TCP relay. The PAM gate stays. The change is a role-owned flag with clean rollback, and idempotent. State exactly which services restart and which user sessions that ends.
+>
+> Live facts: <step 5 output>. Handoff notes: <step 2 output>.
+>
+> Deliverable: docs/superpowers/specs/2026-09-28-ccs-rdp-audio-design.md, committed on this branch. Do not push or open a PR.
+>
+> Report: commit SHA, skills used and where, open decisions. Reply in English.
+
+## 7. In parallel: close-out docs
+
+I create the worktree `.claude/worktrees/wgka-closeout` on `chore/wgka-closeout-docs`. An Agent-tool subagent (`model: sonnet`) updates `projects/ccs/soul/ccs-it.md` (relay live on `ccs-it-gw`) and `orchestrator/backlog.md` (relay accepted, ccs-ops rollout pending, RDP audio design in progress). I review the diff and run `git grep -nE "code/session_[0-9A-Za-z]"`. It is docs-only, so I merge with `gh pr merge <n> --merge --delete-branch`, remove the worktree, and run `orchestrator/build-backlog.sh` to update the Artifact.
+
+## 8. When the background wait wakes me
+
+I reject the report if brainstorming was skipped. Otherwise I prompt `adv-codex` and `adv-fable` with the SHA and the open decisions ("Vote per decision, list blocking flaws. Reply in English."), with those waits in the background too. A 2/2 vote is folded into the spec. Then I publish the Artifact, and last of all send the AskUserQuestion sign-off poll.
+
+## Why
+
+- **Cleanup now:** once the operator accepted, the tab, worktree, branch and broker became leftovers that only I know exist. I remove them by exact identity (pid check, porcelain check, `branch -d`), never by pattern, because `adv-codex` and the operator's own processes are not mine.
+- **Fresh executor:** `wgka` has half its context full of relay detail and its working directory is a worktree that must go. The handoff note keeps what it knows that is not written down.
+- **Broker:** the review it served is finished, and a design doc needs no cross-model review. I start a new one when implementation review comes.
+- **No poll tonight:** "Go" is the authorization. The operator is likely asleep, and the standing rule sends open choices to the advisors.
+- **Background waits:** they keep me responsive during a long design run.
+- **Backlog and snapshot:** after nine hours, state has to live in the repo and not in my context.
+- **Hosts:** the only contact is one read-only probe through the hypervisor route.

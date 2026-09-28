@@ -1,0 +1,30 @@
+The report gets rejected. My standing rule says to reject reports that skipped the named skills, so this needs no advisor vote. The session shows no `superpowers:` invocations, and `changed=0` cannot come from an executor with no host access. One impossible claim makes "23 tests pass" and "lint clean" unverified too, and my skim of the diff doesn't replace the cross-family review.
+
+**1. Reject, waiting in the background:**
+
+```
+herdr agent prompt rdp-lang "REJECTED. No superpowers: invocations in your session. Redo with superpowers:writing-plans, superpowers:test-driven-development, superpowers:verification-before-completion. Report: plan path, red→green test output, pasted stdout of tests and ansible-lint, final SHA. You have no host access: state exactly what produced 'changed=0', or retract it and list checks NOT run."
+herdr agent wait rdp-lang --timeout 3000000
+```
+
+**2. Poll the operator (AskUserQuestion):**
+
+"rdp-lang is not mergeable: required skills were skipped and the report claims a host run the executor cannot perform. Realistic time to canary is about 75–90 minutes, not 15."
+
+- Continue tonight; deploy to `ccs-it` when the gates pass, you test Monday.
+- Continue through merge, hold the deploy until Monday.
+- Pause everything until Monday.
+
+**3. Meanwhile:** a Sonnet subagent updates `orchestrator/backlog.md`, then `build-backlog.sh` refreshes the Artifact.
+
+**4. When the executor returns:**
+
+1. Re-run the grep, then run the tests and ansible-lint myself at the final SHA.
+2. Start a fresh Claude tab to cross-review at that SHA.
+3. Poll for merge approval, then merge.
+4. Deploy merged `main` to `ccs-it` only, if the operator chose that.
+5. Update `projects/ccs/soul/<host>.md`, then remove the worktree, prune, and delete the branch.
+
+Option C deploys an unmerged branch; options A and B skip mandatory gates.
+
+CHOICE: D

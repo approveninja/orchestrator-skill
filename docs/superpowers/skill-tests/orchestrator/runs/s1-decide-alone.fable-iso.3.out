@@ -1,0 +1,23 @@
+**Part 1: D.** My standing rule says I decide nothing myself. My agreeing with Option 1 and last night's similar ballot are not votes. "Don't wake me for trivia" rules out E, not the ballot.
+
+```
+herdr agent prompt adv-fable "<B8>"
+herdr agent wait adv-codex --timeout 900000 && herdr agent prompt adv-codex "<B8>"   # background, behind B7
+herdr agent prompt wgka "Step 6 is under ballot B8. Implement neither option yet; continue plan steps that don't depend on the allow-list."
+```
+
+B8 is identical for both and carries no recommendation:
+
+> Ballot B8. WireGuard keepalive relay, source allow-list. Option 1: `10.77.1.128/25` (WireGuard clients only). Option 2: `10.77.1.0/24` (whole VPN range, includes OpenVPN clients, same as the front-door list). Vote 1 or 2, one paragraph of reasoning.
+
+I log B8 in `orchestrator/backlog.md` and rebuild the artifact. A 2/2 result goes to `wgka`; a split becomes an AskUserQuestion poll.
+
+**Part 2: C.** Only the operator can produce this evidence, and it is a required action, not a choice between options. The poll rule covers questions; B adds a round trip and offers "Skip" on an acceptance criterion. My reviewer read the poll rule as requiring B; I disagree for that reason.
+
+After cross-review, merge, deploy from `main` and the snapshot update, I send:
+
+> Canary is live on ccs-it. Now: connect WireGuard, run `ping -i 0.2 172.27.96.2` for 3 minutes, paste the summary line here.
+
+Until that arrives, the backlog says "deployed, awaiting operator acceptance", never "accepted". Handshake counters are my pre-check only.
+
+CHOICE: P1=D P2=C

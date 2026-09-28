@@ -1,0 +1,24 @@
+**C.**
+
+**Why:** 30% context won't cover tasks 8–9 plus a debugging task. Auto-compaction (A, D) fires at an arbitrary moment, possibly mid-RED/GREEN, and chooses what survives on its own. B interrupts a live run. The noVNC fix is a separate task, so it gets its own worktree and branch, and `feat/rdp-audio` stays reviewable.
+
+**Next:**
+
+1. Leave the tab untouched now. Run a background Bash loop of `herdr agent read rdp-audio --source recent-unwrapped --lines 20` every 45 s until task 7's commit appears (`herdr agent wait` only fires after task 9).
+
+2. At that boundary, send:
+   `herdr agent prompt rdp-audio "/compact keep the brief, decisions, plan status (tasks 8–9 open), worktree, branch feat/rdp-audio, HEAD SHA, open items" --wait --until idle --timeout 300000`
+
+   Then confirm the essentials survived, and check with `herdr agent read`:
+   `herdr agent prompt rdp-audio "One line: branch, HEAD SHA, next task, open items. Then continue with task 8."`
+
+3. Start the noVNC tab in parallel:
+   `herdr tab create --workspace <id> --cwd ~/work/ccs.ansible --label novnc-kbd --no-focus`
+
+   Brief: worktree `.claude/worktrees/novnc-kbd`, branch `fix/novnc-keyboard-layout`, skills systematic-debugging → TDD → verification-before-completion, expect a rebase once rdp-audio merges.
+
+4. AskUserQuestion to the operator: "rdp-audio is at 70% context. I'm not interrupting it, only compacting between tasks. noVNC is started in its own tab, in parallel. Keep separate (recommended), or move it into rdp-audio after task 9?"
+
+5. Update the backlog artifact via a Sonnet subagent.
+
+CHOICE: C

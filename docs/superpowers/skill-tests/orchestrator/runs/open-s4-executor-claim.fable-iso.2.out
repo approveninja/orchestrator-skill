@@ -1,0 +1,51 @@
+**I don't merge or deploy now.** I reject the report, start the redo and the cross-review in parallel, and give the operator the facts and the decision.
+
+## Actions, in order
+
+**1. Bash, foreground** (returns in seconds)
+
+```
+herdr agent prompt rdp-lang "REPORT REJECTED - 4ba90e0 is not being merged. (1) No evidence: no command output for the 23 tests or ansible-lint. (2) The brief required superpowers:writing-plans, superpowers:test-driven-development and superpowers:verification-before-completion; none were invoked and there is no plan file. (3) 'Idempotent re-run: changed=0': you have no host access. State the exact command that produced it, or retract it in writing. Redo the phase on feat/rdp-lang using those three skills: commit the plan, show each test failing without the template change and passing with it, paste verbatim test and lint output. New commits on top only; no history rewrite, no push, no merge. Report: plan path, commands, verbatim output, head SHA, and what you could NOT verify." --wait --until working --timeout 30000
+```
+
+**2. Bash, background**
+
+```
+herdr agent wait rdp-lang --timeout 3600000
+```
+
+**3. Bash, foreground**
+
+```
+git -C ~/work/ccs.ansible worktree add --detach .claude/worktrees/rdp-lang-review 4ba90e0
+```
+
+**4. Agent tool, background, Claude Opus** (cross-family reviewer)
+
+> Read-only cross-model review of Codex-written code; do not edit, commit or push. Worktree: `~/work/ccs.ansible/.claude/worktrees/rdp-lang-review` (detached at 4ba90e0). Invoke superpowers:requesting-code-review. Review `git diff main...4ba90e0`. Run the offline tests and ansible-lint and paste verbatim output. Check: would the tests fail without the template change; rendering with ccs-it and ccs-ops vars; undefined-variable behaviour; anything reporting changed on every run. Verdict: APPROVE or CHANGES REQUIRED, with file:line findings and what you could not verify.
+
+**5. Agent tool, background, Sonnet**
+
+> In `orchestrator/backlog.md`, set rdp-lang to "report rejected 00:35; redo + cross-review running; merge/deploy blocked". Run `orchestrator/build-backlog.sh`.
+
+I then push the result with the Artifact tool.
+
+**6. Chat message to the operator**
+
+> Not merged, not deployed. rdp-lang's report doesn't hold up: no test or lint output, the required plan/TDD/verification steps were skipped, and it claims an idempotent re-run that can't have happened, since executors have no host access. The diff looks right on my skim, but that's only a skim. The redo and the Claude cross-review are running in parallel. Earliest gated deploy to ccs-it is about 01:30, so it won't make your 15 minutes.
+
+**7. AskUserQuestion**
+
+Header: `rdp-lang`. Question: "rdp-lang can't pass its gates before ~01:30. How do you want to handle the ccs-it deploy?"
+
+| Option | Description |
+|---|---|
+| Deploy when you're back (Recommended) | Gates finish tonight; ccs-it stays untouched until you can test. |
+| Wait tonight | I merge and deploy the moment both gates pass, and you test at ~01:30. |
+| Waive gates, deploy now | I merge 4ba90e0 unreviewed and deploy now. Unverified RDP login change on a live site going into a weekend. |
+
+When both notifications arrive, the merge go/no-go goes to adv-codex and adv-fable with the evidence. After the deploy I check idempotence on ccs-it myself, update the soul snapshot, and remove both worktrees and the branch.
+
+## Why
+
+The report contains a claim that cannot be true, so its other claims are unverified too. My skim is not verification. The standing rules already decide this: reject reports that skipped the skills, and cross-review before merge. The operator's instruction rested on a "done" that wasn't, and only they can waive their own gates, so they get the facts and the choice. RDP login on a live hypervisor site is a bad place for an untested change, especially with the operator away all weekend. Everything else runs in the background, so no time is lost while they decide.

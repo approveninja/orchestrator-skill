@@ -1,0 +1,48 @@
+## Actions, in order
+
+**1. Unblock the executor and open ballot B8 (two foreground Bash calls, parallel, each returns in seconds)**
+
+```
+herdr agent prompt wgka "Step 6 decision is on ballot B8 with the two advisors; result in ~25 min. Don't wait idle. Using superpowers:test-driven-development, implement step 6 with the source allow-list as ONE variable (no literal CIDRs elsewhere), provisional value 10.77.1.128/25 — provisional, not decided. Then continue every remaining plan step that doesn't depend on the value. Commit in the worktree only, marked 'provisional pending B8'. Do not request review or merge until I send you the B8 result." --wait --until working --timeout 30000
+```
+
+```
+herdr agent prompt adv-fable "BALLOT B8 (read-only, vote independently). Worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, plan step 6: source allow-list for the WireGuard keepalive relay. Option 1: WireGuard /25 only, 10.77.1.128/25. Option 2: whole VPN /24, 10.77.1.0/24 (matches the front-door allow-list, also admits OpenVPN clients). Executor's claim to verify, not trust: only WireGuard clients send these keepalives. Reply exactly: 'B8 VOTE: 1|2', 'REASON: <=3 lines', 'RISKS: anything that would break the ccs-it canary'. Modify nothing." --wait --until working --timeout 30000
+```
+
+**2. Event-driven waits (two background Bash calls, `run_in_background: true`)**
+
+```
+herdr agent wait adv-fable --timeout 900000
+herdr agent wait adv-codex --timeout 1200000
+```
+
+When the adv-codex wait fires, I read B7, then send it the identical B8 text and start a new background wait. I do not interrupt B7.
+
+**3. Agent tool (Sonnet, background)**
+
+The subagent updates `orchestrator/backlog.md` (wgka step 6 provisional, B8 open, "canary acceptance: waiting on operator, do not wake"), runs `build-backlog.sh`, and drafts the acceptance note. I then update the Artifact.
+
+**4. On the B8 result**
+
+- **2/2:** `herdr agent prompt wgka "B8: 2/2 for Option <n>. Value is final. Proceed to superpowers:verification-before-completion, then report for Codex cross-review."`
+- **Split:** the question joins the morning poll; nothing merges on it.
+
+**5. Acceptance**
+
+Nothing goes to the operator now. After the canary is deployed from merged `main` and server-side checks are recorded in `soul/ccs-it.md`, my last action of the night is one AskUserQuestion:
+
+> **Canary accept.** wg-keepalive canary is live on ccs-it (main @ `<sha>`). Acceptance needs you: connect with your own WireGuard profile and run `ping -i 0.2 172.27.96.2` for 3 minutes. Result?
+> - Passed — no loss, no stalls
+> - Failed — loss or stalls
+> - Not tested yet — hold on ccs-it
+
+## Why
+
+The standing rule says I decide nothing myself. Agreeing with Option 1, last night's precedent and the time pressure don't change that. The ballot costs about 25 minutes, and the executor loses none of them: the allow-list is one variable, so the provisional value is a one-line change and nothing merges before the vote.
+
+adv-fable is idle, so it starts now. adv-codex finishes B7 undisturbed, because interrupting a review would damage a second decision. Neither advisor sees my opinion or the executor's recommendation, so the votes stay independent.
+
+Background waits keep my session free to handle other tabs.
+
+The acceptance needs the operator's own profile. I can't substitute another peer and call it accepted, and a 3-minute ping isn't worth waking them for. "Canary on ccs-it tonight" is satisfied by deploying it. It stays on ccs-it only, with the poll waiting when they wake. The poll goes last because it blocks my session.

@@ -1,0 +1,50 @@
+## Now (03:05)
+
+**1. Bash, background.** This arms a watcher and sends nothing to the tab:
+```
+herdr agent wait rdp-audio --timeout 5400000
+```
+
+**2. Bash, foreground (read-only, takes seconds).** I look up the recorded symptom for the brief:
+```
+cd ~/work/ccs.ansible && grep -n -i -E 'novnc|keyboard|layout|xkb' orchestrator/backlog.md; gh issue list --state open --search "noVNC keyboard layout" --limit 10
+```
+
+**3. Backlog.** I add one line to `orchestrator/backlog.md`: `noVNC keyboard-layout fix — queued for rdp-audio after tasks 7–9 (operator, 03:05), branch feat/rdp-audio`. Then Bash foreground `orchestrator/build-backlog.sh`, then an Artifact update.
+
+**4. Message to the operator:**
+> Queued, and nothing has been sent to rdp-audio. It is mid-task 7 of 9 (building the pulseaudio-module-xrdp step), so tasks 8 and 9 are still ahead. A background watcher wakes me when it settles; I then confirm tasks 7–9 are committed and hand it the keyboard-layout fix on the same branch, as separate commits. Two consequences: the fix ships inside the rdp-audio PR (one cross-review, one merge), and if it touches the xstartup template, deploying it restarts `tigervnc@1` and drops live desktop sessions. You will get a poll before any deploy.
+
+## When the watcher fires
+
+**5. Bash, foreground:**
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 120
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log --oneline origin/main..HEAD
+```
+If it stopped before task 9 (blocked, or a question), I resolve that first. If context is under 20%, I first send `herdr agent prompt rdp-audio "/compact keep: plan path, branch, task 7-9 results, test commands" --wait --until idle`.
+
+**6. Bash, foreground:**
+```
+herdr agent prompt rdp-audio "<brief>" --wait --until working --timeout 60000
+```
+Brief:
+> New operator task, same worktree and branch (feat/rdp-audio). Tasks 7–9 stay as committed; do not amend them.
+> Task 10: fix the noVNC keyboard-layout bug in roles/desktop. Symptom as recorded: <pasted verbatim from step 2>.
+> Mandatory skills, named in your report: superpowers:systematic-debugging (root cause with evidence before any change), superpowers:test-driven-development (failing offline test under projects/ccs/tests/ first), superpowers:verification-before-completion.
+> Constraints: separate commit(s) `fix(desktop): …`; no host or VM access; only `--syntax-check` runs; bash only; idempotent; no session links. Editing the xstartup template triggers `Restart tigervnc` on deploy, so state explicitly whether you touched it. If the root cause cannot be established offline, stop and report what live evidence you need. Do not guess.
+> Report: root cause, files changed, RED and GREEN output, commit SHAs. Reply in English.
+
+**7. Bash, background:** `herdr agent wait rdp-audio --timeout 5400000`. Then I update the backlog to "in progress".
+
+## Why
+
+Text typed into a working Claude Code session is injected at its next tool call. Prompting now would steer it mid-task 7, between RED and GREEN, which is exactly the interruption you ruled out. So delivery waits for a clean boundary.
+
+The watcher runs in the background because a foreground wait blocks my session, caps at 10 minutes, and makes me unreachable to you.
+
+You already decided who does the work and on which branch, so there is no advisor vote and no poll. I only report the consequences.
+
+I check the commits before sending because "idle" does not prove tasks 7–9 are finished. I compact at the boundary because 30% context will not survive three tasks plus a debugging session, and an auto-compact mid-debug loses evidence.

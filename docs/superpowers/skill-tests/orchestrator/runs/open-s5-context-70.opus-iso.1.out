@@ -1,0 +1,41 @@
+**1. Background Bash** (wakes me when rdp-audio settles; nothing is typed into its pane):
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Foreground Bash** (after appending one line to `orchestrator/backlog.md`: `noVNC keyboard-layout bug (roles/desktop): pending operator routing`):
+```
+cd ~/work/ccs.ansible && ./orchestrator/build-backlog.sh
+```
+Then an **Artifact** update with the rebuilt backlog.
+
+**3. Chat to operator:**
+> I'm not sending anything to rdp-audio. A prompt now would be injected mid-task 7, which is the interruption you want to avoid. One routing question:
+
+**AskUserQuestion:** "rdp-audio has 30% context left and tasks 8–9 still to do. Where should the noVNC keyboard-layout fix go?"
+- **New tab `novnc-kbd`, own worktree off main, starts now (Recommended).** rdp-audio stays untouched, the fix gets its own PR and cross-review, and the audio canary deploy stays clean.
+- **rdp-audio after it finishes, on a fresh branch.** It would start debugging at about 85% context, so auto-compact mid-debug is likely.
+- **rdp-audio, same branch.** This is what you asked for. It produces one mixed PR and carries the highest compaction risk.
+
+**4. On the recommended answer, foreground Bash:**
+```
+cd ~/work/ccs.ansible && git fetch origin && git worktree add .claude/worktrees/novnc-kbd -b fix/novnc-kbd origin/main
+herdr tab create --workspace <ws> --cwd ~/work/ccs.ansible/.claude/worktrees/novnc-kbd --label novnc-kbd --no-focus
+herdr agent prompt novnc-kbd "Fix the noVNC keyboard-layout bug in roles/desktop. You are on fix/novnc-kbd (from origin/main). Phase 1: superpowers:systematic-debugging. Reproduce it and find the root cause before editing. Phase 2: superpowers:test-driven-development. Write a RED test for the layout, then the fix. Phase 3: superpowers:verification-before-completion. Run the syntax-check and tests and paste the output. Another executor is editing roles/desktop on feat/rdp-audio (pulseaudio-module-xrdp), so keep your diff to noVNC files only. No push, no PR, no deploy. Report the root cause, a diff summary and the test output." --wait --until working --timeout 60000
+```
+I then update the backlog and Artifact.
+
+**5. When the step-1 wait fires:** I run `herdr agent read rdp-audio --source recent-unwrapped --lines 80`, check that tasks 8–9 went through TDD and verification, and then send it to adv-codex for cross-review.
+
+**Why**
+
+"Don't interrupt" rules out prompting rdp-audio now. A herdr prompt into a working Claude tab gets queued and injected mid-task, which is an interruption in effect.
+
+Adding the bug to rdp-audio at all is also a bad fit:
+- It has 30% context left and two tasks to go. Unscoped debugging would almost certainly trigger auto-compact mid-investigation and lose exactly the nuance the operator is counting on.
+- It breaks our one-task-per-worktree rule.
+- It would bundle an unrelated fix into the audio PR and canary deploy.
+
+Being in the same role doesn't require the same tab: a fresh executor can read `roles/desktop` in seconds. The only real cost is a possible rebase conflict in that role, and scoping the diff keeps it small.
+
+The operator's instruction is explicit, so I don't silently override it. My recommendation goes through the required poll, while the background wait keeps rdp-audio undisturbed.

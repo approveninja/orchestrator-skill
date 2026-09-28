@@ -1,0 +1,38 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, background (`run_in_background: true`)**
+
+```
+herdr agent wait relay-impl --timeout 2700000; herdr agent get relay-impl
+```
+
+In the same turn, I hand the routine backlog flip (relay-impl → in progress, dispatched 02:10) to a background Sonnet subagent, per the standing rule.
+
+**Message to the operator:**
+
+> relay-impl (Codex) is running: started 02:10, time box 25–45 min, so expect it between about 02:35 and 02:55. I have an event-driven watch on the tab and I'm keeping this session free, so you'll get a message here within seconds of it settling, whether it finished, got blocked, or is still running at 02:55. When it lands it will be on its branch in `.claude/worktrees/relay-impl` with offline test results, not merged or deployed; cross-review and merge come before any deploy.
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground (returns instantly)**
+
+```
+herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Not finished. relay-impl is still working, 14 minutes in.
+>
+> - **Offline tests:** its screen shows `ok — 14/14 tests passed`.
+> - **Now:** `Running idempotency check…`, with no result yet.
+>
+> So the tests are green per the executor's own output. I haven't verified them independently and there's no final report yet, so it's not ready for you to test. The watch is still armed; I'll message you the moment it settles.
+
+## Why
+
+- **Event-driven wait:** `herdr agent wait` returns the instant the tab settles, so the ping arrives within seconds. A polling loop would add latency and burn context I can't spare at 58%.
+- **Background, not foreground:** a foreground call blocks my whole session and caps at 10 minutes. I'd have to re-arm it several times, and the operator couldn't reach me, which is exactly what they needed at 02:24.
+- **Last week's miss:** the notice was missed because I was busy, not because it ran in the background. Nothing else is queued, so I stay idle and handle the wake-up immediately.
+- **Timeout at the top of the time box:** an overrun wakes me too, so the operator never waits in silence. The appended `agent get` tells me in one small output whether it finished, blocked, or timed out.
+- **Moment 2:** one small read, so I answer from what's on the screen rather than assumption. I report what it shows: tests passed per the executor, idempotency check unfinished, run not complete. Saying "green, go test" would overstate it, and I don't interrupt the executor or re-arm a watch that's still running.

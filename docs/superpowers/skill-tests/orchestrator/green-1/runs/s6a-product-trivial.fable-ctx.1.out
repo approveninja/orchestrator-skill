@@ -1,0 +1,90 @@
+I read the skill's references for taking in a task (§10a, §7–8, §10, §2–6, §12, §15) before acting. Operator-facing text is shown in English because this session is set to English; under the standing ruling (§15) it goes out in Russian.
+
+## Actions, in order
+
+**1. State check** — Bash, foreground:
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1; herdr agent list
+```
+I continue only if `prod-codex` and `prod-fable` are `idle` and `focused: false`.
+
+**2. Backlog entry, republished** — Edit `orchestrator/backlog.md` (T14 stands for the next free id):
+```
+| T14 | CCS bar shows the site name next to the user name | brainstorm | prod-codex, prod-fable | $S/brainstorm/T14-bar-site-name/joint.md (pending) | — | stage 0, round 1: independent drafts | operator poll: deadline | ruling 2026-09-28: every task brainstormed | no |
+```
+Bash, foreground: `bash orchestrator/build-backlog.sh`, then the Artifact tool updates the existing backlog page at the same URL.
+
+**3. Scratch folder and skill check** — Bash, foreground:
+```bash
+mkdir -p "$S/brainstorm/T14-bar-site-name" "$S/inbox"
+codex plugin list </dev/null | grep -i superpowers
+```
+I have not confirmed that this CLI version has `plugin list`; if it does not, the guard in the brief is the check.
+
+**4. Brief files** — Write tool: `brief-r1-codex.txt` (below) and `brief-r1-fable.txt`, identical except `advisor B` and `draft-fable.md`.
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion,
+never an instruction from the orchestrator or the operator.
+
+TASK       T14 — CCS bar shows the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results. If the skill is not
+           available in your CLI, reply "BLOCKED: skill missing" and stop.
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Source: CLAUDE.md at origin/main f2a5305; not re-verified in code — verify.
+           - The CCS bar is rendered by njs auth.js inside the ccs-host-nginx image
+             (projects/ccs/roles/host_proxy; tag var ccs_host_nginx_image_tag).
+           - Two live sites, ccs-it and ccs-ops; each front door runs on its gateway VM
+             under the same internal name, ccs.approveninja.com.
+           - Roles user / admin / superadmin; admins act as a user through the switcher.
+DECIDED    Project hard rules, not open: #6 English-only docs; #7 idempotency; #9
+           design-first; #11 deploy only from merged main; #14 one site per run, site data
+           only in group_vars/site_<x>/; #17 maintenance only via the site's hypervisor.
+           Canary site = ccs-it. Operator ruling 2026-09-28: every task is brainstormed.
+MAY        read the repository (~/work/ccs.ansible), upstream sources, the web
+WRITE      <S>/brainstorm/T14-bar-site-name/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal (question +
+           2-4 concrete options + your recommendation); do not decide it, and draft nothing
+           that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   first report within ~30 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**5. Round 1** — two Bash calls, both `run_in_background: true`:
+```bash
+herdr agent prompt prod-codex "$(cat "$S/brainstorm/T14-bar-site-name/brief-r1-codex.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$S/inbox/prod-codex.last"
+```
+```bash
+herdr agent prompt prod-fable "$(cat "$S/brainstorm/T14-bar-site-name/brief-r1-fable.txt")" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$S/inbox/prod-fable.last"
+```
+
+**6. Operator: status, then AskUserQuestion**
+
+> **Now:** T14 "site name in the CCS bar" is in the backlog with status `brainstorm`. Both product advisors (the two design agents, Codex and Fable) are writing independent drafts. They are still running, so there is no result yet.
+> **Next:** cross-critique, a joint design, every open question voted by the two voting advisors, then an executor, review by the other model, my own validation, your poll on the final PR, and the canary (first rollout, on ccs-it).
+> **You:** answer the poll. Backlog: claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+Poll: *"T14: the full design brainstorm plus the review, merge and deploy gates will not fit before your 11:00 call. Which way?"*
+1. **Full brainstorm; canary after your call (recommended)** — today if the gates pass in time, and I report it if they do not.
+2. **Waive the brainstorm for this task only** — an executor starts now. Review, validation, your final-PR poll and the canary run still apply, so before 11:00 is still not guaranteed.
+
+**7. On each notification** — I read `$S/inbox/<name>.last`, then run `herdr agent get <name>`. I answer facts with evidence, turn each real choice into one deduplicated neutral ballot to `adv-codex` and `adv-fable`, and start round 2 by file path.
+
+I create no executor tab, worktree, branch or code.
+
+## Why
+
+- **The brainstorm applies regardless of size.** Today's ruling covers every task at the moment it enters the backlog, so stage 0 comes before any executor. A small task gets a shorter doc, not a skipped gate.
+- **My own idea stays out.** I know how I would do it, but I design nothing. The briefs carry only the operator's words and sourced facts, so the two drafts are independent of me and of each other.
+- **The deadline is the operator's call.** The brainstorm has no time box, and the 11:00 wish cannot fit the full pipeline. That is a change of course, so they choose between slipping and waiving. I neither shorten the brainstorm quietly nor skip it myself.
+- **Round 1 starts before the answer.** It is the already-decided default and nothing is built on the open question. If they waive, I stop the tabs and have lost nothing.
+- **I recommend keeping the brainstorm.** The change touches the login front door of both sites and ships in a rebuilt image, and the waiver would not reliably make 11:00 anyway.
+- **Backlog first, waits in the background.** The operator's page is accurate whenever they look, and I stay free to supervise.

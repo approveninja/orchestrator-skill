@@ -1,0 +1,77 @@
+## Actions, in order
+
+**1. Harvest `wgka`'s knowledge before closing it** (Bash, foreground, then the wait in background)
+
+```
+herdr agent prompt wgka "<message below>" --wait --until working --timeout 30000
+herdr agent wait wgka --timeout 900000        # background
+```
+
+> WG keepalive is closed: PR #165 merged, deployed to ccs-it (changed=0), operator accepted. One last job before I close this tab and remove your worktree. Write a handoff note to ~/work/ccs.ansible/orchestrator/handoff/wgka-roles.md (outside your worktree, do not commit). Contents: what you learned about the gateway and host_proxy roles that is NOT obvious from the code: variable precedence traps, handler ordering, ccs-it vs ccs-ops differences, idempotence gotchas. Facts only, each with file:line; mark anything unverified. Max 150 lines. Change nothing else. Reply DONE.
+
+**2. Meanwhile: stop the broker** (Bash, foreground)
+
+```
+ps -p 48211 -o pid=,lstart=,command=
+kill 48211 && sleep 2 && ps -p 48211 || echo gone   # only if the command is "codex app-server"
+```
+
+**3. Meanwhile: Agent tool, Sonnet subagent**
+
+> In ~/work/ccs.ansible, edit only these files; no commits, no deploys.
+> 1. orchestrator/backlog.md: move "WireGuard keepalive relay" to Done (PR #165 merged; merged main deployed to ccs-it, re-run changed=0; operator accepted 2026-09-28 23:10). Add open item "WG keepalive: ccs-ops not deployed, awaiting operator instruction". Add in-progress "RDP audio: design due morning 2026-09-29; tab rdpaudio, worktree .claude/worktrees/rdp-audio, branch design/rdp-audio; design only".
+> 2. projects/ccs/soul/<host>.md for each ccs-it host in the recap below: record the keepalive relay as live, with the deployed main SHA and date. Use only recap facts; write "not recorded" where missing.
+>
+> Run orchestrator/build-backlog.sh; return both diffs.
+> [PLAY RECAP and main SHA pasted]
+
+Then I publish the result with the Artifact tool.
+
+**4. On the `wgka` wake: verify, close, clean up** (Bash, foreground)
+
+```
+test -s ~/work/ccs.ansible/orchestrator/handoff/wgka-roles.md
+herdr agent get wgka                     # take tab_id
+herdr tab close <tab_id>
+cd ~/work/ccs.ansible
+git -C .claude/worktrees/wg-keepalive status --porcelain   # must be empty
+gh pr view 165 --json state,headRefName,headRefOid          # must be MERGED
+git rev-parse feat/wg-keepalive-relay                       # must equal headRefOid
+git worktree remove .claude/worktrees/wg-keepalive          # no --force
+git worktree prune
+git branch -d feat/wg-keepalive-relay || git branch -D feat/wg-keepalive-relay
+git ls-remote --heads origin feat/wg-keepalive-relay        # if present: git push origin --delete feat/wg-keepalive-relay
+```
+
+If the worktree is dirty or the SHAs differ, I leave everything in place and log it in the backlog.
+
+**5. Start a fresh executor** (Bash, foreground, then the wait in background)
+
+```
+git fetch origin && git worktree add .claude/worktrees/rdp-audio -b design/rdp-audio origin/main
+herdr tab create --workspace <ws-id> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdpaudio --no-focus
+# launch Claude Code (Opus) in the tab the same way I launched wgka
+herdr agent prompt rdpaudio "<brief below>" --wait --until working --timeout 60000
+herdr agent wait rdpaudio --timeout 3600000   # background
+```
+
+> Task: DESIGN ONLY for RDP audio. Problem statement: [backlog entry pasted verbatim]. Use superpowers:brainstorming, and superpowers:verification-before-completion before reporting. Read first: ~/work/ccs.ansible/orchestrator/handoff/wgka-roles.md, then the desktop and gateway roles. Live state comes from projects/ccs/soul/*.md only: no SSH, no ansible-playbook, no role changes. The operator is offline until morning, so do not wait on a human. End your turn with your questions plus 2–3 approaches and a recommendation, and I will return decisions. Anything undecidable tonight goes under "Open decisions for operator" with options. Deliverable: docs/superpowers/specs/2026-09-28-rdp-audio-design.md, committed on design/rdp-audio, not pushed. Stop there: no writing-plans, no implementation.
+
+**6. On each `rdpaudio` wake**, send this identical prompt to `adv-codex` and `adv-fable` separately:
+
+> Read-only vote. Read .claude/worktrees/rdp-audio/docs/superpowers/specs/2026-09-28-rdp-audio-design.md and the desktop and gateway roles. For each open decision pick exactly one option, and give your reasons, the strongest objection to your own choice, and what would change your vote. Edit nothing.
+
+A 2/2 vote goes back to `rdpaudio` as the decision. A split is documented as two branches in the design and queued for one AskUserQuestion poll in the morning.
+
+**7. To the operator**
+
+> WG keepalive closed out: worktree, branch, executor tab and review broker removed; backlog and ccs-it snapshot updated. ccs-ops is not deployed; it stays in the backlog as an open item and I won't touch it without your word. RDP audio design is running in tab `rdpaudio` (design only, nothing live touched). The doc and one poll with any split decisions will be waiting in the morning.
+
+## Why
+
+- **Cleanup comes first.** The standing rule says the worktree, branch and tab always go when the task ends. The broker is my own leftover process, so I check the pid still is that process before killing it.
+- **A fresh executor, not `wgka`.** Executors are one per task and per worktree, and `wgka` is bound to a worktree that must be removed. Its half-full context would also carry WireGuard assumptions into the new design. What it knows that the code does not show costs one prompt to save, so I save that first.
+- **No poll tonight.** "Go" is the authorisation, and a poll would block until the operator wakes up. Decisions go through the two advisors, and splits are batched for the morning.
+- **ccs-ops stays untouched.** Acceptance covered the canary only, and approval does not extend to the other site.
+- **State goes into files.** After nine hours, the backlog and the handoff note are what survive a context compaction.
+- **Waits run in the background**, so I keep working while agents run.

@@ -1,0 +1,39 @@
+## Actions, in order
+
+**1. Bash (background)**, so my session stays free and the harness wakes me when it settles:
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Agent tool (Sonnet subagent)**: "In `~/work/ccs.ansible`, add to `orchestrator/backlog.md`: 'noVNC keyboard-layout bug (desktop role) — assigned to rdp-audio, queued behind tasks 7–9, branch feat/rdp-audio, operator decision 03:05'. Run `build-backlog.sh`." Then I update the Artifact with the output.
+
+**3. Message to the operator:**
+> Queued. rdp-audio gets the noVNC keyboard-layout fix the moment it finishes tasks 7–9, and I'm sending it nothing until then. The fix lands as separate `fix(novnc):` commits on `feat/rdp-audio`. It has about 30% context left, so I'll compact it at the boundary first.
+
+**4. On the wake notification, Bash (foreground):**
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 120
+```
+I confirm tasks 7–9 are reported with verification output.
+
+**5. Bash (foreground):**
+```
+herdr agent prompt rdp-audio "/compact keep plan status, test commands, desktop role layout" --wait --until idle --timeout 300000
+```
+
+**6. Bash (foreground):**
+```
+herdr agent prompt rdp-audio "New operator task, same worktree and branch (feat/rdp-audio): fix the noVNC keyboard-layout bug in the desktop role. Do not alter the finished tasks 1–9. Use superpowers:systematic-debugging (reproduce and find the root cause first), then superpowers:test-driven-development (failing test before the fix), then superpowers:verification-before-completion (full role tests plus syntax-check of playbooks/50-vm-app.yml, paste the output). Commit separately with the prefix 'fix(novnc):'. Do not push, merge or deploy. If you cannot reproduce, stop and report. Report root cause, files changed, test output and commit hashes." --wait --until working --timeout 60000
+```
+
+**7. Bash (background):** `herdr agent wait rdp-audio --timeout 3600000`, then the backlog update again via the subagent.
+
+## Why
+
+- **No prompt now:** a prompt sent to a working Claude agent is injected mid-turn, which is exactly the interruption the operator forbade, and it would land in the middle of a TDD cycle.
+- **Background wait:** `herdr agent wait` is event-driven, so there is no polling, and running it in the background avoids the 10-minute foreground cap and keeps me reachable.
+- **No advisor vote or poll:** the operator already made the decision, which overrides my one-task-per-worktree default, and I have no question to ask.
+- **Compact first:** starting a debugging task with under 30% context risks auto-compaction in the middle of the fix.
+- **Separate commits:** the fix stays reviewable and revertible independently of the audio feature.
+- **Still to come:** cross-review by Codex before any merge, and worktree cleanup after the merge.

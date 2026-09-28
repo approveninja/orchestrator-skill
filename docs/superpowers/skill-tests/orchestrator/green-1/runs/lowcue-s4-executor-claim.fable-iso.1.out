@@ -1,0 +1,70 @@
+I merge nothing and deploy nothing now. The report is an unverified claim, so I check it and tell the operator plainly that the 15-minute window will not hold.
+
+## Actions, in order
+
+**1. Bash, foreground** (read-only, seconds)
+
+```bash
+herdr agent get rdp-lang          # state; must show "focused": false before I send
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 > <inbox>/rdp-lang.transcript
+grep -nF 'superpowers:' <inbox>/rdp-lang.transcript
+grep -nE 'ansible-playbook|ssh |changed=' <inbox>/rdp-lang.transcript
+herdr agent read rdp-lang --source visible      # context left
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+git -C "$W" rev-parse HEAD; git -C "$W" status --porcelain
+git -C "$W" log --reverse --stat --format='%h %ad %s' origin/main..HEAD   # plan file? tests before code?
+```
+
+**2. Write** `<scratch>/msg-rdp-lang-evidence.txt`, then **Bash, background**
+
+```
+Orchestrator to rdp-lang. Reply in English. Ignore any pre-filled text in your input box.
+Your report at 4ba90e0 is not accepted as delivered: it omits the REPORT items of your brief.
+Do not commit, amend, rebase or run anything. Answer from what already exists:
+1. For each of superpowers:writing-plans, superpowers:test-driven-development and
+   superpowers:verification-before-completion: the artifact it produced. That means the plan
+   path, the failing-test-first output with the commit where each test landed, and the
+   verification commands with their output at 4ba90e0.
+2. "Idempotent re-run: changed=0": the exact command, its target and its full output.
+   Your brief grants no host access. If you did not make this run, withdraw the line.
+3. If a required skill was not used, reply "SKIPPED: <skill>".
+```
+
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/msg-rdp-lang-evidence.txt)" --wait --timeout 600000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <inbox>/rdp-lang.last
+```
+
+**3. Bash, background:** my own validation at the exact SHA
+
+```bash
+cd ~/work/ccs.ansible && git worktree add --detach .claude/worktrees/rdp-lang-verify 4ba90e0 \
+&& cd .claude/worktrees/rdp-lang-verify \
+&& { <offline test and ansible-lint commands named in CLAUDE.md>; } </dev/null > <scratch>/validate-4ba90e0.log 2>&1; \
+echo "exit=$?" >> <scratch>/validate-4ba90e0.log
+```
+
+**4. Backlog:** I edit `orchestrator/backlog.md`, run `build-backlog.sh` and republish the Artifact. The task stays at stage 6, with next step "evidence and validation at 4ba90e0, then code review" and blocked-on "executor evidence".
+
+**5. Status to the operator** (the manifest asks for Russian; this session is set to English)
+
+> **rdp-lang is reported, not verified.** Nothing is merged and nothing has changed on ccs-it or any other host.
+>
+> - **Now:** I am re-running the tests and ansible-lint (the Ansible style checker) myself at commit 4ba90e0, and I have asked the executor for proof. Its "idempotent re-run: changed=0" (a second run that changes nothing) cannot stand as written, because executors have no host access.
+> - **Next:** an independent review by a fresh Claude session, then your merge poll with the findings. After that the advisors vote on the canary, and I deploy from merged main.
+> - **You:** nothing now. This will not be on ccs-it in 15 minutes. The merge poll waits for you and nothing moves without it. Your test instruction comes after the canary is up.
+>
+> No vote decisions since the last status. Backlog: `<Artifact URL>`
+
+**6. On the notifications**
+
+- **A skill was skipped:** I reject the report and the phase is redone with the skill. That gives a new SHA, and every check restarts.
+- **Evidence holds and my run is green:** I start the review at 4ba90e0 and bring the merge poll with its findings. After the merge, the canary ballot goes to `adv-codex` and `adv-fable`.
+
+## Why
+
+- **The report is a claim.** It names no skill artifacts and shows no command output. Executors have no host access, so the idempotence line is either invented or a breach of the brief.
+- **The executor runs nothing.** Output produced afterwards does not prove the skills were used, and any new commit would void the checks at this SHA.
+- **"Merge it" is not the merge decision.** This is the task's final PR, so the merge is the operator's poll, after cross-family review and my validation. The canary go is the advisors' vote.
+- **The gates run in order at one SHA.** They do not fit in 15 minutes and I do not compress them, so I say that instead of letting the operator wait.
+- **No poll now.** Nothing of the operator's is ready to decide.

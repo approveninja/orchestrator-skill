@@ -1,0 +1,65 @@
+## Batch 1: issued together, right now
+
+**1. Bash, background** (capture `wgka`'s knowledge before its tab goes; `$SP` is my scratchpad):
+```bash
+herdr agent prompt wgka "Task closed: PR #165 merged, canary ccs-it accepted. Last job before I close this tab and remove your worktree; change nothing in the repo. Write $SP/handoff-gateway-roles.md for the next executor (RDP audio design): how the desktop, gateway and host_proxy roles fit together, the variables and handlers that matter, ccs-it vs ccs-ops differences, traps you hit tonight. Facts with file:line, no design proposals. Then list any uncommitted or unpushed work in your worktree." \
+&& herdr agent wait wgka --timeout 900000
+```
+
+**2. Bash, foreground** (seconds):
+```bash
+cd ~/work/ccs.ansible && git fetch --prune origin \
+&& git worktree add .claude/worktrees/rdp-audio-design -b design/rdp-audio origin/main \
+&& herdr tab create --workspace <ws> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio-design --label rdpaudio --no-focus \
+; ps -p 48211 -o pid,lstart,command
+```
+If that line is my 21:30 `codex app-server`, I run `kill 48211; sleep 2; ps -p 48211`.
+
+**3. Executor.** I start Claude Code (Opus) in `rdpaudio` the way I started `wgka`, then **Bash, background**:
+```bash
+herdr agent prompt rdpaudio "You are the executor for the RDP audio design. Design only: no role or playbook changes, no deploys, no SSH. Use superpowers:brainstorming and name the skills you invoked in your report. Read the desktop, gateway and host_proxy roles, and $SP/handoff-gateway-roles.md (appears within ~10 min) before proposing options. The operator is offline: ask them nothing; end your turn with your questions and I will return advisor answers. Deliverable: the design spec where the skill puts it, committed on design/rdp-audio, not pushed: 2-3 options with trade-offs, a recommendation, ccs-it canary plan, rollback, open questions. Finish with superpowers:verification-before-completion." \
+&& herdr agent wait rdpaudio --timeout 3600000
+```
+
+**4. Agent tool (Sonnet, background):**
+> Update `projects/ccs/soul/ccs-it.md` to the post-relay state. Take values from merged `main` and the PR #165 diff, mark anything you cannot verify as "unverified", and leave `ccs-ops.md` alone. Facts: deployed from `main` on 2026-09-28 at about 23:00, re-run `changed=0`, operator accepted after 0% loss over 3 minutes. In `orchestrator/backlog.md`: WG keepalive relay becomes "accepted on canary ccs-it 2026-09-28"; add "ccs-ops rollout: open, needs operator decision"; add "RDP audio design: in progress, due morning 2026-09-29". Run `build-backlog.sh` and return the diffs and output path.
+
+I then push the built output with the Artifact tool.
+
+**5. Write tool:** `memory/wg-keepalive-relay-canary-state.md` (type `project`: relay live on `ccs-it` only, PR #165, accepted 2026-09-28, `ccs-ops` not rolled out), plus its pointer line in `MEMORY.md`.
+
+**6. Message to the operator:**
+> Started. RDP audio: executor `rdpaudio` is brainstorming in its own worktree, and both advisors will vote on the options. The design will be linked from the backlog artifact by morning. Any advisor split, plus the ccs-ops rollout of the WG relay, will reach you as a poll. The WG relay closeout is running in parallel and touches nothing live.
+
+## Batch 2: when the `wgka` notification arrives
+
+**Bash, foreground:**
+```bash
+herdr agent read wgka --source recent-unwrapped --lines 60; test -s $SP/handoff-gateway-roles.md
+cd ~/work/ccs.ansible
+git -C .claude/worktrees/wg-keepalive status --porcelain   # must be empty, else stop and inspect
+gh pr view 165 --json state,headRefOid; git rev-parse feat/wg-keepalive-relay   # SHAs must match
+herdr agent get wgka    # for tab_id
+herdr tab close <tab_id>
+git worktree remove .claude/worktrees/wg-keepalive && git worktree prune
+git branch -d feat/wg-keepalive-relay   # -D only if -d refuses on a squash merge and the SHAs matched
+git worktree list; git branch --list 'feat/wg-*'
+```
+
+## Batch 3: when `rdpaudio` settles
+
+**Bash, background, one call per advisor** (`adv-codex`, `adv-fable`), same text:
+```bash
+herdr agent prompt adv-codex "Read-only. Review the RDP audio design at <path reported by rdpaudio>. Vote for exactly one option or REJECT ALL, give your three strongest reasons and any blocker for a ccs-it canary, and answer the executor's open questions." \
+&& herdr agent wait adv-codex --timeout 1800000
+```
+On 2/2, `rdpaudio` finalizes that option. On a split, the design keeps both and I post an AskUserQuestion poll for the morning.
+
+## Why
+
+- **Closeout now:** my rules say cleanup and snapshot updates happen always, not when convenient. After nine hours my context is the least durable place for this state, and a snapshot that still describes the pre-relay canary is a trap for the next deploy.
+- **Nothing blocks the design:** every wait runs in the background, and the prose goes to a Sonnet subagent.
+- **Fresh executor:** reusing `wgka` would keep a merged worktree alive and carry stale context into new work. The handoff file keeps its knowledge.
+- **Look before deleting:** I check the worktree, branch and pid before removing each.
+- **ccs-ops:** the relay is live on the canary only, so the backlog says so and the rollout goes to the operator as a poll.
+- **Design choice:** the advisors vote on it; I don't pick.

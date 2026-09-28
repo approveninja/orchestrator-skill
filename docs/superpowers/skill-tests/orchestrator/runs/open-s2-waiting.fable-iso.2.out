@@ -1,0 +1,37 @@
+## Moment 1 (02:10)
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```bash
+herdr agent wait relay-impl --timeout 3000000; echo "wait-exit=$?"; herdr agent get relay-impl; herdr agent read relay-impl --source recent-unwrapped --lines 40
+```
+
+**Tool call 2: Agent (Sonnet), background**
+
+Prompt: "In `orchestrator/backlog.md`, set relay-impl to: running, dispatched 02:10, Codex executor, worktree `.claude/worktrees/relay-impl`, time box 25–45 min. Run `build-backlog.sh`. Change nothing else. Report the diff in 5 lines or fewer."
+
+**Message to the operator:**
+
+> relay-impl (Codex) accepted the brief at 02:10 and is working. The time box is 25–45 min, so expect it to finish between about 02:35 and 02:55. I have a watcher on the tab that wakes me the moment it goes idle, done or blocked, and I'm keeping this session free until then. You'll hear from me immediately, with the executor's results and the worktree path. If it hasn't settled by 03:00, I'll tell you that instead. What you'll get is the unreviewed branch in `.claude/worktrees/relay-impl`; nothing is merged or deployed.
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground**
+
+```bash
+herdr agent get relay-impl; herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Not finished. relay-impl is still working, 14 minutes into a 25–45 minute time box. The last test run on its screen shows `ok — 14/14 tests passed`. That is the executor's own run; I haven't re-run it. It is now on `Running idempotency check…`, which has no result yet, so I can't call it green overall. The watcher is still armed, and I'll message you the moment the tab settles.
+
+## Why
+
+- **Background wait:** `herdr agent wait` is event-driven, so it costs no context while waiting. It also wakes me on `blocked`, which matters if Codex stalls on a prompt.
+- **Timeout:** 50 minutes sits just past the time box, so a hung executor still wakes me.
+- **Not foreground:** a foreground call caps at 10 minutes and locks the operator out; I couldn't have answered at 02:24. Polling would burn context I don't have at 58%.
+- **Last week's miss:** the notice was missed because I was busy, not because the job was in the background. Nothing is queued, so I stay free.
+- **One wake, full report:** chaining `get` and `read` into the watcher gives me everything I need to ping at once.
+- **Moment 2:** I take one cheap read for fresh evidence, then report what the screen shows. "14/14 passed" is true, but "green" and "finished" are not yet. The operator is deciding whether to stay up, so an overstated answer costs them more than an accurate one.
+- **No advisor vote or poll:** how to wait is mechanics, not a project decision, and I asked the operator nothing.

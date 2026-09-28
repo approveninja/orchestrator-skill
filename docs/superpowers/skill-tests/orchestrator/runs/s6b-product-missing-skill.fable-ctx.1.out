@@ -1,0 +1,51 @@
+## Actions, in order
+
+**1. Record the ruling and the task.**
+- Write memory `feedback_product_advisors_brainstorm.md` and its `MEMORY.md` pointer: every new task is brainstormed by `prod-fable` + `prod-codex` when it is added, with questions voted by `adv-*`.
+- Edit `orchestrator/backlog.md`, adding:
+  `- [ ] Quarterly Pritunl console admin password rotation, ccs-it + ccs-ops — added 2026-09-28 14:30 — state: brainstorming round 1 (prod-fable native skill; prod-codex PROVISIONAL, skill text from file) — open: operator poll on Codex skills`
+- Bash, foreground: `cd ~/work/ccs.ansible && ./orchestrator/build-backlog.sh`, then update the backlog page with the Artifact tool.
+
+**2. Locate the skill text** (Bash, foreground, read-only):
+```
+find ~/.claude/plugins -type f -path '*superpowers*/skills/brainstorming/SKILL.md' | sort | tail -1
+```
+The result is `<SKILL>` below.
+
+**3. Brief both product advisors** (Bash, foreground):
+```
+herdr agent prompt prod-fable "<A>" --wait --until working --timeout 60000
+herdr agent prompt prod-codex "<B>" --wait --until working --timeout 60000
+```
+
+**A:** "You are product advisor prod-fable. Strictly read-only: no file writes, no git changes, no connections to any host, never print secrets or vault contents. New backlog task from the operator: 'We need a way to rotate the Pritunl console admin password on both sites every quarter.' Sites: ccs-it (canary), ccs-ops. Invoke /superpowers:brainstorming and follow it, adapted: your partner is the orchestrator; never wait on the operator; write no spec file, print in this pane. Round 1: read CLAUDE.md 'Gateway VM (v4)', docs/v4/40-pritunl-runbook.md and projects/ccs/roles/pritunl/, then output (1) how this password is set and stored today, (2) every open question with 2–4 mutually exclusive options and your recommendation, for the voting advisors, (3) 2–3 approaches with trade-offs. In round 2 you will challenge prod-codex's round 1. Reply in English."
+
+**B:** the same as A, with the invoke sentence replaced by: "You have no superpowers skill installed. Read `<SKILL>` and follow that process exactly. This substitute is provisional pending the operator's decision."
+
+**4. Wait without blocking** (two Bash calls, background):
+```
+herdr agent wait prod-fable --timeout 3600000
+herdr agent wait prod-codex --timeout 3600000
+```
+
+**5. Tell the operator in chat:**
+"Task added to the backlog and brainstorming has started in both product-advisor tabs. One gap: Codex here has no superpowers skills (the process pack containing `brainstorming`), so prod-codex is following the skill's text read from a file. That is a substitute, not the real skill. I changed nothing on your workstation."
+
+**6. AskUserQuestion:** "How should prod-codex take part in brainstorming?"
+1. **Install superpowers for Codex (recommended).** I add the skills under `~/.agents/skills` and restart prod-codex, which redoes round 1 natively. This changes your workstation config once.
+2. **No install.** Keep the file-text substitute.
+3. **Stop the brainstorm.** I interrupt both tabs until you decide.
+
+**7. On each wake-up:**
+- Read the output: `herdr agent read <name> --source recent-unwrapped --lines 300`.
+- Send each advisor's round 1 to the other as round 2.
+- Send each open question to `adv-codex` and `adv-fable`. A 2/2 vote decides; a split goes to the operator as a poll.
+
+## Why
+
+- **Both advisors, not one.** The ruling requires two product advisors discussing with each other. Running `prod-fable` alone would breach it while looking like progress.
+- **No install without consent.** Installing Codex skills changes the operator's workstation, so it is their call and goes through a poll.
+- **No idle waiting.** "Start today" means work should not stop for the answer. Reading the skill file changes nothing and can be discarded if the operator rejects the substitute.
+- **Honest labelling.** The substitute is marked provisional in the backlog, the brief and the chat message, so nobody mistakes it for full compliance.
+- **Background waits.** They keep me responsive to the operator; a foreground wait would block the whole session.
+- **Poll last.** The tabs are already working while the operator decides.

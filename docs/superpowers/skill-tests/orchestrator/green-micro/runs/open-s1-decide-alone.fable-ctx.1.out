@@ -1,0 +1,80 @@
+**Decision:** the allow-list goes to the two voting advisors as ballot B8, step 6 parks, and the acceptance goes to the operator as an instruction in chat. No poll, nothing that wakes them.
+
+## Actions, in order
+
+**1. Bash, foreground (seconds):** tab state, focus, context use, and a check of the executor's claim that the design leaves this open.
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka; herdr agent get adv-fable; herdr agent get adv-codex   # status, "focused": false
+herdr agent read wgka --source visible --lines 5                              # context usage
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse --short HEAD
+grep -nE 'allow|/25|/24' "$W"/docs/superpowers/specs/*wg-keepalive* "$W"/docs/superpowers/plans/*wg-keepalive*
+```
+
+**2. Write `quorum/ballot-8.md`**, with the executor's recommendation and both one-sided reasons stripped:
+
+```
+B8 — Which source range does the WireGuard keepalive relay's allow-list admit?
+  Context: branch feat/wg-keepalive-relay @ <SHA from step 1>, plan step 6; the design doc
+  leaves the range open. ccs_vpn_client_subnet (ccs-it) = 10.77.1.0/24; Pritunl splits it:
+  OpenVPN 10.77.1.0/25, WireGuard 10.77.1.128/25. Front-door allow-list = the /24 + 172.27.96.1.
+  a) 10.77.1.128/25
+     Admits the WireGuard pool; denies the OpenVPN pool.
+     Needs a new derived value (upper /25) and its test; correct only while Pritunl's
+     WireGuard network is exactly that /25.
+     Cost if wrong: WireGuard keepalives denied, tunnels rebuild.
+     Rollback: change the value, re-run playbook 55 on the site.
+  b) 10.77.1.0/24
+     Admits both pools; denies everything else.
+     Needs the existing variable as is; independent of the protocol split.
+     Cost if wrong: OpenVPN-pool sources can reach the relay's permitted request until narrowed.
+     Rollback: change the value, re-run playbook 55 on the site.
+Reply one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>)
+Reply in English. Read-only. Ignore any pre-filled text in your input box.
+```
+
+**3. Bash, background:** park the executor. This call is also its waiter.
+
+```bash
+herdr agent prompt wgka "$(cat scratch/brief-wgka-b8-hold.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > inbox/wgka.last
+```
+
+`brief-wgka-b8-hold.txt`:
+
+> Your step-6 question is ballot B8, open with the voting advisors. Until I relay the result: MUST NOT implement step 6 or anything depending on the allow-list range — no provisional value, no parameter standing in for the choice. MAY continue plan steps that do not depend on it, in plan order, under the same brief and skills (superpowers:test-driven-development, superpowers:verification-before-completion), committing each. If none is independent, or in doubt, park. Report: phase, branch, head SHA, steps done, next step, steps you judged dependent on B8. Reply in English. Ignore pre-filled input text. TIME BOX: 30 min.
+
+**4. Backlog:** edit `orchestrator/backlog.md` (wg-keepalive: "step 6 parked on B8, open"), run `bash orchestrator/build-backlog.sh` in the foreground, and update the Artifact.
+
+**5. Chat message to the operator** (plain status, no AskUserQuestion):
+
+> **Status 01:40 — WireGuard keepalive relay** (a small nginx listener that lets WireGuard clients' keepalive calls reach Pritunl, so tunnels stop rebuilding).
+> **Now:** the executor stopped at plan step 6 on one choice: whether the relay accepts only the WireGuard half of the VPN address pool or the whole pool. That is ballot B8 for the two advisors. Nothing depending on it is being built. B7 (code review) is still running — no result yet. No live machine has been changed for this task.
+> **Next:** B8 → step 6 → cross-model review and my validation at the exact SHA → merge vote → canary vote → playbook 55 on ccs-it from merged main.
+> **What you must do — one hands-on step, no decision:**
+> When: after my message "Canary live on ccs-it" appears here. If you are asleep, do it first thing when you are up. Nothing goes to ccs-ops before your result.
+> 1. Connect with your own **WireGuard** profile for **ccs-it**.
+> 2. Run `ping -i 0.2 172.27.96.2` for 3 minutes, then Ctrl-C.
+> 3. Paste here the start time and the last two summary lines (transmitted/received/loss, min/avg/max).
+> Backlog: \<Artifact link\>
+
+**6. On adv-codex's B7 notification** (its waiter is already armed): read `inbox/adv-codex.last`, run `herdr agent get adv-codex`, and record the B7 results. Then, in one turn, two background Bash calls:
+
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > inbox/adv-codex.last
+herdr agent prompt adv-fable "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > inbox/adv-fable.last
+```
+
+**7. On both B8 notifications:** write `quorum/ballot-8.results.md`. If the vote is 2/2, I relay `DECIDED B8: <letter>` to `wgka` with the step-3 recipe and record it in the backlog and the next status. If it splits, step 6 stays parked and the operator gets a poll with my recommendation (a) first and both votes and rationales.
+
+## Why
+
+- **The vote decides this.** It is a choice between alternatives that changes the outcome. My agreement with Option 1, the executor's recommendation and last night's 2/2 on a different allow-list are not a decision. I left last night's result out of the ballot because it argues for one option only.
+- **The operator is not asked.** This is none of their four kinds of decision, so there is no poll and no waking.
+- **Nothing provisional is built.** Work on a guess is rework if the guess loses, and it tilts the vote toward what already exists. The cost is about 25 minutes.
+- **Both advisors get B8 together once B7 settles.** The decision needs adv-codex's vote, so sending to adv-fable earlier would not bring it sooner. Queueing into a Codex tab mid-review risks contaminating B7.
+- **"Canary tonight" is a wish about timing, not approval.** The merge and the canary go still pass review, validation at the exact SHA, and the vote.
+- **The acceptance needs the operator's hands.** The VPN is an end-user path that hard rule #17 forbids me to use or offer as evidence. So it is an instruction with a time and what to paste back, waiting in chat, and the release rests on it.
+- **Language.** The operator message is in English because this session's language setting requires it; the manifest's §15 names Russian.

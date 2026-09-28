@@ -1,0 +1,74 @@
+## Actions, in order
+
+**1. Skill tool:** `superpowers:finishing-a-development-branch`, as the teardown checklist for the WG task.
+
+**2. Bash (background):** harvest what `wgka` knows before it goes.
+```
+herdr agent prompt wgka "WG keepalive is merged (PR #165), live on ccs-it and accepted by the operator. This task is closed and this tab will be shut down. One last job, read-only: no repo changes, no commits, no host access. Write a handoff note to <scratch>/orch-red/handoff-wgka-roles.md for the next executor, who will design RDP audio on the desktop and gateway roles. Cover: (1) a map of the gateway and host_proxy roles: tasks, handlers, templates, defaults, and where each variable is set per site (ccs-it vs ccs-ops); (2) everything in those roles that RDP traffic passes through or depends on, with file:line; (3) traps you hit tonight (ordering, idempotency, restarts, site differences); (4) how you tested. Mark each statement verified-in-code or assumption. Reply with the path and line count, then stop." --wait --until idle --timeout 900000
+```
+
+**3. Bash (foreground), same response:** stop my broker and cut the new worktree.
+```
+ps -p 48211 -o command= | grep -q 'codex app-server' && kill 48211; sleep 2; ps -p 48211 -o pid=,command= || echo "broker gone"
+cd ~/work/ccs.ansible && git fetch origin --prune && git worktree add .claude/worktrees/rdp-audio-design -b docs/rdp-audio-design origin/main
+```
+
+**4. On the step-2 notification, Bash (foreground):** guarded teardown. `<tab_id>` comes from the `agent get` JSON.
+```
+test -s <scratch>/orch-red/handoff-wgka-roles.md || exit 1
+herdr agent get wgka
+herdr tab close <tab_id>
+cd ~/work/ccs.ansible; W=.claude/worktrees/wg-keepalive; B=feat/wg-keepalive-relay
+test -z "$(git -C $W status --porcelain)" \
+ && [ "$(gh pr view 165 --json state,headRefOid --jq '.state+" "+.headRefOid')" = "MERGED $(git rev-parse $B)" ] \
+ && git worktree remove $W && git worktree prune && git branch -D $B \
+ && { git ls-remote --exit-code --heads origin $B >/dev/null && git push origin --delete $B; git worktree list; }
+```
+
+**5. Bash (foreground):** start the fresh executor. `<ws>` is the workspace id used all night, and the launch line is the one I used for `wgka`.
+```
+herdr tab create --workspace <ws> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio-design --label rdpa --no-focus
+herdr agent send-keys rdpa "claude --model claude-opus-5-5" enter
+herdr agent prompt rdpa "<brief below>" --wait --until working --timeout 60000
+```
+
+Brief, verbatim:
+
+> You are the executor for one task: a DESIGN for RDP audio. Design only, no implementation. You are in worktree .claude/worktrees/rdp-audio-design on branch docs/rdp-audio-design, cut from origin/main (includes PR #165).
+>
+> Process: use superpowers:brainstorming for the whole task. Your partner for its questions is me, the orchestrator; the operator is offline until morning. Ask in batches: end your turn with a block headed QUESTIONS, each with options and your recommendation. Do not invoke writing-plans. Do not implement.
+>
+> Read first: (1) the RDP audio entry in ~/work/ccs.ansible/orchestrator/backlog.md; (2) the previous executor's handoff at <scratch>/orch-red/handoff-wgka-roles.md; (3) the desktop and gateway roles; (4) projects/ccs/soul/ snapshots for both sites.
+>
+> Hard limits: no ansible-playbook, no ssh to ccs-it or ccs-ops, no push, no PR. A missing live fact goes under Open questions with the exact command that would answer it.
+>
+> Deliverable: one design doc committed on this branch, with current state (file:line), 2–3 approaches with trade-offs and a recommendation, changes per role, site differences, canary-first rollout and rollback, verification plan, risks, and open decisions for the operator with options and a recommendation. Mark every claim verified-in-code or assumption.
+>
+> Finish with superpowers:verification-before-completion. Report doc path, commit SHA, skills used and open decisions.
+
+**6. Bash (background):** `herdr agent wait rdpa --timeout 7200000`, re-armed on every wake.
+
+**7. Agent tool (Sonnet), then Artifact update:**
+
+> Text-only, no git, no host contact. (1) projects/ccs/soul/ccs-it.md: reflect that the WG keepalive relay from PR #165 is live as of 2026-09-28 (facts from `gh pr diff 165`; re-run changed=0; operator-accepted, 0% loss). If it already says so, change nothing. (2) orchestrator/backlog.md: WG keepalive is done on ccs-it, with worktree, branch, tab and broker removed; add "WG keepalive: ccs-ops rollout, not started, operator decision"; RDP audio is "design in progress, executor rdpa, due 2026-09-29 morning". Run build-backlog.sh and report the diff.
+
+**8. To the operator, sent once steps 3–7 are verified:**
+
+> WG keepalive relay is closed: PR #165 merged, live on ccs-it, accepted by you. I shut down the wgka tab, removed its worktree and branch, and stopped the Codex review broker. ccs-ops has not been deployed; it is a separate backlog item and I am not touching it tonight.
+>
+> RDP audio: design only tonight. Nothing will be deployed or run against either site. A fresh executor (rdpa) is brainstorming in its own worktree, the two advisors decide its questions, and a Codex tab reviews the result. In the morning you will find the design doc, the updated backlog, and one poll with whatever the advisors split on. Nothing is needed from you tonight.
+
+**9. On each wake:** `herdr agent read rdpa --source recent-unwrapped --lines 200`, then send its QUESTIONS to both advisors in parallel:
+
+> Vote only, read-only. <executor's question, options and recommendation, verbatim>. Reply: VOTE: <option>, confidence, and the one fact that would change your vote.
+
+A 2/2 vote goes back to `rdpa`. On a split, `rdpa` documents both options and the question joins the morning AskUserQuestion poll.
+
+## Why
+
+- **Teardown now:** the task is accepted, so cleanup is owed under the standing rule, and nine hours in is when leftovers get forgotten. Each deletion is checked first: clean tree, branch tip equal to the merged PR head, and the pid still being my broker.
+- **Fresh executor:** `wgka`'s value is its knowledge, not its tab. It is at 47% context, full of WG detail, and sits in a worktree that must go. The handoff file keeps the knowledge and gives the design a full context budget.
+- **Broker:** it is task-scoped and idle, and I won't leave a credentialed process running unattended overnight.
+- **No poll tonight:** the order is clear and the operator is leaving, so a poll would block my session until morning. The advisors decide, and splits wait for the morning poll.
+- **Background waits:** a foreground wait would block me and cap at ten minutes, while `herdr agent wait` wakes me on the event.
+- **Design only:** nobody authorised overnight changes to either site, so the executor stays read-only toward the hosts.

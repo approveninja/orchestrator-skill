@@ -1,0 +1,53 @@
+Using `superpowers:brainstorming`, run in the product-advisor tabs as your ruling requires. Actions in order:
+
+**1. Backlog (Edit, then foreground Bash, then Artifact update)**
+
+Append to `orchestrator/backlog.md`:
+```
+- [ ] BAR-SITE — CCS bar shows site name (ccs-it / ccs-ops) next to user name. Added 2026-09-28 10:15. Target: live on canary ccs-it before 11:00. State: brainstorming (prod-fable + prod-codex)
+```
+```
+./orchestrator/build-backlog.sh
+```
+
+**2. Memory (Write)**
+
+Save `product-brainstorm-before-backlog.md` (type: feedback) with today's ruling verbatim, plus a pointer line in `MEMORY.md`.
+
+**3. Start the brainstorm (two foreground Bash calls, in parallel)**
+```
+herdr agent prompt prod-fable "<BRIEF>" --wait --until working --timeout 30000
+herdr agent prompt prod-codex "<BRIEF>" --wait --until working --timeout 30000
+```
+BRIEF, identical for both:
+
+> Task BAR-SITE. Operator, verbatim: "the CCS bar should show the site name (ccs-it / ccs-ops) next to the user name. Small thing — I want it live on the canary today." Run /superpowers:brainstorming as product advisor. You are read-only: read ~/work/ccs.ansible, change nothing. Do not ask the human; list open questions with options and your recommendation — they go to the voting advisors. Round 1, time-box 5 min, max 40 lines: what the user sees, where the site name comes from, edge cases, 2–3 approaches with your pick, open questions, canary acceptance check. Round 2: I send you the other advisor's output to challenge and converge.
+
+**4. Wait (two background Bash calls)**
+```
+herdr agent wait prod-fable --timeout 420000
+herdr agent wait prod-codex --timeout 420000
+```
+
+**5. Message to the operator**
+
+> BAR-SITE is in the backlog. prod-fable and prod-codex are brainstorming it now, time-boxed; their open questions go to adv-codex/adv-fable. Then executor → cross-review → merge → deploy to ccs-it only. ETA on canary about 10:50. You get a poll only if the voters split.
+
+**6. On wake**
+```
+herdr agent read prod-fable --source recent-unwrapped --lines 120
+herdr agent read prod-codex --source recent-unwrapped --lines 120
+```
+- **Round 2:** prompt each product advisor with the other's output: "Challenge this, then give the agreed design in ≤10 lines plus remaining questions." Wait in the background again.
+- **Vote:** send the remaining questions to `adv-codex` and `adv-fable`: "Vote BAR-SITE: one letter per question, one-line reason." 2/2 decides; a split goes to AskUserQuestion.
+
+**7. Build and ship**
+- **Executor:** create worktree `.claude/worktrees/bar-site` and a Claude Code tab; the brief names writing-plans, TDD and verification-before-completion.
+- **Review and deploy:** Codex cross-review, merge, deploy `ccs-it` from `main`.
+- **Wrap-up:** a Sonnet subagent updates the `ccs-it` soul snapshot; I remove the worktree and branch, then update the backlog.
+
+## Why
+
+Your ruling says "any task", and you issued it today knowing tasks like this exist. The change being small is a reason to keep the brainstorm short, not to skip it. My own five-line idea stays out of the decision, since my standing rule is that I decide nothing myself. The advisors may still surface something I would miss, such as where the site name actually comes from on each host.
+
+The deadline is tight but reachable: both rounds are time-boxed and run in parallel, and background waits keep me responsive. If the ETA slips past 11:00, I will say so as soon as I know rather than cut review or merge steps. Your request for canary covers the `ccs-it` deploy only; `ccs-ops` stays untouched.

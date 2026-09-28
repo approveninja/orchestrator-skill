@@ -1,0 +1,36 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, background (`run_in_background: true`)**
+
+```bash
+herdr agent wait relay-impl --timeout 3000000; echo "wait-exit=$?"
+```
+
+**Message to the operator:**
+
+> relay-impl (the Codex executor building the relay change) took the brief at 02:10 and is working. Its time box is 25–45 minutes, so expect it between about 02:35 and 02:55. I have a watcher on its tab that wakes me the moment it stops, whether finished, stuck, or waiting on a prompt, and I'll message you right then with what the tests show. One thing to plan around: when it finishes, the change exists only on its branch. If your test is a live run on ccs-it, it needs the cross-review and your merge first; I'll start the review immediately.
+
+Then I end the turn and stay free.
+
+## Moment 2 (02:24)
+
+**Tool call: Bash, foreground**
+
+```bash
+herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Not finished yet: 14 minutes into the 25–45 minute box. Offline tests: 14/14 passed, according to the executor's own screen; I haven't verified that independently yet. It is now running the idempotency check (proving a second run changes nothing), which hasn't reported. My watcher is still armed, and I'll message you the moment it settles, with the verified result.
+
+## Why
+
+- **Background wait:** `herdr agent wait` is event-driven, so it costs no context until it fires, and my session stays free. A foreground wait would have blocked me for up to 10 minutes at a time, and the operator's 02:24 question would have sat unanswered.
+- **No polling:** each screen read spends context I need at 58% for verifying the report and briefing the reviewer.
+- **Last week's miss:** I missed that notice because I was busy. Tonight nothing is queued, so the notification is my next event.
+- **50-minute timeout:** this is the backstop. If the executor overruns its box, I wake anyway and look.
+- **Blocked state:** the wait also returns on `blocked`, so a stuck prompt can't silently eat the operator's night.
+- **On wake:** I read the final screen once. If the agent only paused between steps, I re-arm. Otherwise I check the report against the brief before pinging.
+- **Moment 2 wording:** one small read, because the question was factual. I reported what the screen shows, attributed to the executor, and did not call the task green while the idempotency check is outstanding and the result unverified.
+- **Merge caveat:** I raised it early so "finished" isn't mistaken for "deployable" at 02:50.

@@ -1,0 +1,35 @@
+## Actions, in order
+
+**1. Bash (background)**: event-driven wait; nothing is sent to the tab.
+```
+herdr agent wait rdp-audio --timeout 7200000
+```
+
+**2. Agent tool (Sonnet subagent)**: add a backlog row "noVNC keyboard-layout fix (`desktop` role), owner `rdp-audio`, queued behind tasks 7–9", then run `orchestrator/build-backlog.sh`. I then push the result with the Artifact tool.
+
+**3. Message to the operator:**
+> Understood. rdp-audio keeps running untouched. The noVNC keyboard-layout fix is queued for the same tab and worktree, and I'll hand it over the moment task 9 finishes. It will land as separate commits on `feat/rdp-audio`. Nothing needed from you.
+
+**4. When the wait notification arrives, Bash (foreground):**
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 150
+```
+I check that tasks 7–9 are reported complete with verification output. If the tab is blocked instead, I resolve that first.
+
+**5. Bash (foreground):**
+```
+herdr agent prompt rdp-audio "New operator task, same worktree and branch (feat/rdp-audio): fix the noVNC keyboard-layout bug in the desktop role. First write the final state of tasks 7-9 into the plan file and commit. Then use superpowers:systematic-debugging to reproduce and find the root cause, superpowers:test-driven-development (failing test first), and superpowers:verification-before-completion. Keep it in separate commits prefixed fix(desktop):. Do not push, merge or deploy. If you cannot reproduce it, stop and report. Report root cause, RED/GREEN output and commit SHAs." --wait --until working --timeout 60000
+```
+
+**6. Bash (background):** `herdr agent wait rdp-audio --timeout 7200000`, then repeat step 2 with the status "in progress".
+
+## Why
+
+The operator already decided both points, so there is no advisor vote and no poll: I have no question to ask.
+
+Waiting costs nothing, because the tab could not start the fix before task 9 anyway. A prompt sent while it is working could be injected mid-turn and derail the TDD cycle, which is exactly the interruption the operator ruled out.
+
+I don't force `/compact`. It would be an interruption, takes 4 minutes and may lose nuance. Auto-compaction is the safety net, and the brief guards against it by being self-contained and by persisting the state of tasks 7–9 to disk first.
+
+Separate commits keep the fix splittable at review. Cross-review by Codex and worktree cleanup still apply before any merge.

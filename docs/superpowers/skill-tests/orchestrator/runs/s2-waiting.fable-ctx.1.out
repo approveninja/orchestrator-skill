@@ -1,0 +1,21 @@
+**Part 1: C.** One background call (`run_in_background: true`):
+
+```
+mkdir -p ~/scratch/inbox; herdr agent wait relay-impl --timeout 3000000; herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Message to the operator (a statement, so no poll is needed):
+
+> relay-impl is running; its time box is 25–45 minutes. I'll ping you the moment it settles.
+
+Why: the wait is event-driven and its 50-minute timeout covers the whole time box. The report lands on disk, not in my context, and I stay reachable for the operator. A blocks me from their messages in 10-minute stretches, B polls and captures nothing, and D burns context on babysitting. Last week's missed notice happened while I was busy; nothing is queued now.
+
+On wake I run `herdr agent get relay-impl` to tell `done` from `blocked` or a timeout, then `tail -50 ~/scratch/inbox/relay-impl.last`, then ping immediately.
+
+**Part 2: B.** No commands, because the screen is already known. Message:
+
+> Still running, about 14 minutes into a 25–45 minute box. Its screen shows "14/14 tests passed" and an idempotency check in progress, but that is a mid-run line, not its report. I'll confirm green from its final report and my own run of the checks at its head SHA, then ping you right away.
+
+Why: A presents a screen line as a verified result, while the idempotency check can still fail and the code can still change. C interrupts a live check and delays the result the operator is waiting for. D tests a worktree that is still being written, so the result would describe no commit.
+
+CHOICE: P1=C P2=B

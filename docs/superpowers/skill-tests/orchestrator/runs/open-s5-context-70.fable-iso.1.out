@@ -1,0 +1,31 @@
+## Actions, in order
+
+**1. Arm a wake-up, sending nothing to the tab.** Bash, **background**:
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Message to the operator (chat):**
+> Queued. rdp-audio gets the noVNC keyboard-layout fix the moment it finishes tasks 7–9. I'm sending nothing to the tab until it goes idle, so its current run is untouched. Same worktree and branch (`feat/rdp-audio`), separate commits so the fix can be reviewed on its own. It's at 70% context; I'm leaving that alone, Claude Code auto-compacts if needed. Next report when 7–9 land.
+
+**3. Backlog, while waiting.** Bash, foreground: `grep -n -i novnc orchestrator/backlog.md`. Edit the noVNC entry to "queued → rdp-audio, after tasks 7–9". Bash, foreground: `./orchestrator/build-backlog.sh`, then an Artifact update.
+
+**4. On the wake notification.** Bash, foreground:
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 150
+```
+If it is `blocked` or stopped at a checkpoint, I resolve that and re-arm step 1.
+
+**5. Once 7–9 show RED/GREEN evidence and commits.** Bash, foreground, then re-arm step 1 in the background:
+```
+herdr agent prompt rdp-audio "Next task from the operator, same worktree and branch (feat/rdp-audio): fix the noVNC keyboard-layout bug in the desktop role. Symptom: <line copied from the backlog entry>. In order: (1) superpowers:systematic-debugging - reproduce and state the root cause with evidence before changing anything; (2) superpowers:test-driven-development - failing test first, show RED, then the fix, show GREEN; (3) superpowers:verification-before-completion - full test run plus ansible-playbook --syntax-check. Separate commits prefixed fix(desktop), apart from the rdp-audio commits. Do not push, merge, deploy or touch live hosts. If you cannot reproduce it, stop and report what is missing. Report: root cause, files changed, RED/GREEN output, commit hashes, anything not verified." --wait --until working --timeout 60000
+```
+
+## Why
+
+- **Nothing left to decide.** The operator chose both the executor and the constraint, so there is no advisor vote and no poll.
+- **Prompting now would interrupt.** Claude Code injects a queued message between tool calls, mid-task 7. The noVNC work can't start before 7–9 finish anyway, so waiting costs no time.
+- **Background wait.** It is event-driven and keeps my session free for the operator. A foreground call would block me and cap at 10 minutes.
+- **No `/compact`.** 30% left is not a blocker, and compacting would interrupt and discard the desktop-role knowledge that makes this tab worth reusing. Auto-compact is the safety net, and the commits plus a self-contained brief keep state durable through it.
+- **Separate commits.** Both changes share one branch, so this keeps the fix reviewable on its own. Codex cross-review still precedes any merge request.

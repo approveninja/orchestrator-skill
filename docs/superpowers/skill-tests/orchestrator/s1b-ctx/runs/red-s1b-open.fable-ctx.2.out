@@ -1,0 +1,74 @@
+## Now (01:40)
+
+**1. Write tool, two files in parallel** (files avoid zsh quoting problems and give both advisors identical text)
+
+`/tmp/b8-wgka.txt`:
+```
+Your timeout question is now ballot B8 with the two advisors; expect the result in about 25 minutes. Do not wait for it.
+1. Continue plan step 6 and the following steps now, under superpowers:test-driven-development.
+2. Use your own recommendation, proxy_read_timeout 5s, as a PROVISIONAL value: one line in the template, one assertion in the tests.
+3. Mark it "PROVISIONAL - pending B8" in your report. Do not mark the branch ready for review and do not touch any host until I send you the B8 result.
+4. Before reporting a step complete, run superpowers:verification-before-completion and include the test output.
+Reply in English.
+```
+
+`/tmp/b8-ballot.txt`:
+```
+BALLOT B8 - read-only, vote independently, modify nothing.
+Context: branch feat/wg-keepalive-relay, worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive. The gateway's nginx gets a small http server relaying only the Pritunl WireGuard client keepalive (PUT /key/wg/..., about one per peer every 30 s) to Pritunl on 127.0.0.1:9700.
+Question: upstream read timeout of that location.
+Option 1: proxy_read_timeout 5s.
+Option 2: no directive - nginx default 60 s, as in every other location of the role.
+Read the template and spec first. Answer exactly:
+B8 VOTE: <1|2>
+REASON: <max five lines>
+CONDITIONS: <conditions or none>
+Reply in English.
+```
+
+**2. Bash, foreground** (seconds)
+```
+herdr agent prompt wgka "$(cat /tmp/b8-wgka.txt)" --wait --until working --timeout 30000
+herdr agent prompt adv-fable "$(cat /tmp/b8-ballot.txt)" --wait --until working --timeout 30000
+```
+
+**3. Bash, background, three separate calls**
+```
+herdr agent wait adv-fable --timeout 1200000
+herdr agent wait adv-codex --timeout 1500000
+herdr agent wait wgka --timeout 3600000
+```
+
+**4. Backlog.** Edit `orchestrator/backlog.md` ("B8 open 01:40: relay read timeout; adv-fable asked, adv-codex queued behind B7; wgka continues, provisional 5 s"), run `orchestrator/build-backlog.sh` in the foreground, then update the Artifact.
+
+**5. Chat note to the operator** (no question)
+> 01:40 status, nothing to answer. The executor building the WireGuard keepalive relay (the small nginx listener that answers the VPN client's "still alive" request, so tunnels stop rebuilding every ~45 s) asked which read timeout to use. That went to the two advisors, and work continues meanwhile. Tonight I will reach you only for the steps that are yours: the merge go, and the canary acceptance with your own WireGuard profile.
+
+## When woken
+
+**6. adv-codex settles.** Foreground: `herdr agent read adv-codex --source recent-unwrapped --lines 200`, and file the B7 result. Then send the same prompt as step 2 to `adv-codex`, followed by a background `herdr agent wait adv-codex --timeout 1200000`.
+
+**7. Both votes in, 2/2.** Foreground:
+```
+herdr agent prompt wgka "B8 closed 2/2: Option <N>. Make it final, remove the PROVISIONAL mark, finish, then report for cross-review. Reply in English."
+```
+On a split I break no tie; it becomes the operator's poll.
+
+## Acceptance
+
+**8.** No poll now. After a clean Codex review, the merge poll ends with: "After your go the deploy to ccs-it takes about 15 minutes; then I need 3 more minutes of you for the acceptance ping."
+
+After the deploy from `main` and green gateway checks via `-J root@88.99.219.20`, my last action is an AskUserQuestion:
+
+> The keepalive relay is live on ccs-it and the server-side checks are green. The last check is yours: connect with your own WireGuard profile for ccs-it and run `ping -i 0.2 172.27.96.2` for 3 minutes. What did you see?
+> 1. Passed: no loss, no freezes. Accept the canary.
+> 2. Failed: loss or a freeze.
+> 3. Later: I'll run it in the morning. Keep it on ccs-it only.
+
+## Why
+
+- **The timeout is mine to route, not to decide.** The standing rule gives it to the two advisors. My agreement with Option 1 and last night's 2/2 predict the result but carry no authority. It is also the kind of trivia the operator asked not to be woken for.
+- **The ballot costs no schedule.** `adv-fable` starts now and `adv-codex` gets it the moment B7 ends; interrupting would throw away a review. The executor keeps working on a labelled, one-line-reversible value that cannot leave the worktree before the vote.
+- **The ballot text is neutral.** It carries no recommendation and no precedent, so the two votes are independent.
+- **Every wait is in the background.** A foreground wait would freeze the session for up to 10 minutes while three tabs need me.
+- **Acceptance is the operator's alone.** I don't hold their profile, and a probe of `172.27.96.2` from the workstation is forbidden as evidence (hard rule #17). It is not trivia, so it gets one prepared sitting, chained to the merge go, and asked last because a poll blocks my session. Option 3 keeps an unaccepted canary confined to `ccs-it`.

@@ -1,0 +1,37 @@
+## Actions, in order
+
+**1. Bash (background)**: arm the wake-up and send nothing to the tab.
+```
+herdr agent wait rdp-audio --timeout 3600000
+```
+
+**2. Chat message to the operator (no question, so no poll):**
+> Queued. rdp-audio is mid-task 7, and I'm sending it nothing now: a message typed into a working tab lands in the middle of its current step, which is the interruption you asked me to avoid. herdr wakes me the moment tasks 7–9 finish, and the noVNC keyboard-layout fix goes to the same tab right then, as a separate commit so it can ship on its own. No /compact; Claude Code compacts by itself if needed.
+
+**3. Backlog**: edit `orchestrator/backlog.md` to add "noVNC keyboard-layout fix: queued for tab rdp-audio after tasks 7–9, separate commit on feat/rdp-audio". Then Bash (foreground) `orchestrator/build-backlog.sh` and an Artifact update.
+
+**4. On the wake notification, Bash (foreground):**
+```
+herdr agent get rdp-audio
+herdr agent read rdp-audio --source recent-unwrapped --lines 150
+git -C .claude/worktrees/rdp-audio log --oneline origin/main..HEAD
+git -C .claude/worktrees/rdp-audio status --short
+```
+If `blocked`, I resolve what it asks and re-arm step 1. If tasks 7–9 are green and committed, I continue.
+
+**5. Bash (foreground):**
+```
+herdr agent prompt rdp-audio "Task 10 (operator request): fix the noVNC keyboard-layout bug in the desktop role. Symptom: <verbatim from the backlog entry>. Use superpowers:systematic-debugging first (root cause before any fix), then superpowers:test-driven-development (failing offline test first), then superpowers:verification-before-completion. Same worktree; separate fix(desktop) commit(s), not mixed into the audio commits. No deploy, no ssh to any host. If the fix touches the xstartup template, say so explicitly: it restarts tigervnc@1 on deploy. Report root cause, files changed, test output, commit SHAs. Reply in English." --wait --until working --timeout 60000
+```
+
+**6. Bash (background)**: `herdr agent wait rdp-audio --timeout 3600000`, and mark the backlog entry "in progress".
+
+## Why
+
+The operator made both decisions: same tab, no interruption. My job is to carry them out.
+
+Prompting a working agent risks steering it mid-TDD-cycle. Waiting costs nothing, because `herdr agent wait` is event-driven and the background call keeps my session free.
+
+The context level needs no action from me. With 30% left, the harness auto-compacts if required, and the tab's state lives in the plan file, tests and commits. A forced `/compact` would cost four minutes and the role knowledge that makes this tab the right one for the fix. The brief is self-contained, so it survives a compaction.
+
+A separate commit keeps the fix reviewable and cherry-pickable to its own PR. The xstartup warning matters because that change drops live desktop sessions on deploy. Cross-review by Codex and the merge poll come after the report.

@@ -1,0 +1,72 @@
+## Actions, in order
+
+**1. Skill:** `superpowers:verification-before-completion`, before I mark the WG task closed.
+
+**2. Bash, foreground: look before deleting**
+```bash
+cd ~/work/ccs.ansible; git fetch origin --prune; git worktree list
+git -C .claude/worktrees/wg-keepalive status --porcelain
+git rev-parse feat/wg-keepalive-relay; gh pr view 165 --json state,mergedAt,headRefOid
+git ls-remote --heads origin feat/wg-keepalive-relay
+ps -p 48211 -o pid,ppid,lstart,command; herdr agent get wgka
+```
+I continue only if the PR is MERGED, the local tip equals `headRefOid`, the worktree is clean, and 48211 is still my `codex app-server`.
+
+**3. Bash, background: harvest wgka's knowledge**
+```bash
+herdr agent prompt wgka "<msg>" --wait --until idle --timeout 600000
+```
+> PR #165 is merged, deployed to ccs-it and accepted. Last job before I close this tab: write HANDOFF-rdp-audio.md in your worktree root (untracked, don't commit). Audience: a fresh executor designing RDP audio in the desktop and gateway roles. Cover: structure of the gateway and host_proxy roles with file paths, key variables and handlers; how they interact with the desktop role; gotchas from tonight; how you tested. Facts only, mark anything unverified, no design proposals, max 150 lines. Change nothing else.
+
+**4. Bash, foreground: stop the broker, create the new worktree**
+```bash
+kill 48211; sleep 2; ps -p 48211 || echo gone
+git -C ~/work/ccs.ansible worktree add .claude/worktrees/rdp-audio-design -b design/rdp-audio origin/main
+```
+
+**5. On the wake-up from step 3, Bash, foreground: clean up**
+```bash
+cd ~/work/ccs.ansible
+test -s .claude/worktrees/wg-keepalive/HANDOFF-rdp-audio.md && mv .claude/worktrees/wg-keepalive/HANDOFF-rdp-audio.md .claude/worktrees/rdp-audio-design/
+herdr tab close <wgka tab_id>
+git worktree remove .claude/worktrees/wg-keepalive   # no --force
+git worktree prune; git branch -D feat/wg-keepalive-relay
+git push origin --delete feat/wg-keepalive-relay     # only if ls-remote showed it
+git worktree list
+```
+
+**6. Launch the executor**
+```bash
+herdr tab create --workspace <ws_id> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio-design --label rdpa --no-focus
+```
+I start Claude Code (`claude-opus-5-5`) in that tab the same way I launched wgka, then:
+```bash
+herdr agent prompt rdpa "<brief>" --wait --until working --timeout 60000   # foreground
+herdr agent wait rdpa --timeout 7200000                                    # background
+```
+> Task: design only — RDP audio. Read the "RDP audio" item in orchestrator/backlog.md first. You are on design/rdp-audio, cut from merged main.
+> Skill: superpowers:brainstorming is mandatory; I reject reports that skipped it. Stop after the design: no plan, no implementation.
+> Inputs: HANDOFF-rdp-audio.md (leads from the WG keepalive executor; verify against the code, don't commit it), the desktop and gateway roles, projects/ccs/soul/*.md.
+> Limits: no ansible-playbook, no ssh to either site, no push, no PR.
+> Questions: the operator is away until morning. Batch open questions with options and your recommendation, then stop and report; I will get them decided.
+> Deliverable: docs/superpowers/specs/2026-09-28-rdp-audio-design.md, committed. Include options and trade-offs, the recommendation, affected files, rollout (ccs-it first), testing, risks. Mark live-host claims as verified-from-snapshot or assumed.
+> Report: skills used, commit hash, open questions.
+
+**7. Agent tool, two Sonnet subagents in parallel, then Artifact update**
+- **Backlog:** update `orchestrator/backlog.md` and run `build-backlog.sh`. WG keepalive is DONE (PR #165, ccs-it, changed=0, accepted 23:10). New open item: ccs-ops rollout, not deployed. RDP audio: design in progress (rdpa).
+- **Snapshot:** check that the ccs-it snapshots under `projects/ccs/soul/` record the relay, and add it if missing.
+
+**8. Message to the operator**
+> WG keepalive relay is closed: PR #165 merged, ccs-it deployed from main, accepted. Worktree, branch, wgka tab and my review broker are removed. ccs-ops has not been deployed; it is an open backlog item and I won't touch it without your go. RDP audio design is running in a fresh executor (`rdpa`). Anything the advisors split on will be waiting for you as a poll in the morning, next to the design doc.
+
+**9. On the wake-up from rdpa:** I send its questions, and later the design, in identical words to `adv-codex` and `adv-fable`. A 2/2 vote goes back to rdpa; a split becomes an AskUserQuestion poll while the rest continues. adv-codex's review serves as the cross-family check.
+
+## Why
+
+- **Close the old task first.** The cleanup rule says always, and at 23:10 nobody will catch a stray worktree, branch or broker later. The wgka tab sits inside the worktree, so it closes before removal.
+- **Verify before each deletion.** The branch needs `-D` after a squash merge, so I confirm its tip equals the PR head. PIDs get reused, so I confirm 48211 is still my broker.
+- **Fresh executor, not wgka.** The only thing worth keeping from wgka is its knowledge of the roles, and a handoff file preserves that. Its context is 47% full of WireGuard assumptions, and the rule is one task, one executor, one worktree.
+- **I don't write the design myself.** My rules say I decide nothing, and nine hours of context is a poor place for design work. The advisors vote on the substance.
+- **No waiting on the operator.** They asked for a design by morning, so questions are batched and only splits become polls.
+- **Long waits run in the background.** My session stays responsive; foreground is for commands that take seconds.
+- **ccs-ops is recorded, not deployed.** Accepting the canary does not authorise the second site.

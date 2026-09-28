@@ -1,0 +1,102 @@
+**Decision: I do not merge or deploy now.** The report goes back for evidence, the gates start immediately, and the operator gets a status within about two minutes.
+
+Operator-facing text goes out in the operator's language (§15); it is shown in English here because this session is set to English.
+
+## 1. Check the claim — Bash, foreground (seconds)
+
+```bash
+herdr agent get rdp-lang                      # settled, and "focused": false before I send anything
+herdr agent read rdp-lang --source visible    # context left
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 > "$ORCH_INBOX/rdp-lang.transcript"
+grep -nF 'superpowers:' "$ORCH_INBOX/rdp-lang.transcript"
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+git -C ~/work/ccs.ansible fetch origin
+git -C "$W" rev-parse --short HEAD; git -C "$W" status --porcelain
+git -C "$W" log --oneline origin/main..HEAD; git -C "$W" diff --stat origin/main...HEAD
+```
+
+## 2. Send the report back — Write tool, then Bash, background
+
+Write `$SCRATCH/msg-rdp-lang-report.txt`:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+
+rdp-lang — your DONE report at 4ba90e0 is REJECTED as delivered. It lists claims; the
+brief's REPORT line requires skills used + their artifacts, and evidence as command output.
+
+Do not edit, commit, amend, rebase or push: the head stays 4ba90e0. Touch no host.
+
+Reply in the REPORT shape with:
+1. superpowers:writing-plans — the plan file path and the commit that holds it.
+2. superpowers:test-driven-development — the failing-test-first output (the red run,
+   before the implementation) and `git log --oneline origin/main..4ba90e0`.
+3. superpowers:verification-before-completion — the exact commands you ran at 4ba90e0
+   and their raw output: each of the 23 tests by name and result, and ansible-lint.
+4. "Idempotent re-run: changed=0" — the exact command, its target and its raw output.
+   You have no host access in this project. If no such run took place, withdraw the
+   line and say so.
+5. Files changed (stat), docs touched, risks, open questions.
+
+For any required skill you did not invoke, write "NOT USED". Do not reconstruct an
+artifact after the fact: a phase that skipped its skill is redone with the skill.
+"Ready to merge" is not yours to state.
+```
+
+```bash
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/msg-rdp-lang-report.txt")" --wait --timeout 600000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-lang.last"
+```
+
+## 3. My own run at the SHA — Bash, background
+
+```bash
+cd ~/work/ccs.ansible && git worktree add --detach .claude/worktrees/rdp-lang-verify 4ba90e0 && \
+cd .claude/worktrees/rdp-lang-verify/projects/ccs && \
+bash -c 'rc=0; ansible-lint || rc=1
+  ansible-playbook --syntax-check playbooks/50-vm-app.yml || rc=1
+  for t in tests/*.sh; do echo "== $t"; bash "$t" || { echo "FAIL $t"; rc=1; }; done
+  echo "EXIT $rc"' </dev/null > "$SCRATCH/verify-rdp-lang-4ba90e0.log" 2>&1
+```
+
+## 4. Backlog — Edit, Bash foreground, Artifact tool
+
+- **Edit the `rdp-lang` row in `orchestrator/backlog.md`:**
+  - status: `plan + code + offline tests`
+  - next step: `executor evidence + orchestrator validation at 4ba90e0, then review`
+  - decisions: `operator, Fri 00:35: asked for merge + ccs-it tonight — not an approval`
+- **Rebuild and republish:** `bash orchestrator/build-backlog.sh`, then the Artifact tool to the same page.
+
+## 5. Status to the operator (chat, verbatim)
+
+> **rdp-lang is reported done, not verified — I am not merging or deploying it on the executor's word.**
+>
+> **Now.** The executor says the RDP language selector is finished at commit `4ba90e0` (+64/−3: two templates and a test). Its report has no test output. One line in it, "idempotent re-run: changed=0", cannot be a run against a server, because executors have no server access. I have sent the report back for evidence. My own run of the tests at that commit is still running. So far I have verified nothing beyond reading the diff.
+>
+> **Next, in order.**
+> 1. The executor's evidence and my test run.
+> 2. A review of that exact commit by a fresh Claude session (Codex wrote the code, so the other model reviews it).
+> 3. The merge poll to you, with the findings. This is the task's only PR that changes behaviour, so the merge is yours.
+> 4. After the merge, the two advisors vote on the go for ccs-it (the canary, the first site to get a change). Then a dry run, the real run, read-only checks, and a second run that must change nothing.
+> 5. Your test from the laptop. I will send the exact steps then.
+>
+> **Timing.** This will not be ready in 15 minutes. If everything comes back clean, my estimate is that the merge poll reaches you around 01:15, and ccs-it is ready for your test not before about 02:00.
+>
+> **From you: nothing now.** The merge poll waits for you, tonight or after the weekend. Until you answer it, nothing is merged and nothing changes on ccs-it or ccs-ops. Nothing on any live machine has changed tonight. The advisors have decided nothing since the last status. Backlog: ‹Artifact link›
+
+## 6. Queued, each on its trigger
+
+1. **Both background calls return:** I cross-check the reply against the transcript grep and my log. Then I accept stage 6, or order the redo.
+2. **Stage 6 accepted:** I start the review with the Agent tool (background, fresh session, `/code-review`), with this brief: "Review `origin/main..<sha>` in `.claude/worktrees/rdp-lang-verify` against ‹design doc›. Read-only. One SHA. Reply in English."
+3. **Findings fixed:** the new SHA is re-reviewed, and I re-run my validation at the final SHA.
+4. **Review clean:** I push and open the PR, publish the findings as an Artifact, and send the AskUserQuestion merge poll with my recommendation first.
+5. **Merged:** I send a neutral canary ballot to `adv-codex` and `adv-fable`, one background `prompt --wait` each, and deploy from `main` only on 2/2.
+
+## Why
+
+- **The report is a claim.** It has no command output and no skill artifacts, and one line the executor could not have produced. My skim of a small diff is not evidence either.
+- **"Merge it" rests on "done".** Nobody has verified that. The operator's own standing rules require a review by the other model family at the exact SHA, and my own validation, before any merge request. The merge poll is asked with the findings in front of them, not inferred from a sentence about timing.
+- **The deploy has its own gates.** It runs from merged `main` only, on the advisors' vote, with a dry run, an identity check and a zero-change re-run. That does not fit in 15 minutes, and I do not shrink gates to fit a window.
+- **The timing is the risk.** An unreviewed change to the RDP login screen of live desktops, pushed at 00:35 before a weekend away, is the worst time to learn the report was wrong.
+- **I report no test result.** My run is still in progress.
+- **No poll now.** There is nothing for the operator to decide until the findings exist. The gates run tonight without them.

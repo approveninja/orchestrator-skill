@@ -1,0 +1,59 @@
+## Actions, in order
+
+**1. Bash (foreground, a few seconds)** to find the skill text Claude Code already has on disk:
+
+```
+find ~/.claude/plugins -type f -path '*superpowers*/skills/brainstorming/SKILL.md' | head -1
+```
+
+The printed path is `$SKILL` below.
+
+**2. Agent tool (Sonnet)** for the backlog state change:
+
+> "In ~/work/ccs.ansible/orchestrator/backlog.md add, in the file's existing format: PRITUNL-ROTATE: quarterly rotation of the Pritunl console admin password, ccs-it (canary) then ccs-ops. Added 2026-09-28 14:30. Status: brainstorm round 1 (prod-fable + prod-codex). Note: Codex has no superpowers installed; prod-codex follows the skill text read-only; operator poll open. Then run build-backlog.sh and return its output."
+
+Then **Artifact** update with the rebuilt backlog.
+
+**3. Foreground:**
+
+```
+herdr agent prompt prod-fable "<brief>" --wait --until working --timeout 30000
+```
+
+Brief:
+
+> "Backlog task PRITUNL-ROTATE: a way to rotate the Pritunl console admin password on both sites (ccs-it = canary, ccs-ops) every quarter. Invoke /superpowers:brainstorming on it. You are strictly read-only: no file writes, no spec file, no commits, no writing-plans hand-off. Repo: ~/work/ccs.ansible. Never open, decrypt or print secret or vault values. prod-codex is your partner on the same task; I relay between you. Where the skill says to ask the user, do not ask and do not assume: list it under OPEN QUESTIONS with 2–4 options and your recommendation, for the voting advisors. Round 1, then stop: (1) CONTEXT: how Pritunl and its admin credential are deployed and stored today, with file:line; (2) OPEN QUESTIONS; (3) 2–3 APPROACHES with trade-offs. No final design yet."
+
+**4. Foreground:** the same command and brief for `prod-codex`, prefixed with:
+
+> "You have no superpowers skills installed. First read $SKILL in full (read-only) and follow that process exactly."
+
+**5. Two background Bash calls:**
+
+```
+herdr agent wait prod-fable --timeout 1800000
+herdr agent wait prod-codex --timeout 1800000
+```
+
+**6. Chat status to the operator:**
+
+> "PRITUNL-ROTATE is in the backlog. Brainstorm round 1 is running in both product tabs. prod-codex is following the skill's text, not an installed skill. Poll follows."
+
+**7. AskUserQuestion:**
+
+> "Codex CLI has no superpowers skills (~/.agents/skills contains only herdr), so prod-codex cannot invoke superpowers:brainstorming. How should Codex get it?"
+>
+> - **Install superpowers for Codex (Recommended)**: I change your workstation config, restart prod-codex and redo its round with the installed skill.
+> - **Keep the read-only stopgap**: prod-codex keeps following SKILL.md from the Claude plugin directory; nothing is installed.
+> - **Pause**: the task stays blocked until you install it yourself.
+
+**On wake:** I read both tabs, cross-send each round 1 to the other tab for critique, and send the merged OPEN QUESTIONS to `adv-codex` and `adv-fable` for a vote. Splits go to a poll.
+
+## Why
+
+- **Not Fable alone:** the ruling requires two product advisors, so running only `prod-fable` would break it on the first day it applies.
+- **No install without approval:** installing skills changes the operator's workstation, and only they can authorize that, so it goes to a structured poll with my recommendation.
+- **The stopgap is my own call:** having Codex read the skill file changes nothing on the machine and gives both tabs the same process. It is not the literal ruling, so I disclosed it and the operator can overrule it.
+- **Nothing is lost either way:** round 1 is read-only, so any poll answer costs at most one redone Codex round.
+- **Session stays free:** the prompts go out before the blocking poll, and the waits run in the background.
+- **I decide no design content:** every open question goes to the voting advisors.

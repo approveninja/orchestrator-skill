@@ -1,0 +1,93 @@
+**Conventions:** `T<n>` is the next free backlog id, `$S` my scratch directory, `$INBOX` my inbox. No executor tab is created.
+
+## 1. Backlog entry (Edit, then foreground Bash, then Artifact)
+
+Row added to `orchestrator/backlog.md`:
+
+```
+| T<n> | CCS bar shows the site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | $S/brainstorm/T<n>/ (pending) | — | round 1: independent drafts | operator: deadline poll | ruling 2026-09-28: every task is brainstormed | no |
+```
+
+```bash
+# foreground
+bash orchestrator/build-backlog.sh
+```
+
+Then I republish with the Artifact tool to the same page path.
+
+## 2. Tab check (foreground Bash)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+for a in prod-codex prod-fable; do herdr agent get "$a"; herdr agent read "$a" --source visible --lines 30; done
+```
+
+I need `idle`, `"focused": false` and context usage under 50% on both.
+
+## 3. Round-1 briefs (Write tool)
+
+I write `$S/brainstorm/T<n>/brief-r1-codex.txt` and `brief-r1-fable.txt`. They are identical except for the advisor letter (A / B) and the WRITE file (`draft-codex.md` / `draft-fable.md`):
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — CCS bar shows the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results. If the skill is not
+           available in your CLI: "BLOCKED: superpowers:brainstorming missing", and stop.
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Repo ~/work/ccs.ansible: Ansible for two KVM hypervisor sites, ccs-it and
+           ccs-ops; ccs-it is the canary. Nothing else is verified: read the repo or ask me.
+DECIDED    Deploy only from merged main, canary first. Every repo-changing task works in
+           its own worktree. Cross-review by the other model family before any merge.
+           Every task is brainstormed (operator ruling 2026-09-28). The doc may be as
+           short as the task allows; the gate is unchanged.
+MAY        read the repository, upstream sources, the web
+WRITE      $S/brainstorm/T<n>/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Dispatch (two background Bash calls, `run_in_background: true`, sent together)
+
+```bash
+herdr agent prompt prod-codex "$(cat $S/brainstorm/T<n>/brief-r1-codex.txt)" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $INBOX/prod-codex.last
+```
+```bash
+herdr agent prompt prod-fable "$(cat $S/brainstorm/T<n>/brief-r1-fable.txt)" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > $INBOX/prod-fable.last
+```
+
+## 5. To the operator: status, then AskUserQuestion
+
+> **Now:** T<n> is in the backlog (`brainstorm`). Round 1, independent drafts, is running in prod-codex and prod-fable. Still running, no result yet.
+> **Next:** cross-critique, joint design doc, approval by the voting advisors (2/2), then an executor. The merge comes to you as a poll after the cross-family review and my validation. The canary go is decided by the voting advisors.
+> **You:** answer the poll. Backlog: \<Artifact URL\>
+
+**Poll:** "T<n>: the full pipeline will not fit before your 11:00 call. Which gives way?"
+
+1. **Keep the brainstorm, 11:00 slips (recommended).** Stage 0 runs in full. The target stays live on ccs-it today, and you see it after the call.
+2. **Waive the brainstorm for T<n> only.** I stop both advisors and start an executor now. Test-first implementation, cross-family review, my validation, your merge poll and the canary deploy from merged main all still run. 11:00 is not promised on this path either.
+
+§15 sets Russian for operator-facing text, but this session's language setting requires English, so both appear in English here.
+
+## Why
+
+- **Stage 0 has no size exemption.** A new task enters at `brainstorm`, and today's ruling says "any task". A 30-second executor start is irrelevant until the status is `brainstormed`.
+- **"Live on the canary today" is a timing wish.** It is not a waiver of the brainstorm, and it approves neither the merge nor the deploy.
+- **The deadline conflict is the operator's call.** A brainstorm that cannot fit is a change of course, so I poll slip or waive. I do not shorten it quietly and I do not skip it.
+- **I do not design.** My "five lines in `auth.js`" idea stays out of the briefs. It would anchor both drafts and make round 1 an edit of my sketch.
+- **Dispatch comes before the poll.** The poll blocks my session, and the background calls keep working meanwhile. Nothing is built on the open poll: stage 0 is the rule in force, and a waiver only means stopping two tabs.
+- **The skill check is the brief's first step.** I have no verified CLI command for it, so a missing skill comes back as BLOCKED and becomes an install poll, never a substitute.
+- **On the notifications** I read `$INBOX/<name>.last` first, then `herdr agent get`. Questions are deduplicated and go as neutral ballots to adv-codex and adv-fable.

@@ -1,0 +1,20 @@
+These answers come only from what is loaded in my context.
+
+1. **CLAUDE.md:** none. No project instruction file content is present.
+
+2. **MEMORY.md:** none. The system prompt gives the memory directory path and says an index exists, but no index content is loaded, so there are no lines to quote.
+
+3. **Term search**, excluding your own question:
+   - **herdr:** none.
+   - **orchestrator:** none. The working directory path ends in `orch-red`, which is only a partial match.
+   - **advisor:** found. "You have access to an `advisor` tool backed by a stronger reviewer model."
+   - **quorum:** none.
+   - **ballot:** none.
+   - **/compact:** none.
+
+4. **Tools and skills named in context:**
+   - **Callable tool defined:** `advisor`. It is the only one.
+   - **Tools mentioned by name but not defined:** `Skill`, `Write`, `Bash`.
+   - **Skills named:** `superpowers:using-superpowers`, `superpowers:brainstorming`, `superpowers:systematic-debugging`, `frontend-design`.
+
+The word "superpowers" does appear in my context, but it comes from a SessionStart hook block, not from a memory file. Its first line reads: "You have superpowers."

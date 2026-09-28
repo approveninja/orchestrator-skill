@@ -1,0 +1,89 @@
+## Actions, in order
+
+**1. Bash, foreground (seconds): check the leftovers before touching them**
+```bash
+cd ~/work/ccs.ansible && git status --short --branch && git worktree list
+git -C .claude/worktrees/wg-keepalive status --porcelain
+git fetch origin --prune && git branch --merged origin/main | grep feat/wg-keepalive-relay
+ps -p 48211 -o pid=,lstart=,command=
+herdr agent list && herdr agent get wgka
+```
+
+**2. Bash, foreground: start the RDP audio executor in a fresh worktree and tab**
+```bash
+git worktree add .claude/worktrees/rdp-audio -b feat/rdp-audio-design origin/main
+herdr tab create --workspace <this workspace id> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdpaudio --no-focus
+```
+I launch a Claude Opus executor there with the same launch line I used for `wgka` (it is not in the CLI excerpt, so I don't restate it). Then:
+```bash
+herdr agent prompt rdpaudio "<brief below>" --wait --until working --timeout 60000
+```
+> Task: DESIGN ONLY for RDP audio on CCS desktops: sound from the live desktop session heard in the user's RDP client; assess microphone as optional. No implementation, no playbook runs, no host connections.
+> Use superpowers:brainstorming, then superpowers:verification-before-completion; name the skills you used in your report.
+> Read first: CLAUDE.md (rdp_server, vnc_server, the gateway's stream rdp.conf), docs/v3/30-rdp.md, docs/superpowers/specs/2026-09-21-ccs-rdp-lan-ccs-password-design.md, projects/ccs/roles/{rdp_server,vnc_server,desktop}.
+> Fixed constraints: xrdp stays a libvnc bridge to the running Xvnc :1 (same desktop as the browser, no xorgxrdp, no second X session); listeners and the PAM gate are unchanged; idempotent; bash only; ccs_ vars.
+> Answer first: can xrdp's audio channel work at all over this bridge, and which audio server runs in the tigervnc@1 session? Give 2–3 approaches with trade-offs and one recommendation.
+> The operator is offline until morning. Ask him nothing. Put every open question under "Decisions needed" with options and your default; list live facts you need under "Facts needed from a host" and I will fetch them.
+> Deliverable: docs/superpowers/specs/2026-09-28-ccs-rdp-audio-design.md, committed on this branch, no PR, no session links. Reply in English.
+
+Bash, **background**: `herdr agent wait rdpaudio --timeout 14400000`
+
+**3. Message to the operator**
+> Started. RDP audio (sound from the desktop reaching your RDP client) is being designed overnight in a new executor tab. Open choices go to the two advisors; anything they split on comes to you in the morning as a poll, after the design is published as an Artifact. No live changes tonight.
+> In parallel I'm closing the relay task: ccs-it snapshot and backlog (docs-only PR, merged under the docs-only rule), memory note, review broker stopped, tab, worktree and branch removed. Not started: enabling the relay on ccs-ops. It is in the backlog awaiting your go.
+
+**4. Bash, foreground: read-only live facts through the ccs-it hypervisor**
+```bash
+CCS_SSH=(-o StrictHostKeyChecking=accept-new -o ControlMaster=no -o ControlPath=none)
+ssh "${CCS_SSH[@]}" -o HostKeyAlias=ccs-it-gw -J root@88.99.219.20 ubuntu@172.27.96.2 \
+ 'hostname; sudo ss -ltnpH | grep ":9700 "; sysctl -n net.ipv4.ip_nonlocal_bind; cat /opt/ccs-host-proxy/state/wg-keepalive.applied; sha256sum /opt/ccs-host-proxy/conf.d/wg-keepalive.conf; docker ps --format "{{.Names}} {{.Image}}"' \
+ </dev/null >/tmp/ccs-it-gw-relay-facts.txt 2>&1
+```
+I confirm the first line is `ccs-it-gw`.
+
+**5. Close-out brief to `wgka`**
+```bash
+herdr agent prompt wgka "<brief below>" --wait --until working --timeout 60000
+```
+> Close-out of the WireGuard keepalive relay, docs only. Canary accepted by the operator on ccs-it, 2026-09-28 23:10 (WireGuard ping, 0% loss over 3 minutes); PRs #165 and #166 merged; re-run from main changed=0.
+> 1. Confirm your worktree is clean, then `git fetch origin && git switch -c chore/wg-keepalive-closeout origin/main`.
+> 2. Update projects/ccs/soul/ccs-it.md to the post-relay state using only /tmp/ccs-it-gw-relay-facts.txt and the merged repo. Do not connect to any host.
+> 3. In orchestrator/backlog.md: relay → done, canary accepted 2026-09-28; add "relay fleet enablement (ccs-ops): waiting for operator go"; add "RDP audio design: in progress (tab rdpaudio), due 2026-09-29 morning".
+> 4. Commit (Co-Authored-By only; `git grep -nE "code/session_[0-9A-Za-z]"` empty), push, open a PR. Do not merge.
+> 5. Use superpowers:verification-before-completion. Report the PR number, diff stat, anything uncommitted and any process you left running. Reply in English.
+
+Bash, **background**: `herdr agent wait wgka --timeout 1800000`
+
+**6. Bash, foreground: stop the broker (only if step 1 showed `codex app-server`)**
+```bash
+kill 48211; sleep 2; ps -p 48211 || echo gone
+```
+
+**7. Write the memory note `ccs-wg-keepalive-relay.md` (type: project) plus a `MEMORY.md` pointer**
+> Relay live on ccs-it only (PRs #165/#166); canary accepted 2026-09-28; ccs-ops NOT enabled. **Why:** WireGuard clients rebuilt tunnels every ~45 s. **How to apply:** fleet = move `ccs_proxy_wg_keepalive` from site_it to gateways group_vars (never both), operator go first; rollback needs WireGuard profiles moved to OpenVPN first. [[project_ccs_v4_sites]]
+
+**8. On the `wgka` notification**
+I check that `gh pr diff <n>` touches only `*.md`, then:
+```bash
+gh pr merge <n> --merge --delete-branch
+herdr tab close <wgka tab_id>
+git worktree remove .claude/worktrees/wg-keepalive && git worktree prune
+git pull && git branch -d feat/wg-keepalive-relay chore/wg-keepalive-closeout
+./orchestrator/build-backlog.sh
+```
+Then I update the backlog Artifact with the Artifact tool.
+
+**9. On the `rdpaudio` notification**
+I reject the report if brainstorming was skipped. I prompt `adv-codex` and `adv-fable` with the "Decisions needed" list; 2/2 rulings go back to the executor. In the morning I publish the design Artifact, then send one AskUserQuestion poll per split decision and one for sign-off.
+
+## Why
+
+The operator's priority is running within about three minutes, and nothing waits on him. A poll now would block my turn all night if he has gone to bed, so open questions go to the advisors and splits wait for morning.
+
+I use a fresh executor rather than `wgka`. The convention is one executor and one worktree per task, and `wgka`'s half-used context is mostly relay detail. RDP audio lives mainly in `rdp_server`, and that knowledge is in the specs. `wgka` is an Opus agent that holds the relay facts, so it writes its own task's paperwork and is then closed.
+
+"Harmless" and "nine hours in" are not reasons to leave the leftovers. I started the broker, the tab and the worktree, so they are mine to remove. A snapshot and backlog that describe the pre-relay state would mislead the next session, and the clean-up is cheapest now while the facts are fresh. I still verify before deleting: worktree clean, branch merged, pid is what I think it is.
+
+Host access stays with me, read-only, through the site's hypervisor with the host key alias. Enabling ccs-ops is a live change nobody asked for, so it is recorded, not done.
+
+Both waits run in the background, so I stay responsive.

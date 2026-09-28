@@ -1,0 +1,39 @@
+## Actions, in order
+
+**1. Bash (background, `run_in_background: true`):**
+```
+herdr agent wait rdp-audio --timeout 590000
+```
+If it times out and rdp-audio is still `working`, I re-run the same command.
+
+**2. Agent tool (Sonnet subagent):**
+> In `~/work/ccs.ansible/orchestrator/backlog.md`, add under Queued: "noVNC keyboard-layout bug (desktop role). Operator 03:05. Assigned to rdp-audio after its tasks 7–9. Worktree `.claude/worktrees/novnc-kbd`, branch `fix/novnc-kbd-layout` off main." Run `orchestrator/build-backlog.sh` and return the output.
+
+Then I call **Artifact** to update the backlog page with that output.
+
+**3. Chat to operator:**
+> I won't touch rdp-audio now. Anything I send to a working Claude tab gets injected at its next tool call, so it would interrupt it. It's also only on task 7 of 7–9 with 30% context left. I'm waiting on it in the background. When it finishes and its 7–9 report checks out, I'll /compact it and give it the noVNC keyboard-layout fix. Same agent, as you asked, but in its own worktree and branch (`fix/novnc-kbd-layout` off main), not on `feat/rdp-audio`. That keeps the audio feature's review, merge and ccs-it canary separate from an unrelated fix. The backlog is updated.
+
+**4. When the wait finishes:**
+- Run `herdr agent get rdp-audio`.
+- If it is `blocked`: run `herdr agent read rdp-audio --source visible` and answer only that prompt.
+- If it is idle or done: run `herdr agent read rdp-audio --source recent-unwrapped --lines 150`. I check that tasks 7–9 show RED→GREEN, verification-before-completion output, and a commit on `feat/rdp-audio`. If any of that is missing, I send it back to finish before giving it new work.
+
+**5. Compact it:**
+```
+herdr agent prompt rdp-audio "/compact Keep: desktop role layout, noVNC/xrdp files and templates, test and syntax-check commands. Drop: step detail of tasks 1-9." --wait --until working --timeout 30000
+```
+Then re-arm step 1.
+
+**6. Send the brief:**
+```
+herdr agent prompt rdp-audio "New task (operator request), separate from feat/rdp-audio. Do NOT commit it there. Fix the noVNC keyboard-layout bug in the desktop role. Setup, from ~/work/ccs.ansible: git worktree add .claude/worktrees/novnc-kbd -b fix/novnc-kbd-layout main. Work only in that worktree, using absolute paths. The symptom is in the noVNC keyboard-layout entry of orchestrator/backlog.md. If you can't reproduce it, stop and report; don't guess. Skills, in order: superpowers:systematic-debugging (root cause before any edit), superpowers:test-driven-development (show RED then GREEN), superpowers:verification-before-completion (syntax-check and tests, paste the output). No push, no deploy, no merge request. Report the root cause, a diff summary, test output and the commit SHA." --wait --until working --timeout 30000
+```
+Then re-arm step 1.
+
+## Why
+
+- **Waiting is the only way to not interrupt it.** Text sent to a working Claude tab lands in the middle of Task 7's TDD cycle. A background wait is event-driven and leaves my session free; a foreground wait would freeze me for up to 10 minutes.
+- **Its context can't take a second task right now.** At 30% left, stacking a debugging task on top would trigger auto-compaction mid-task. A deliberate `/compact` between tasks is safer and keeps the desktop-role knowledge the operator wants to reuse.
+- **Separate branch, same agent.** The operator chose the agent; the standing worktree rule sets the branch. Keeping them apart means cross-review, merge, canary deploy and any revert happen independently for each change.
+- **No advisor vote and no poll.** The operator already made the decision, and I'm not asking the operator anything.

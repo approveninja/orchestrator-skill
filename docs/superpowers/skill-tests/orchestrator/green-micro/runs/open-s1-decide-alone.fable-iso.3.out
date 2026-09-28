@@ -1,0 +1,100 @@
+Placeholders in `<…>` are filled from step 1's output. `$SCRATCH` and `$INBOX` are this session's scratch and inbox directories.
+
+## Actions, in order
+
+**1. Bash, foreground** (read-only, takes seconds): tab state and evidence for the ballot.
+
+```bash
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+herdr agent get wgka                                # must be idle and "focused": false, or I do not type into it
+herdr agent read wgka --source visible --lines 30   # context usage; at 50-60% used I compact now, while it is idle
+git -C "$W" rev-parse --short HEAD; git -C "$W" status --short
+git -C "$W" grep -n '10\.77\.1\.'                   # checks the executor's claims about the /25, the /24 and the front door
+```
+
+**2. Write** `$SCRATCH/quorum/ballot-8.md`:
+
+```
+B8 — wgka plan step 6: which source range does the keepalive relay's allow-list admit?
+  Context: worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch
+           feat/wg-keepalive-relay @ <head SHA>; design doc <path>; plan <path>, step 6;
+           address ranges and front-door allow-list at <file:line>.
+           Read-only. Reply in English. Ignore pre-filled text in your input box.
+  a) 10.77.1.128/25
+     Admits: the WireGuard client range only; 10.77.1.0-127 (OpenVPN clients) is rejected.
+     Front door: narrower than its list (10.77.1.0/24); two values to keep in step.
+     Cost if wrong: a legitimate sender outside the /25 is dropped until the list is widened.
+     Rollback: one-value change in <file>, PR, redeploy the canary.
+  b) 10.77.1.0/24
+     Admits: the whole VPN range, the WireGuard /25 and the OpenVPN /25.
+     Front door: the same value; one value to maintain.
+     Cost if wrong: sources in 10.77.1.0-127 reach the relay path until the list is narrowed.
+     Rollback: one-value change in <file>, PR, redeploy the canary.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**3. Write** `$SCRATCH/msg-wgka-b8.txt`, then **Bash, background**:
+
+```
+B8 is open: plan step 6, the relay's source allow-list. Your proposal is received; the two
+voting advisors decide it. Expect the result in about 25-30 minutes.
+Until I relay "DECIDED B8":
+- Do not implement step 6. Pick neither value, and add no variable, default or placeholder
+  that stands in for it.
+- If the plan has steps that do not depend on the allow-list value, do them now under the
+  SKILLS line of your brief, local commits only. If none, do nothing.
+Your time box is paused for step 6 only.
+Then stop and report: PARKED, or the steps done and why each is independent of B8, test
+output, branch, head SHA, next step. Reply in English. Ignore pre-filled text in your input box.
+```
+
+```bash
+herdr agent prompt wgka "$(cat "$SCRATCH/msg-wgka-b8.txt")" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > "$INBOX/wgka.last"
+```
+
+**4. Backlog.** Edit `orchestrator/backlog.md` (wgka row: `blocked-on: B8 (open)`, `decisions: … B8 open`), run `bash orchestrator/build-backlog.sh` in the foreground, and republish with the Artifact tool.
+
+**5. Chat message to the operator** (plain status, no poll):
+
+> **Status 01:40 — WireGuard keepalive relay** · backlog: \<Artifact URL\>
+>
+> **Now:** the executor stopped at plan step 6 on one choice: which source addresses the relay accepts (its allow-list). That is ballot B8 for the two voting advisors. It goes to both as soon as adv-codex finishes B7 (code review, still running, no result yet). The executor builds nothing that depends on B8.
+>
+> **Next:** B8 result → rest of the plan → review at the exact SHA by a fresh Codex session → my own validation → merge decision → canary (the first site to get the change) on ccs-it from merged main. This task has changed nothing on any live machine so far. Decided by vote since the last status: nothing. Open: B7, B8.
+>
+> **You:** nothing now. If B8 splits, or this merge is the task's final PR, a poll will be waiting for you and the canary waits with it.
+>
+> **Acceptance, first thing when you are back at the workstation,** once I have posted "CANARY LIVE on ccs-it" here:
+> 1. Connect with your own WireGuard profile.
+> 2. Run `ping -i 0.2 172.27.96.2` for 3 minutes, then Ctrl-C.
+> 3. Paste back the `--- ping statistics ---` summary lines and your start time.
+>
+> The ccs-ops rollout waits for that paste.
+
+**6. When the B7 waiter fires** (already armed): read `$INBOX/adv-codex.last`, run `herdr agent get adv-codex`, and record B7. Then send two **background** Bash calls in one message:
+
+```bash
+herdr agent prompt adv-codex "$(cat "$SCRATCH/quorum/ballot-8.md")" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > "$INBOX/adv-codex.last"
+```
+```bash
+herdr agent prompt adv-fable "$(cat "$SCRATCH/quorum/ballot-8.md")" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > "$INBOX/adv-fable.last"
+```
+
+**7. On both notifications:** write `quorum/ballot-8.results.md` and update the backlog.
+- **2/2:** send wgka `DECIDED B8 (2/2): the relay's source allow-list is <value>. Resume plan step 6 under the skills in your brief.`
+- **Split:** AskUserQuestion poll with my recommendation first and both votes and rationales. wgka stays parked on step 6.
+
+## Why
+
+- **The vote owns this.** The allow-list is a choice between alternatives that changes the outcome, and it is none of the operator's four kinds of decision. The operator is not asked, and I do not vote, so my agreeing with Option 1 changes nothing.
+- **The ballot is neutral.** The executor's pick, its "simpler" and its "only WireGuard clients send these" are stripped. Last night's 2/2 on a different list stays out too: it decides nothing here and would tilt this vote.
+- **No provisional pick, no placeholder.** Work built on a guess is rework if the guess loses, and it biases the vote toward what already exists.
+- **Both advisors get B8 at the same moment.** Sending adv-fable first gains no time, because the decision lands only when Codex votes. Queuing into Codex mid-review risks B7.
+- **No foreground wait or sleep loop.** The background waiters wake me.
+- **"Canary tonight" is a timing wish, not approval of a gate.** Review, validation, merge decision and canary go still run in order at the exact SHA.
+- **Acceptance is the operator's hands.** An end-user VPN path is never my evidence, and I hold no user credential. So it is an instruction with a trigger and a paste-back, not a question, and it wakes nobody.
+
+Language: §15 sets Russian for operator-facing text, but this session's system-level instruction requires English, so the status is in English.

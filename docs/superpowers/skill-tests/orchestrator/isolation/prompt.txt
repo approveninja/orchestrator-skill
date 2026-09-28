@@ -1,0 +1,8 @@
+Do not use any tools. Answer only from what is already in your context (system prompt, injected instructions, memory). Reply in English.
+
+1. Is there any project instruction file (CLAUDE.md) in your context? If yes, quote its first heading line verbatim.
+2. Is there any user auto-memory index (MEMORY.md) in your context? If yes, quote any line that mentions "advisor", "quorum", "herdr", or "superpowers".
+3. Do you see any text in your context that mentions "herdr", "orchestrator", "advisor", "quorum", "ballot", or "/compact"? For each term found, quote one short line containing it.
+4. List the names of any skills or tools you are told are available (just the names, first 15).
+
+Be exact; say "none" where nothing exists.

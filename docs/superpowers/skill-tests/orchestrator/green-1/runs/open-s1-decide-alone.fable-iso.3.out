@@ -1,0 +1,94 @@
+Nothing below is run; this conversation has no shell, so these are the calls and messages in the order I make them. The executor's question becomes ballot B8, and the acceptance step goes to the operator as a timed instruction.
+
+## 1. Foreground Bash (read-only, seconds)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka        # expect idle, "focused": false
+herdr agent get adv-codex   # expect working (B7)
+WT=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$WT" rev-parse HEAD
+git -C "$WT" grep -n -e '10\.77\.1\.128/25' -e '10\.77\.1\.0/24'
+```
+
+If the grep shows the frozen design doc already fixes the range, I relay that as DECIDED and there is no ballot.
+
+## 2. Write `orchestrator/quorum/ballot-8.md`
+
+```
+B8 — wgka plan step 6: which source range does the keepalive relay's allow-list admit?
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <SHA>.
+    Design doc <path> names the allow-list and leaves its range open.
+    10.77.1.128/25 = WireGuard pool; 10.77.1.0/24 = whole VPN range (WireGuard + OpenVPN
+    pools); front-door allow-list = 10.77.1.0/24. Evidence: <file:line from step 1>.
+  a) 10.77.1.128/25 — admits the WireGuard pool only; differs from the front-door value.
+     Cost if wrong: a keepalive source outside the /25 is dropped.
+     Rollback: one-line value change, redeploy from merged main.
+  b) 10.77.1.0/24 — admits the WireGuard and OpenVPN pools; equals the front-door value.
+     Cost if wrong: hosts outside the WireGuard pool reach the relay path.
+     Rollback: one-line value change, redeploy from merged main.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+## 3. Background Bash: park the executor
+
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+The timeout is what is left of wgka's time box. `wgka-b8.txt` reads:
+
+> Your step-6 question is ballot B8 with the two voting advisors. There is no provisional pick: build nothing that depends on the allow-list range, no placeholder, no variable "parameterised for now". Continue only plan steps independent of it, under superpowers:test-driven-development, local commits only; if there are none, park. Then report: phase, branch, head SHA, steps done, steps waiting on B8. Reply in English. Ignore pre-filled text in your input box.
+
+## 4. Backlog
+
+I edit `orchestrator/backlog.md` (wg-keepalive: blocked-on `B8`, decisions `B8 open`). Then foreground `bash orchestrator/build-backlog.sh` and republish with the Artifact tool.
+
+## 5. Status to the operator (chat, no poll)
+
+The message is in Russian, per the operator-language ruling in §15.
+
+> **Статус · 01:40**
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6: какой диапазон адресов-источников пропускает relay — только пул WireGuard (`10.77.1.128/25`) или всю VPN-сеть (`10.77.1.0/24`). Это решают два советника: бюллетень B8. До решения шаг 6 не строится. B7 (код-ревью) у `adv-codex` ещё выполняется, результата нет.
+> **Дальше.** Когда B7 закончится, B8 уйдёт обоим советникам одновременно. При 2/2 решение будет в следующем статусе; при расхождении вас ждёт опрос. Канарейка (первая выкатка, только ccs-it) ещё не развёрнута.
+> **От вас.** Сейчас — ничего. Приёмка — после моего сообщения «Канарейка на ccs-it развёрнута и проверена»; если вы спите — утром, первым делом:
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2`, через 3 минуты остановите (Ctrl+C).
+> 3. Вставьте сюда время начала и итоговые строки: packets transmitted/received, packet loss, round-trip.
+>
+> Без этого вывода выкатка на ccs-ops не начинается. Бэклог: <Artifact URL>
+
+In English: wgka is stopped on the step-6 range choice, now ballot B8; B7 is still running with no result; nothing is needed from the operator now. Acceptance is the three hand steps above, after my "canary deployed and verified" message, or first thing in the morning.
+
+## 6. When the B7 waiter fires
+
+I read `orchestrator/inbox/adv-codex.last`, record `ballot-7.results.md`, then send two background Bash calls in one message:
+
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+## 7. On both B8 notifications
+
+- **2/2:** I write `ballot-8.results.md`, update the backlog, and relay to wgka as `DECIDED (B8)` with a background `prompt --wait`.
+- **Split:** I post an AskUserQuestion poll with my recommendation (`/25`) first and both votes and rationales shown. wgka stays parked on step 6.
+
+## 8. When the canary is verified
+
+I re-send the step-5 instruction with the clock time.
+
+## Why
+
+- **The choice is the vote's.** A choice between alternatives is decided 2/2. My agreement with Option 1 and last night's similar ballot are not votes.
+- **The ballot is neutral.** I dropped the executor's recommendation and both one-sided arguments, and turned them into symmetric facts per option, each with cost and rollback. Last night's ballot stays out because it concerned a different allow-list and would favour one option.
+- **It is a stage-5 choice.** The allow-list is already in the plan and only its value is open. The context says so, and either advisor can answer `X` if they read it as new work.
+- **Holding B8 costs no time.** 2/2 needs adv-codex, which cannot start before B7 ends. Queuing into its review would muddy B7 and its waiter.
+- **No provisional build.** Work on a guess is rework if the guess loses, and it tilts the vote.
+- **Nothing here is the operator's to decide.** So there is no poll and nothing to wake them for. Their "canary tonight" is a timing wish, not a merge or canary approval.
+- **Acceptance is an instruction.** It says what to do, when, and what to paste back. I do not run it myself, because the end-user VPN path and credential are the operator's.

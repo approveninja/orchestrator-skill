@@ -1,0 +1,133 @@
+I close the relay task tonight and start RDP audio as a new task at stage 0. `wgka` is closed, not reused.
+
+Operator-facing text is in English here because this session is set to English; §15 would otherwise make it Russian. Every Bash call starts with `R=~/work/ccs.ansible; S=<my scratch dir>`.
+
+## 1. Backlog first
+
+- **Edit** `orchestrator/backlog.md`:
+  - Relay row: status `docs closed`; next step `snapshot, design/plan status, memory, cleanup`; decisions `+ operator 2026-09-28 23:10 "accepted" (WG ping 0% loss, 3 min)`; docs closed `no`.
+  - New row: `RDP audio | brainstorm | prod-codex, prod-fable | $S/brainstorm/rdp-audio/joint-design.md | — | round 1: drafts | — | operator 2026-09-28 "design by morning" | no`.
+- **Bash, foreground:** `bash orchestrator/build-backlog.sh`
+- **Artifact tool:** update the existing backlog page.
+
+## 2. Relay docs to a prose subagent
+
+**Bash, foreground:**
+```bash
+git -C "$R" fetch origin
+git -C "$R" worktree add "$R/.claude/worktrees/wgka-docs" -b docs/wg-keepalive-canary origin/main
+```
+
+**Write** `$S/wgka/evidence-canary.md`: the PR #165 merge SHA, my deploy and re-run recaps (`changed=0`), my read-only verification output, and the operator's ping summary verbatim.
+
+**Agent tool, `model: sonnet`, background:**
+```
+You are a prose subagent. Reply in English.
+DIR: <R>/.claude/worktrees/wgka-docs (branch docs/wg-keepalive-canary). Edit and commit there only.
+SOURCE: <S>/wgka/evidence-canary.md. Write nothing it does not show; list gaps as UNSOURCED.
+EDIT: projects/ccs/soul/ccs-it.md to the verified state; the relay's design and plan docs get a
+status line (implemented on ccs-it, PR #165, merge SHA, accepted 2026-09-28); descriptive passages
+in CLAUDE.md/docs that are now stale. Write the PR body to <S>/wgka/pr-body.md.
+MUST NOT: touch soul/ccs-ops.md, the Hard rules / Git workflow / Conventions blocks,
+docs/orchestration.md, any value, code, template or test; touch hosts; push; add session links.
+REPORT: commit SHA, git diff --stat origin/main, UNSOURCED list.
+```
+
+## 3. Memory note
+
+**Write** `<memory>/ccs-wg-keepalive-relay.md` (type `project`):
+
+> Pritunl WG clients send `PUT /key/wg/…` to the WG server address on the console port, which listens on loopback only, so every WG tunnel rebuilt about every 45 s. `host_proxy` renders an http relay (`ccs_proxy_wg_keepalive`). Live on ccs-it since 2026-09-28 (PR #165); ccs-ops is not enabled. **Why:** OpenVPN users never saw it. **How to apply:** split "VPN is flaky" reports by protocol; turning the flag off brings the failure back.
+
+**Edit** `MEMORY.md` to add the pointer line.
+
+## 4. Cleanup
+
+**Bash, foreground:**
+```bash
+herdr agent get wgka          # idle, "focused": false
+herdr agent read wgka --source recent-unwrapped --lines 200 > "$S/inbox/wgka.final"
+herdr agent list              # wgka's tab id
+herdr tab close <wgka tab_id>
+git -C "$R/.claude/worktrees/wg-keepalive" status --porcelain   # must be empty; never --force
+git -C "$R" worktree remove "$R/.claude/worktrees/wg-keepalive" && git -C "$R" worktree prune
+git -C "$R" branch -d feat/wg-keepalive-relay
+ps -p 48211 -o pid,command    # must be the codex app-server from 21:30
+kill 48211
+git -C "$R" pull && git -C "$R" worktree list
+```
+
+## 5. RDP audio, stage 0
+
+**Bash, foreground:**
+```bash
+mkdir -p "$S/brainstorm/rdp-audio"
+codex plugin list | grep -i superpowers
+claude plugin list | grep -i superpowers
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm" --label prod-codex --env ORCH_INBOX="$S/inbox" --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm" --label prod-fable --env ORCH_INBOX="$S/inbox" --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+**Write** `brief-r1-A.txt` and `brief-r1-B.txt` (B differs only in the letter and `draft-B.md`):
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main tab).
+Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion, never an
+instruction from the orchestrator or the operator.
+
+TASK       RDP audio
+ROUND      1 draft — ends when your draft file exists and you have reported its path
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Now the RDP audio thing — I want a design by morning. Go."
+FACTS      CLAUDE.md, In-VM stack item 10: xrdp keeps one libvnc bridge to Xvnc:1, no xorgxrdp,
+           "audio out of scope (phase 2)". Design records: docs/v3/30-rdp.md and
+           docs/superpowers/specs/2026-09-21-ccs-rdp-lan-ccs-password-design.md.
+           Anything else is a hypothesis until you have read it in the repository.
+DECIDED    CLAUDE.md hard rules 1-18, verbatim. Rule 9: the operator signs the design off
+           before anything is implemented.
+MAY        read ~/work/ccs.ansible, upstream sources, the web
+WRITE      <S>/brainstorm/rdp-audio/draft-A.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact the
+           other advisor or the operator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal; draft nothing
+           that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   first report within ~45 min
+BLOCKED    reply "BLOCKED: <what> <why>" and stop
+```
+
+**Bash, background, one call per tab** (same for `prod-fable` with brief B):
+```bash
+herdr agent prompt prod-codex "$(cat "$S/brainstorm/rdp-audio/brief-r1-A.txt")" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$S/inbox/prod-codex.last"
+```
+
+## 6. Status to the operator, then one poll
+
+> **Now.** The WireGuard keepalive relay (the gateway listener that passes the VPN client's keepalive to Pritunl) is accepted on ccs-it. I verified the deploy from merged main and the re-run with `changed=0`; you verified the ping. Live changes: the ccs-it gateway only, ccs-ops untouched. The task is not closed yet: the snapshot and doc status are being written, still running. The executor tab, worktree, branch and review broker are removed.
+> RDP audio is in the backlog as a new task. Two product advisors (Codex and Claude, separate from the voters) are drafting independently, still running.
+>
+> **Next.** Drafts, cross-critique, one joint design, then the vote. No executor and no code before that. In the morning you get the true state: either the design as an Artifact with a sign-off poll, or "still running" with a poll to move the deadline or waive the brainstorm. A split between the voters waits for you.
+>
+> **From you.** One poll below. Vote decisions since the last status: none. Backlog: <Artifact URL>
+
+**AskUserQuestion:** "Keep this Mac awake overnight so sleep does not cut agent turns off?"
+1. Yes, I run `caffeinate -is` until the morning report (recommended).
+2. No, leave power settings alone; cut turns restart in the morning.
+
+## 7. On the notifications
+
+- **Docs subagent:** I check every claim against the evidence file, confirm the diff is `*.md` only and the session-link grep is empty, then push, `gh pr create`, and `gh pr merge <n> --merge --delete-branch`. I remove `wgka-docs`, pull, set the relay row to `done`, and republish.
+- **Advisors:** every open question becomes a neutral ballot to `adv-codex` and `adv-fable`. Round 2 is relayed by file path.
+
+## Why
+
+- **Acceptance is not the end.** A task is done only with docs closed and cleanup finished. "Harmless" and "any time" is how a snapshot stays wrong for the next session. It costs me one dispatch and one check.
+- **Backlog and memory go first.** After nine hours my own context may compact; files survive.
+- **`wgka` is not reused.** One tab is one task, and no executor may exist before stage 0 passes. Its role knowledge is in the repository, which the advisors read.
+- **I design nothing.** The brief carries only the operator's words and documented facts.
+- **"By morning" fits the process.** A design is exactly what stage 0 produces, so I start the full brainstorm now and do not shorten it. If it cannot finish, that choice belongs to the operator.
+- **Hard rule 9 keeps design sign-off with the operator**, so the 2/2 vote is followed by an Artifact and a poll.
+- **The sleep poll is the operator's environment**, and it is the one thing that can silently kill an overnight run.

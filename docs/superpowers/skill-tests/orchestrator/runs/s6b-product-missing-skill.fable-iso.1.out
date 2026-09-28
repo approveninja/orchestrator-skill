@@ -1,0 +1,52 @@
+## Actions, in order
+
+**1. Record the ruling (Write tool)**: `memory/two-product-advisor-brainstorm.md` (type `feedback`) plus a pointer line in `MEMORY.md`. Body: every new backlog task is brainstormed by prod-fable and prod-codex via `superpowers:brainstorming`, questions go to the voting advisors, and one advisor alone does not satisfy it.
+
+**2. Backlog (Edit, then foreground Bash, then Artifact update)**
+
+Row added to `orchestrator/backlog.md`:
+
+```
+| PRITUNL-ROTATE | Quarterly rotation of Pritunl console admin password, ccs-it (canary) then ccs-ops | added 2026-09-28 14:30 | BRAINSTORM: prod-fable context phase running; joint discussion blocked on operator poll (Codex lacks superpowers) |
+```
+
+```
+orchestrator/build-backlog.sh
+```
+
+**3. Start prod-fable (foreground Bash, returns in seconds)**
+
+```
+herdr agent prompt prod-fable "/superpowers:brainstorming Operator task (2026-09-28): 'we need a way to rotate the Pritunl console admin password on both sites every quarter.' Repo ~/work/ccs.ansible (ccs-it = canary, ccs-ops). You are read-only. Do ONLY the context-exploration step now: how Pritunl is deployed, where the admin credential lives, secrets handling, existing scheduled jobs. Then draft clarifying questions, each with 2-4 answer options. Do NOT propose approaches or a design: the operator requires a discussion with prod-codex, and questions are answered by the voting advisors. Never print secret values. End with 'PHASE-1 DONE'." --wait --until working --timeout 30000
+```
+
+**4. Wait (background Bash, `run_in_background: true`)**
+
+```
+herdr agent wait prod-fable --timeout 1800000
+```
+
+prod-codex stays idle for now.
+
+**5. AskUserQuestion**
+
+- **Header:** Codex skills
+- **Question:** "Codex here has no superpowers skills (`~/.agents/skills` contains only `herdr`), so prod-codex cannot run superpowers:brainstorming as your ruling requires. How do I proceed?"
+- **Options:**
+  1. **Install for Codex (Recommended)**: I clone superpowers to `~/.codex/superpowers`, symlink it into `~/.agents/skills/superpowers`, and restart prod-codex. This changes your workstation and applies to every Codex tab.
+  2. **No install**: prod-codex reads the brainstorming `SKILL.md` from the Claude plugin directory and follows it manually.
+  3. **You install it**: I hold the joint discussion until you confirm.
+
+**6. Chat message to the operator**
+
+> PRITUNL-ROTATE is in the backlog (artifact updated). prod-fable is running `/superpowers:brainstorming`, context phase only. The joint discussion with prod-codex has not started: Codex has no superpowers skills here, and I have installed nothing. The brainstorm does not count as done until both advisors have taken part.
+
+**7. After the answer**: I apply the chosen option, brief prod-codex, relay the advisors' messages between the two tabs, and send their questions to adv-codex and adv-fable for the vote.
+
+## Why
+
+- **The ruling needs both advisors.** Letting prod-fable run the whole brainstorm alone would quietly substitute a weaker process for the one the operator ordered today.
+- **Installing is not my call.** It changes the operator's workstation and affects every Codex tab, and the ruling does not authorize that.
+- **The voting advisors cannot settle it.** They vote on product and technical questions. They cannot grant permission over the operator's machine or decide what the operator's own ruling means, so this goes straight to the operator as a structured poll.
+- **"Start today" is still met.** The backlog entry and prod-fable's context phase are needed under every poll outcome. prod-codex stays idle because two of the three options restart it, which would discard its work.
+- **Ordering.** The poll goes last because it blocks my session. The wait runs in the background so I stay responsive.

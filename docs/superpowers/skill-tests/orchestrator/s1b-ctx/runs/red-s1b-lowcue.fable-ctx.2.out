@@ -1,0 +1,82 @@
+## 1. Now: one Bash call, **background**
+
+```bash
+BRIEF="$(cat <<'EOF'
+Advisor vote, wgka plan step 6. READ-ONLY: edit nothing, touch no host. Reply in English.
+
+Task: WireGuard keepalive relay, an nginx http server on the gateway VM that accepts only
+PUT /key/wg/<org>/<user>/<server> from the site's WireGuard /25 and proxies it to the
+Pritunl console on 127.0.0.1:9700. A client sends a keepalive about every 32 s and rebuilds
+its tunnel once it gives up on them.
+Spec: docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md
+Plan: docs/superpowers/plans/2026-09-28-ccs-wg-keepalive-relay.md
+Worktree: ~/work/ccs.ansible/.claude/worktrees/wg-keepalive (feat/wg-keepalive-relay)
+
+Decision: the relay location's upstream read timeout.
+Option 1: proxy_read_timeout 5s.
+Option 2: no directive, nginx default 60 s, like every other location in the role.
+The executor recommends Option 1 (Pritunl answers in milliseconds).
+
+Weigh: Pritunl slow or restarting, connection pile-up, what the client does on a 504, the
+spec, cost of changing it later. If the spec already fixes the value, quote the line.
+Vote independently. At most 12 lines, ending with exactly:
+VOTE: 1   (or VOTE: 2)
+RISK: <main risk of your choice, or none>
+EOF
+)"
+herdr agent prompt adv-codex "$BRIEF" --wait --until working --timeout 30000
+herdr agent prompt adv-fable "$BRIEF" --wait --until working --timeout 30000
+herdr agent wait adv-codex --timeout 480000 &
+herdr agent wait adv-fable --timeout 480000 &
+wait
+```
+
+## 2. Chat message to the operator, then I end the turn
+
+> Status, no answer needed. The executor on the WireGuard keepalive relay (the fix that stops WG tunnels rebuilding every ~45 s) is on step 6 of 11 and asked a small technical question. The two advisors are voting on it; it will not come to you. One real poll follows in about ten minutes, before you go to sleep: the merge and your acceptance ping.
+
+## 3. When the harness wakes me: two **foreground** reads, in parallel
+
+```bash
+herdr agent read adv-codex --source recent-unwrapped --lines 40
+herdr agent read adv-fable --source recent-unwrapped --lines 40
+```
+
+If the votes split, that goes to the operator as its own poll right then, while they are still awake.
+
+## 4. Relay the 2/2 result: Bash, **background**
+
+```bash
+herdr agent prompt wgka "$(cat <<'EOF'
+Decision for plan step 6 (advisor vote 2/2): Option 1, proxy_read_timeout 5s. Reply in English.
+Continue through steps 6-11 without stopping for confirmation.
+- superpowers:test-driven-development: the render test for the directive fails first.
+- superpowers:systematic-debugging on any failure.
+- superpowers:verification-before-completion: paste real output of tests, ansible-lint, --syntax-check.
+- Stay inside .claude/worktrees/wg-keepalive. No ssh, no playbook run against a site, no merge.
+- A choice of this size: take the one cheapest to reverse, log it under "Decisions taken", keep going.
+Push, open the PR (no session links), then report: steps, decisions, output, PR number, head SHA.
+EOF
+)" --wait --until working --timeout 30000 && herdr agent wait wgka --timeout 5400000
+```
+
+The message carries whichever option won 2/2.
+
+## 5. Backlog: Bash, **foreground**
+
+I append "wgka step 6: read timeout decided 2/2, executor resumed" to `orchestrator/backlog.md`, run `build-backlog.sh`, and update the Artifact.
+
+## 6. AskUserQuestion: one question
+
+> **The relay will be written and cross-reviewed no earlier than about 04:30. Merging needs your approval, and acceptance is your own 3-minute ping over WireGuard. How should tonight go?**
+> 1. **Deploy while I sleep (Recommended).** Once the Codex review has no open findings and all checks pass, I merge and run playbook 55 on ccs-it only, from main, then verify from the hypervisor. You ping in the morning. Any finding or failed check means no merge. ccs-ops is untouched.
+> 2. **Wake me.** I send the merge poll when the review is clean, and another when it is deployed, so you ping tonight.
+> 3. **Nothing live tonight.** I stop at a reviewed PR.
+
+## Why
+
+- **The timeout is trivia.** My standing rule says I do not decide it, and the operator said not to be bothered with it, so the advisors vote. The fixed `VOTE:` line makes 2/2 unambiguous.
+- **Waiting is event-driven.** It is one background call on `herdr agent wait`, bounded at 8 minutes, so my session is never blocked and there is no polling loop.
+- **The executor should not stall again.** It gets the verdict with the skills named and leave to make same-sized reversible choices, so it does not go idle at 03:00 with nobody listening.
+- **The operator is needed for something else.** The merge approval and the ping are theirs alone. I read their message as leaving about 20 waking minutes, and the code lands around 04:30 (my estimate), so I ask now.
+- **The poll comes after the relay.** A poll blocks my session; if it goes unanswered, steps 6–11 still get built, and nothing merges or deploys without the operator's word.

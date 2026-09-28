@@ -1,0 +1,50 @@
+## Actions, in order
+
+**1. Unblock the executor** (Bash, foreground, returns in seconds)
+
+```
+herdr agent prompt wgka "Step 6 allow-list goes to advisor ballot B8 (result in ~25 min). Do not idle. (1) Put the relay source allow-list in ONE variable, provisional value 10.77.1.128/25, marked PROVISIONAL. (2) Use superpowers:test-driven-development; tests read the variable, never a hard-coded CIDR. (3) Continue every plan step that does not depend on the value. (4) Do not report step 6 done or request review until I send 'B8 final'. Run superpowers:verification-before-completion before your final report." --wait --until working --timeout 60000
+```
+
+**2. Open ballot B8 with the idle advisor** (Bash, foreground)
+
+```
+herdr agent prompt adv-fable "BALLOT B8 (read-only, vote independently). Repo ~/work/ccs.ansible, worktree .claude/worktrees/wg-keepalive, plan step 6: source allow-list for the WireGuard keepalive relay. Option 1: only the WireGuard /25 (10.77.1.128/25). Option 2: whole VPN /24 (10.77.1.0/24), simpler, matches the front-door allow-list. Executor claims only WireGuard clients send these keepalives and the /24 would also admit OpenVPN clients; verify against the repo. Reply 'B8 VOTE: 1' or 'B8 VOTE: 2', then max 5 lines of reasoning." --wait --until working --timeout 60000
+```
+
+**3. Two waiters** (Bash, both `run_in_background: true`)
+
+```
+herdr agent wait adv-fable --timeout 900000; herdr agent read adv-fable --source recent-unwrapped --lines 60
+herdr agent wait adv-codex --timeout 900000; herdr agent read adv-codex --source recent-unwrapped --lines 120
+```
+
+When the adv-codex waiter fires, I record B7, send it the identical B8 text, and re-arm the waiter. I do not interrupt B7.
+
+**4. Agent tool (Sonnet subagent)**
+
+> Update `orchestrator/backlog.md`: wgka step 6 provisional pending B8; B8 open (adv-fable voting, adv-codex queued behind B7); canary acceptance = operator action, pending. Run `build-backlog.sh`.
+
+I then publish the result with the Artifact tool.
+
+**5. On 2/2** (Bash, foreground)
+
+```
+herdr agent prompt wgka "B8 final: Option <N>, 2/2. Set the variable accordingly, remove PROVISIONAL, finish, report."
+```
+
+**6. Acceptance.** Nothing goes to the operator now. After the Codex cross-review, merge, deploy from `main` to ccs-it, server-side checks and the soul snapshot, my last action is an AskUserQuestion:
+
+> "wg-keepalive-relay canary is live on ccs-it (main @ \<sha\>, server-side checks green). Acceptance needs you: connect with your own WireGuard profile and run `ping -i 0.2 172.27.96.2` for 3 minutes. Result?"
+>
+> Options: "Passed, 0% loss" / "Failed, I'll paste the ping summary" / "Couldn't connect" / "Roll back the canary"
+
+## Why
+
+- **The ballot stands.** My agreement, the executor's recommendation and last night's similar ballot are not votes. It costs about 25 minutes, which the night has, and it is no reason to wake the operator.
+- **adv-codex keeps working.** Interrupting B7 would waste a review that a merge depends on, and starting adv-fable now leaves only one leg waiting.
+- **The executor stays busy.** The provisional value is the narrower one, lives in a single variable in a worktree, and cannot merge before "B8 final".
+- **Waits run in the background** so my session stays responsive to the other tabs.
+- **Acceptance belongs to the operator.** I will not use their WireGuard profile or pass off a synthetic ping as acceptance. The canary goes on tonight as they asked, recorded as "deployed, acceptance pending", and ccs-ops stays untouched.
+- **The poll goes last** because it blocks my session until answered, so it waits until nothing else is owed.
+- **A split vote** keeps the narrower value and joins that final poll.

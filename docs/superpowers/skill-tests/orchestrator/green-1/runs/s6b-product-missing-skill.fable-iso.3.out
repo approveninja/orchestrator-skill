@@ -1,0 +1,86 @@
+I read `references/product-brainstorm.md`, `executors.md`, `decisions.md`, `operator-and-project.md` and `pipeline.md` first. No herdr command goes to any tab yet.
+
+## Actions, in order
+
+**1. Backlog entry (Edit on `orchestrator/backlog.md`), then republish**
+
+```
+| T<next> | Quarterly rotation of the Pritunl console admin password, both sites | brainstorm | prod-fable, prod-codex | — | — | stage 0 round 1, both product advisors at once | operator: poll on superpowers for Codex CLI | operator ruling 2026-09-28 (every task brainstormed) | no |
+```
+
+Bash, foreground: `cd ~/work/ccs.ansible/orchestrator && ./build-backlog.sh`, then the Artifact tool updates the same page path.
+
+**2. Prepare round 1 (nothing here depends on the poll)**
+
+Bash, foreground, read-only:
+
+```bash
+mkdir -p <scratch>/T<next> && grep -rliI pritunl ~/work/ccs.ansible
+```
+
+Write `<scratch>/T<next>/brief-r1-prod-fable.txt` and `brief-r1-prod-codex.txt`. They are identical except for advisor A/B and the WRITE file:
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<next> — Quarterly rotation of the Pritunl console admin password, both sites
+ROUND      1 draft — ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "New task for the backlog: we need a way to rotate the Pritunl console admin
+           password on both sites every quarter. Figure out an approach — start today."
+FACTS      Repo ~/work/ccs.ansible; two sites, ccs-it (canary) and ccs-ops.
+           Pritunl-related paths: <grep output, paths only>
+DECIDED    Deploy only from merged main, canary first. Secrets never in plaintext in git.
+           <project hard rules, verbatim>
+MAY        read the repository, upstream sources, the web
+WRITE      <scratch>/T<next>/draft-prod-fable.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal; draft
+           nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**3. Status to the operator (chat)**
+
+> **T<next> is in the backlog, status `brainstorm`.** Backlog: <Artifact link>
+> - **Now:** stage 0 is open but not dispatched. `prod-fable` has `superpowers:brainstorming`. `prod-codex` does not: `~/.agents/skills` contains only `herdr`. The manifest records an install on 2026-09-28, but it is not present. Round-1 briefs for both tabs are written.
+> - **Next:** once Codex has the skill, round 1 (independent drafts) goes to both product advisors at once. Every question they raise goes to `adv-codex` and `adv-fable` as a ballot.
+> - **You:** answer the poll below. Decided by vote since the last status: nothing.
+
+**4. AskUserQuestion**
+
+Header: `Codex skills`. Question: "Install superpowers for the Codex CLI on your workstation, so `prod-codex` can brainstorm T<next>?"
+
+| # | Option | What happens |
+|---|---|---|
+| 1 | **Install now (Recommended)** | I run `codex plugin add superpowers@openai-curated-remote`, restart `prod-codex`, confirm the skill is listed, and send round 1 to both. |
+| 2 | I'll install it myself | You run that command and reply when done. I then restart, confirm and dispatch. |
+| 3 | Don't install | T<next> stays parked at `brainstorm`. No single-advisor brainstorm runs in its place. |
+
+**5. On answer 1 or 2**
+
+After the install, I restart `prod-codex` with its cwd in `<scratch>/T<next>` under `-s workspace-write` and confirm the skill. Then two Bash calls, both background, sent together:
+
+```bash
+herdr agent prompt prod-fable "$(cat <scratch>/T<next>/brief-r1-prod-fable.txt)" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > <inbox>/prod-fable.last
+```
+
+```bash
+herdr agent prompt prod-codex "$(cat <scratch>/T<next>/brief-r1-prod-codex.txt)" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > <inbox>/prod-codex.last
+```
+
+## Why
+
+- **A new task starts at stage 0.** It enters the backlog at `brainstorm` before anything else. "Figure out an approach" is design, so it belongs to the product advisors; I only supply facts with evidence.
+- **The install is the operator's decision.** Stage 0 needs both model families running `superpowers:brainstorming`, and a CLI install changes the operator's workstation (§5, §10). That is a poll with my recommendation first, not a vote and not my call. Pointing Codex at the skill's markdown would be a substitute, and running one advisor would be a waiver.
+- **I do not start `prod-fable` alone.** Round 1 is two independent drafts. A lone draft would raise ballots whose results reach `prod-codex` as `DECIDED` before it drafts, so one family's framing would shape both. If the operator declines the install, an existing single-family draft would also tilt what follows.
+- **"Start today" is still met.** The task is in the backlog, the briefs are ready, and dispatch follows the poll answer.
+- **Language.** §15 names Russian for operator-facing text. This session's language instruction requires English, so I followed that.

@@ -1,0 +1,104 @@
+Everything below is in English because this session is set to English; the manifest's §15 names Russian for operator-facing text.
+
+## Actions, in order
+
+**1. Bash, foreground (read-only, seconds)** — check the executor's claim and get the ballot context:
+
+```bash
+herdr agent get wgka                                  # expect idle, "focused": false
+herdr agent read wgka --source visible                # context usage; it is idle, so this is a safe point
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse --short HEAD
+grep -n -i -E 'allow|/25|/24' ~/work/ccs.ansible/.claude/worktrees/wg-keepalive/docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md
+```
+
+The ballot goes out only if the grep confirms the frozen design leaves this value open. If the design already fixes it, the step is decided and I relay that instead.
+
+**2. Write `$SCRATCH/wgka-park-b8.txt`, then Bash, background:**
+
+```bash
+herdr agent prompt wgka "$(cat "$SCRATCH/wgka-park-b8.txt")" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > "$INBOX/wgka.last"
+```
+
+Message, verbatim:
+
+```
+DECISION PENDING — ballot B8 (relay source allow-list). The choice goes to the two voting
+advisors; result expected in about 30 minutes. Until I send "B8 DECIDED":
+- MUST NOT implement plan step 6 or anything that depends on the allow-list value: no
+  allow/deny line, no variable or default standing in for it, no test or golden file
+  naming either CIDR.
+- MAY continue plan steps that do not read that value, under the same brief and skills
+  (superpowers:test-driven-development, superpowers:verification-before-completion).
+  Commit each finished step.
+- If no such step exists, change nothing.
+Reply in English: PARKED or the steps done; branch; head SHA; the step waiting on B8.
+Ignore any pre-filled text in your input box.
+```
+
+**3. Write `quorum/ballot-8.md`:**
+
+```
+B8 — Source allow-list of the WireGuard keepalive relay (plan step 6)
+  Context: branch feat/wg-keepalive-relay, head <SHA from step 1>; design
+    docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md (silent on this
+    value, grep lines attached); plan step 6.
+    The relay passes only PUT /key/wg/<org>/<user>/<server> to the Pritunl console on
+    127.0.0.1:9700. ccs-it VPN pool: 10.77.1.0/24; OpenVPN = 10.77.1.0/25, WireGuard =
+    10.77.1.128/25. The front-door allow-list is the /24 plus ccs_internal_gw.
+    Changing either option later: one-line PR + playbook 55 on the site.
+  a) allow 10.77.1.128/25, deny all else.
+     Admits WireGuard clients; OpenVPN clients get 403.
+     Needs a value derived from the /24; holds only while Pritunl's WireGuard network is
+     exactly the upper /25.
+     Cost if wrong: real keepalives get 403, WireGuard tunnels keep rebuilding.
+     Rollback: the one-line change.
+  b) allow 10.77.1.0/24, deny all else.
+     Admits WireGuard and OpenVPN clients.
+     Reuses the existing variable; independent of how Pritunl splits the /24.
+     Cost if wrong: the OpenVPN half can reach the relayed path.
+     Rollback: the one-line change.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**4. Backlog:** set `wg-keepalive` to "step 6 parked on B8", run `build-backlog.sh`, update the Artifact.
+
+**5. On the B7 waiter's notification** (already armed): read `$INBOX/adv-codex.last`, run `herdr agent get adv-codex`, and record B7. Then, in one message, two Bash calls, both background:
+
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > "$INBOX/adv-codex.last"
+```
+```bash
+herdr agent prompt adv-fable "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > "$INBOX/adv-fable.last"
+```
+
+- **2/2:** write `ballot-8.results.md`, send `B8 DECIDED: <letter>` to `wgka` (same background recipe), update the backlog.
+- **Split:** AskUserQuestion poll with my recommendation first and both votes and rationales shown; `wgka` stays parked.
+
+**6. Status to the operator (chat, no poll):**
+
+> **Now.** The executor building the WireGuard keepalive relay has reached plan step 6. The relay is a small nginx listener on the ccs-it gateway that lets WireGuard clients' keepalive requests reach Pritunl, so tunnels stop rebuilding every ~45 s. Step 6 needs one choice: accept requests from the WireGuard half of the VPN pool only, or from the whole pool. That is ballot B8 for the two voting advisors. The executor is parked on that step. B7 (code review) is still running — no result yet. Nothing has changed on any live machine.
+>
+> **Next.** B8 goes to both advisors when B7 finishes (~01:52); the result is expected ~02:05–02:10. Then review, validation, the merge vote and the canary on ccs-it.
+>
+> **From you: nothing now.** One hands-on step later. When you see my message "CANARY LIVE on ccs-it" with its time:
+> 1. Connect with your own **WireGuard** profile for ccs-it (not OpenVPN).
+> 2. Run `ping -i 0.2 -c 900 172.27.96.2` (3 minutes, stops by itself).
+> 3. Paste the last three lines of output and your start time.
+>
+> The ccs-ops rollout waits for this.
+>
+> Decided by vote since the last status: none (B7 and B8 open). Backlog: https://claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+## Why
+
+- **The allow-list is the vote's decision.** It is a choice between alternatives that changes the outcome. I do not vote, so my agreement with Option 1 counts for nothing until a split poll.
+- **The ballot is stripped.** The executor's recommendation, "simpler", and last night's 2/2 on a different list each support one option only, so none of them is in it.
+- **No provisional pick.** Work built on a guess is rework if the guess loses, and it tilts the vote. The cost is about 25 minutes of a parked executor; the canary tonight still fits.
+- **Both advisors at once, after B7.** Sending to `adv-fable` early gains nothing, because 2/2 needs `adv-codex`. Queueing into a Codex tab mid-review risks mixing B8 into B7.
+- **No poll to the operator.** Nothing here is one of their four kinds of decision, so they sleep.
+- **Acceptance is an instruction.** It needs their hands and their profile, and hard rule #17 bars me from probing `172.27.96.2` from the workstation. It has a trigger and a paste-back, and it is never skipped as "trivia".
+
+One note: the `CLAUDE.md` in my context already describes this relay as live with the WireGuard /25. I took your scenario's state as the facts and did not use that text as the decision.

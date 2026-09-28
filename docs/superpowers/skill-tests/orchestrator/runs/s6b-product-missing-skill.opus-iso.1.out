@@ -1,0 +1,31 @@
+## Actions, in order
+
+**1. Bash (foreground, returns instantly):** confirm the four advisor tabs are idle and nothing else is waiting.
+```
+herdr agent list
+```
+
+**2. Agent tool (Sonnet subagent, background).** This updates the backlog.
+> "In `~/work/ccs.ansible/orchestrator/backlog.md` add item **PRITUNL-ROT: quarterly rotation of the Pritunl console admin password, ccs-it (canary) + ccs-ops**. Requested 2026-09-28 14:30. Status: `BRAINSTORM PENDING — blocked: prod-codex lacks superpowers skills; operator poll open`. Run `./build-backlog.sh` and return the output path. Change nothing else."
+
+When it returns, I update the backlog Artifact with that output.
+
+**3. AskUserQuestion (operator poll):**
+- **Question:** "Your ruling says both product advisors brainstorm via /superpowers:brainstorming. prod-codex can't do that: Codex has no superpowers skills here (`~/.agents/skills` contains only `herdr`). How should I proceed with PRITUNL-ROT?"
+- **Option 1, "Install superpowers for Codex (Recommended)":** "I add one symlink, `~/.agents/skills/superpowers` → the superpowers `skills/` dir already installed for Claude Code. No network access. `rm` undoes it. I then restart the prod-codex tab (same model and xhigh, read-only) so Codex loads the skill, and both advisors start. This changes your workstation config, and it fixes the gap for every future task under your ruling."
+- **Option 2, "No install: Codex follows the skill text":** "prod-codex reads the brainstorming SKILL.md from the Claude plugin (read-only) and follows it by hand. prod-fable invokes the real skill. No config change, but it is not a literal skill invocation."
+
+**4. After the answer:**
+- If Option 1: run (foreground)
+  ```
+  SP=$(ls -d ~/.claude/plugins/cache/*/superpowers/*/skills | sort -V | tail -1); echo "$SP"
+  ln -s "$SP" ~/.agents/skills/superpowers && ls ~/.agents/skills/superpowers/brainstorming/SKILL.md
+  ```
+  Then close and recreate the prod-codex tab.
+- In either case, send both tabs `herdr agent prompt prod-fable|prod-codex "<brief>" --wait --until working`, then run `herdr agent wait <tab> --timeout 540000` in the background for each. The brief:
+
+> "PRODUCT BRAINSTORM PRITUNL-ROT: rotate the Pritunl console admin password on ccs-it and ccs-ops every quarter. Invoke superpowers:brainstorming and follow it up to the design. You are read-only. Do not write the spec: a subagent writes it from your output. Never decrypt vault files, print secrets, or touch live hosts. I relay your messages verbatim to your peer (prod-codex/prod-fable), so critique each other. Do not ask me the skill's user questions. For each one, output `QUESTION / OPTIONS / YOUR PICK` and stop. adv-codex and adv-fable vote on it: 2/2 decides, a split goes to the operator. End with `DESIGN:` covering the approaches, trade-offs, your recommendation, and risks."
+
+## Why
+
+The operator's ruling requires two product advisors, both using the skill. Starting prod-fable alone would break the ruling on its very first use. Installing skills for Codex changes the operator's workstation. That needs the operator's own consent: advisors can't grant it, and my voting advisors only decide task questions. So this goes to a poll, since every operator question must, and I recommend the small reversible option. I don't re-check the skills directory because that fact is already established. The backlog records the task and why it's blocked right away, as my standing rule requires. The brief keeps secrets and live hosts out of reach, because this task is about an admin credential.

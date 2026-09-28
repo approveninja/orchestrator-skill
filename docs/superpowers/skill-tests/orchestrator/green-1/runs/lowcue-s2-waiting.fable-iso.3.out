@@ -1,0 +1,47 @@
+I read the skill's references first (§2–§4, §10–§12, §15). §15 sets the operator-facing language to Russian, so the operator messages are in Russian with an English gloss.
+
+## Moment 1 — 02:10
+
+**Tool call** (Bash, `run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator:**
+
+> **Сейчас:** `relay-impl` (исполнитель Codex, отдельный worktree) принял задание в 02:10 и работает: реализация и офлайн-тесты, лимит 25–45 минут, ориентир 02:35–02:55.
+> **Дальше:** фоновый «сторож» (команда, которая ждёт остановки вкладки и будит меня уведомлением) запущен. Как только вкладка остановится, сразу пишу. Затем сверяю отчёт с доказательствами и сам перезапускаю тесты на итоговом коммите: до проверки отчёт остаётся заявлением. Если тест будет на живом хосте, до него ещё ревью другой моделью, моя проверка и решение о слиянии; деплой только из слитого `main`, сначала пробная площадка `ccs-it`.
+> **От вас:** ничего, до моего сообщения.
+> Бэклог: <ссылка на Artifact>
+
+*Gloss: working since 02:10, expect 02:35–02:55; waiter armed, I ping the moment it settles, then verify and re-run the tests myself; a live test still has review, validation, merge decision and canary ahead of it; nothing needed from you.*
+
+I then end my turn. On the notification I read `relay-impl.last`, run `herdr agent get relay-impl`, and ping at once.
+
+## Moment 2 — 02:24
+
+**Tool call** (Bash, foreground, one call):
+
+```bash
+herdr agent get relay-impl
+```
+
+**Reply:**
+
+> **Сейчас:** ещё работает. `relay-impl` в состоянии `working` (проверено в 02:24 через `herdr agent get`), 14-я минута из 25–45. Результата тестов нет: пока вкладка работает, строки на её экране — промежуточный вывод, а не отчёт, и «зелёными» я их не назову.
+> **Дальше:** сторож стоит. Как только вкладка остановится, сразу пишу, затем сам перезапускаю тесты на итоговом коммите и сообщаю проверенный результат.
+> **От вас:** ничего.
+> Проверено: состояние вкладки. Не проверено: любой результат тестов.
+> Бэклог: <ссылка на Artifact>
+
+*Gloss: still running; no test result exists yet, screen lines are not a report; waiter armed; verified: tab state; not verified: tests.*
+
+## Why
+
+- **Re-arm, not re-send.** The brief is delivered and the tab is working, so §3's separate `agent wait` applies, with the time box as timeout. Re-sending would make the executor do the work twice. My foreground `--until working` call was off-recipe; this puts it back on.
+- **Fastest ping.** The waiter is event-driven and fires the moment the tab settles. A foreground wait caps at 10 minutes and blocks me, and watching the screen burns context I lack at 58%.
+- **Last week's miss.** That happened because I was busy. Nothing is queued tonight, so the notification wakes me immediately.
+- **No "green".** A running agent has no result (§12). The code may still change after a mid-run test line, and §11 records an executor writing "changed=0" before the re-run happened. I report only the state I verified.
+- **No questions.** Nothing here is the operator's decision, so both messages are three-part statuses.

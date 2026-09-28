@@ -1,0 +1,62 @@
+## Actions, in order
+
+**1. Two foreground Bash calls in parallel.** Each returns within seconds.
+
+```bash
+herdr agent prompt adv-codex "$Q" --wait --until working --timeout 60000
+herdr agent prompt adv-fable "$Q" --wait --until working --timeout 60000
+```
+
+`$Q`, sent verbatim to both:
+
+> Read-only vote, wgka plan step 6 (worktree `~/work/ccs.ansible/.claude/worktrees/wg-keepalive`, branch `feat/wg-keepalive-relay`). The decision is the WireGuard keepalive relay's source allow-list.
+> - Option 1: `10.77.1.128/25`, the WG pool only.
+> - Option 2: `10.77.1.0/24`, the whole VPN, matching the front-door allow-list.
+>
+> The executor recommends 1, because only WG clients send keepalives and the /24 also admits OpenVPN clients.
+>
+> Check inventory/group_vars for ccs-it and ccs-ops:
+> (a) Is every WG peer address, including the operator's own peer, inside the /25? Canary acceptance is the operator pinging 172.27.96.2 from that profile.
+> (b) Does anything else (OpenVPN, monitoring) need this path?
+>
+> Edit nothing. Reply in ≤10 lines. End with one final line of the form `VOTE: <n>`, where n is 1 or 2.
+
+**2. Background Bash.** This applies the 2/2 rule mechanically, so the executor gets unblocked even if I'm stuck waiting on a poll.
+
+```bash
+herdr agent wait adv-codex --timeout 1800000; herdr agent wait adv-fable --timeout 1800000
+a=$(herdr agent read adv-codex --source recent-unwrapped --lines 60 | grep -Eo '^VOTE: [12]$' | tail -1)
+b=$(herdr agent read adv-fable --source recent-unwrapped --lines 60 | grep -Eo '^VOTE: [12]$' | tail -1)
+echo "codex=$a fable=$b"; [ -n "$a" ] && [ "$a" = "$b" ] || exit 3
+[ "$a" = "VOTE: 1" ] && net="10.77.1.128/25 (Option 1)" || net="10.77.1.0/24 (Option 2)"
+herdr agent prompt wgka "Step 6 decided 2/2 by adv-codex + adv-fable: relay source allow-list = $net. Continue steps 6-11 under superpowers:test-driven-development; finish with superpowers:verification-before-completion and report to me. Do not open a merge request." --wait --until working --timeout 60000
+```
+
+**3. In the same turn, two calls in parallel.**
+
+- **AskUserQuestion**, sent while the operator is still awake:
+  - **Q1 "Canary acceptance":** "WG relay is at step 6/11. The ccs-it deploy lands around 04:30. Acceptance needs you: connect with your WireGuard profile and run `ping -i 0.2 172.27.96.2` for 3 min. How do we run it?"
+    - Deploy tonight, I accept in the morning
+    - Wake me once when it's deployed
+    - Merge tonight, deploy when I'm up
+  - **Q2 "Tie-break":** "Only used if the two advisors split on the relay allow-list; otherwise you won't hear of it."
+    - 10.77.1.128/25 (WG only, executor's pick)
+    - 10.77.1.0/24 (whole VPN)
+    - Hold until morning
+- **Agent (Sonnet):** "Update `orchestrator/backlog.md`. wg-keepalive: step 6/11 blocked on allow-list vote (adv-codex + adv-fable, 01:40), auto-relay on 2/2, acceptance plan = pending operator poll. Run `build-backlog.sh` and return the output."
+
+**4. Artifact update** with the built backlog.
+
+**5. On the background notification:**
+- Exit 0: update the backlog.
+- Exit 3: send wgka the operator's Q2 answer, or hold.
+
+When wgka reports, the sequence is: Codex cross-review, merge, deploy ccs-it from `main`, soul snapshot via subagent, then acceptance per the Q1 answer.
+
+## Why
+
+The allow-list isn't mine to decide, and it isn't the operator's either. The advisors vote. I asked them to check that the operator's own WG peer sits in the /25, because acceptance depends on it.
+
+The one thing that isn't trivia is that acceptance needs the operator. Asking now, in their last awake minutes, avoids a 04:30 wake-up. The Q2 tie-break also removes the only other thing that could stall the night.
+
+`--until working` stops `agent wait` from returning at once on an already-idle tab. The background relay keeps my session free, and keeps the executor moving even if the poll sits unanswered.

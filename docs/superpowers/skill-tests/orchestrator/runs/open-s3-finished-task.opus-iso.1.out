@@ -1,0 +1,55 @@
+**Order:** start the design within minutes and close out the relay task in parallel. The executor `wgka` is harvested for its knowledge, then retired.
+
+**1. Bash, foreground. Checks before deleting or killing anything, plus the new worktree**
+```
+ps -p 48211 -o pid=,etime=,command=
+cd ~/work/ccs.ansible && git fetch origin
+git -C .claude/worktrees/wg-keepalive status --porcelain
+git branch --merged origin/main --list feat/wg-keepalive-relay
+git worktree add .claude/worktrees/rdp-audio -b design/rdp-audio origin/main
+mkdir -p .claude/worktrees/rdp-audio/.handoff
+echo '.handoff/' >> "$(git rev-parse --git-common-dir)/info/exclude"
+```
+If `ps` shows `codex app-server`, I run `kill 48211` in the foreground, then confirm it is gone with `ps -p 48211`.
+
+**2. Prompt `wgka`**
+```
+herdr agent prompt wgka "WG keepalive relay is closed: #165 merged, ccs-it accepted by the operator. This is your last task. Do not edit or commit anything. 1) Report `git status --porcelain` for this worktree. 2) Final message: a handoff of at most 80 lines for a new executor designing RDP audio. Cover the desktop, gateway and host_proxy roles: paths, vars, templates, handlers, ports/firewall, how traffic reaches the desktop VMs, anything audio-related already present (pulse/pipewire/xrdp modules), and pitfalls you hit. Facts from code only, with file:line."
+```
+
+**3. Start the design executor**
+
+`herdr tab create --workspace <ws> --cwd ~/work/ccs.ansible/.claude/worktrees/rdp-audio --label rdp-audio --no-focus`, then launch `claude --model opus` in that tab and send it this brief:
+```
+herdr agent prompt rdp-audio "You are executor rdp-audio. Worktree .claude/worktrees/rdp-audio, branch design/rdp-audio. Task: design RDP audio (backlog item). Phase skill: superpowers:brainstorming. Follow it exactly through the written spec and self-review, commit it locally, then STOP: no writing-plans, no implementation, no push. Read-only toward all hosts: no ansible-playbook, no ssh. Take live facts from projects/ccs/soul/*.md; ccs-it.md is being refreshed tonight, so re-read it before finalizing. Ask your questions one at a time; I answer them via the two advisors. Anything only the operator can decide goes in the spec as an Open Decision with your recommendation, and you keep going. The previous executor's handoff lands in .handoff/wgka.md within ~15 min; read it before proposing approaches. Report: spec path, commit, open decisions."
+```
+
+**4. Agent tool, Sonnet, background.** It updates `projects/ccs/soul/ccs-it.md` from the #165 diff, the canary run (`changed=0`) and the operator's ping result. It also writes the memory note `wg-keepalive-relay-rollout`: live on ccs-it since 2026-09-28, operator accepted, ccs-ops not rolled out and awaiting operator go. It adds a pointer line for that note in `MEMORY.md`.
+
+**5. Backlog.** I edit `orchestrator/backlog.md`: relay becomes "ccs-it done / ccs-ops awaiting go", and a new item reads "RDP audio: design in progress". Then I run `build-backlog.sh` in the foreground and update the Artifact.
+
+**6. Message to the operator**
+> Relay closed: ccs-it accepted. The snapshot, backlog and memory note are being filed, and the worktree and review broker are being cleaned up. None of that touches live hosts. The RDP audio design is already running in a fresh Opus executor using the brainstorming skill. It is seeded with the relay executor's knowledge of the desktop, gateway and host_proxy roles. Overnight, both advisors answer its questions and cross-review the spec. Anything only you can decide comes to you as a poll in the morning, alongside the design. The relay rollout to ccs-ops stays parked until you say go.
+
+**7. Background waits**
+- Bash, background: `herdr agent wait wgka --timeout 1200000`.
+- When it wakes me, Bash, foreground:
+  ```
+  herdr agent read wgka --source recent-unwrapped --lines 150 > .claude/worktrees/rdp-audio/.handoff/wgka.md
+  ```
+- I check `tail` of that file to confirm wgka reported a clean worktree, then:
+  ```
+  herdr tab close <wgka tab_id>
+  git worktree remove .claude/worktrees/wg-keepalive && git worktree prune && git branch -d feat/wg-keepalive-relay
+  ```
+  If `-d` refuses because #165 was squash-merged, I first confirm the merge with `gh pr view 165` and then use `-D`.
+- I update the backlog again.
+- Bash, background: `herdr agent wait rdp-audio` to route its questions.
+
+**Why**
+
+The design is the operator's priority, so it starts first. The close-out items each take minutes, and my rules say ALWAYS clean up and update the backlog. Nine hours in, with compaction coming, "do it later" is how cleanup gets lost. The artifact also currently tells the operator something false ("canary pending").
+
+I don't reuse `wgka` in place. A live session can't have its own cwd removed, so the old worktree would stay pinned all night. It would also mix two tasks in one worktree and bring 47% of unrelated context along. A handoff keeps its knowledge.
+
+Before destroying anything I check the target: `ps` guards against a reused pid, `--porcelain` confirms the worktree is clean, and `-d` refuses to delete an unmerged branch. The prose work goes to a subagent, as my rules require. Nothing is deployed to ccs-ops without the operator.

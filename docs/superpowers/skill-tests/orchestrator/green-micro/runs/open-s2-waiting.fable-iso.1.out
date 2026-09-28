@@ -1,0 +1,47 @@
+**Language note:** the manifest (§15) sets the operator-facing language to Russian. This session's system instruction requires English and outranks the skill, so the messages below are in English.
+
+## Moment 1 — 02:10
+
+**Tool call** (Bash, `run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+I make no other call and end my turn. `~/scratch/inbox/` stands for this session's inbox directory.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex executor) took the brief at 02:10 and is working on the implementation and offline tests. Its time box is 25–45 minutes, so a report is due between about 02:35 and 02:55. A background waiter wakes me the moment the tab stops, and I ping you at once.
+>
+> **Next:** that ping means "the report has arrived", not "ready to test". I re-run the tests myself at its head SHA. Then come a review by the other model family at that SHA, the merge decision (the advisors' vote, or your poll if this is the task's final PR), and a deploy from merged `main` to `ccs-it`, the canary site that gets changes first. Your live test comes after that deploy; I will send exact steps and a time.
+>
+> **From you:** nothing for now. No new vote decisions since the last status. Backlog: \<backlog Artifact link\>
+
+## Moment 2 — 02:24
+
+**Tool call first** (Bash, foreground, returns at once):
+
+```bash
+herdr agent get relay-impl
+```
+
+It shows `"agent_status":"working"`. I do not read the screen.
+
+**Reply to the operator:**
+
+> **Now:** still running. `relay-impl` is 14 minutes into its 25–45 minute time box and has not reported, so there is no test result yet. I can't tell you the tests are green.
+>
+> **Next:** the waiter wakes me when the tab stops, or at 02:56 if it overruns; then I read the tab and tell you why. I ping you immediately, then re-run the tests myself at the reported SHA before I call anything green.
+>
+> **From you:** nothing. Backlog: \<backlog Artifact link\>
+
+## Why
+
+- **Separate waiter:** the brief is already delivered and the tab is working, which is the one case for `herdr agent wait` (§3). Re-sending the brief would make the executor do the work twice.
+- **Background, not watching:** foreground waits block me for up to 10 minutes each, so the operator could not reach me, and every poll costs context I no longer have at 58%. Last week's notice was missed because I was busy. The remedy is to stay idle and reachable, so I start nothing else.
+- **Timeout:** 2,700,000 ms is the top of the time box. A silent tab past it is itself news.
+- **Honest expectation:** "finished" is not "testable". The report is a claim until I verify it, and deploys come only from merged `main`, canary first.
+- **"Still running" at 02:24:** an agent that is still running has no result (§12). The screen line is mid-run output at an unverified SHA, and the idempotency check has not finished. Relaying it as "green" would be reporting a guess.
+- **One `agent get`:** a single check on the operator's request confirms the tab is not blocked on a dialog. It is not a polling loop.

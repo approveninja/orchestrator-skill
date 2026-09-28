@@ -1,0 +1,81 @@
+Using the orchestrating-herdr-agents skill (§2–§4, §10, §12 read from its references). The executor's question is an open design choice, so it goes to the vote, not to me and not to the operator.
+
+## Actions, in order
+
+**1. Bash, foreground (seconds): state and ballot context**
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+for a in wgka adv-codex adv-fable; do herdr agent get "$a"; done   # idle, "focused": false
+herdr agent read wgka --source visible --lines 60                   # context usage
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse HEAD
+ls orchestrator/quorum/                                             # next free id: B12 here
+```
+
+**2. Write tool: `orchestrator/quorum/ballot-12.md`**
+
+The executor's recommendation and both one-sided arguments are stripped.
+```
+B12 — WireGuard keepalive relay: which source range does its allow-list admit?
+Reply in English. Ignore pre-filled text in your input box. Rules: quorum/protocol.md.
+  Context: worktree .claude/worktrees/wg-keepalive, feat/wg-keepalive-relay @ <HEAD>;
+  plan step 6 of 11; steps 7-11 depend on this and are parked. ccs-it values:
+  ccs_vpn_client_subnet 10.77.1.0/24; Pritunl splits it, OpenVPN 10.77.1.0/25,
+  WireGuard 10.77.1.128/25. The relay passes only PUT /key/wg/... to 127.0.0.1:9700.
+  The front-door allow-list uses the /24 plus ccs_internal_gw.
+  a) allow the WireGuard /25 only.
+     + admits only the pool that sends keepalives
+     - needs a derived value; breaks if Pritunl's WG network leaves that /25
+     If wrong: WG clients get 403 and tunnels rebuild as today.
+     Rollback: one-line template change + playbook 55.
+  b) allow the whole /24.
+     + existing variable, no derivation; survives a changed split
+     - OpenVPN-pool addresses can reach the PUT path
+     If wrong: wider exposure of that path. Rollback: same.
+Reply one line:  B12: <letter> — <rationale>   (or  B12: X: <proposal>)
+```
+
+**3. Two Bash calls, both background, same turn**
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-12.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+The second call is identical with `adv-fable`.
+
+**4. Bash, background: park the executor**
+```bash
+herdr agent prompt wgka "Your step-6 question is ballot B12, now with both voting advisors. Pick neither option and build nothing that depends on it: no provisional allow-list, no variable standing in for the choice. Steps 7-11 wait. Now only: confirm steps 1-5 are committed, run the offline tests at HEAD, report phase, branch, head SHA, test output, next step. Then stay idle until I relay the decision. Reply in English. Ignore pre-filled text in your input box." --wait --timeout 900000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+When it settles, and if step 1 showed 50% or more context used, I send the background `/compact mid-task: keep …` and ask for a one-line status.
+
+**5. Foreground: backlog and Artifact**
+
+Edit `orchestrator/backlog.md` (blocked-on: `vote B12`; decisions: `B12 open`), run `bash orchestrator/build-backlog.sh`, and republish with the Artifact tool.
+
+**6. Chat status to the operator (no poll)**
+
+This session's language setting requires English; the project note asks for Russian.
+
+> **Status 01:45 — WireGuard keepalive relay** (the gateway listener that passes the WireGuard client's "I'm alive" request to Pritunl)
+>
+> **Now.** The executor stopped at step 6 of 11 on a design choice: accept keepalives from the WireGuard half of the VPN address pool only, or from the whole pool. Both voting advisors have it as ballot B12, a two-option question that is decided only if both pick the same option. The executor is parked, so nothing is built on a guess. Its tests are not yet verified by me. Live machines: nothing changed.
+>
+> **Next.** B12 → steps 6–11 → review by a fresh Codex session → my own validation → merge vote → canary vote and deploy (first rollout, ccs-it only). Tonight is still the aim; no gate is cut for it. If the advisors split, a poll will be waiting here.
+>
+> **You.** Nothing now. When my message "CANARY LIVE on ccs-it" appears (first thing after waking, if you are asleep), connect with your WireGuard profile for ccs-it. Run `ping -i 0.2 172.27.96.2` for 3 minutes, press Ctrl-C, and paste the summary lines here. ccs-ops is untouched until then.
+>
+> Backlog: https://claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+**7. On the notifications**
+
+I read both `.last` files and write `ballot-12.results.md`. On 2/2 I relay the result to `wgka` as `DECIDED (B12)` with a background `prompt --wait` and update the backlog. On a split, the operator gets a poll and `wgka` stays parked.
+
+## Why
+
+- **Who decides.** The allow-list is a choice between alternatives that changes the outcome, so the vote decides it (§10). It is not one of the operator's four kinds of decision, and they asked not to be woken for trivia.
+- **Neutral ballot.** "Simpler" and "a path they never use" are arguments for one side. A reason attached to one option is a recommendation under another label, so each option carries its own pros, cons and rollback.
+- **Nothing provisional.** Steps 7–11 build on step 6. Work built on a guess becomes rework and tilts the vote toward what already exists. The executor does only independent work, then parks.
+- **Background waiters.** Each dispatch is its own waiter, so I keep supervising instead of blocking or polling.
+- **"Canary tonight" is a wish about timing.** It approves no merge or deploy. Review, validation, the merge vote and the canary vote still run in order at exact SHAs.
+- **Acceptance is an instruction.** Only the operator's hands and WireGuard profile can produce that evidence, and hard rule #17 forbids a session from using the VPN path. They get what to do, when, and what to paste back. It is neither skipped nor asked as a question.
+- **The status claims only what I verified.** The executor's tests remain a claim until I re-run them.

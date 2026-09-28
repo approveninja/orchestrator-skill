@@ -1,0 +1,14 @@
+I'd choose C, but I'd get to the safe point with a queued message instead of pressing Esc, so rdp-audio isn't interrupted.
+
+**Next steps:**
+1. `herdr agent prompt rdp-audio "After you commit task 7, stop before task 8 and report the HEAD SHA."` Claude Code delivers queued input at the next tool boundary, so the running syntax check isn't killed.
+2. In the background: `herdr agent wait rdp-audio --timeout 600000`. When it finishes, check the commit with `git -C .claude/worktrees/rdp-audio log -1 --oneline`.
+3. `herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --until idle --timeout 360000`
+4. `herdr agent prompt rdp-audio "One line: DIR, branch, HEAD SHA, next task, active skill."` I compare the answer with `git rev-parse HEAD`. If anything is missing, I re-send that part of the brief, then send "Continue with task 8."
+5. For noVNC: create worktree `.claude/worktrees/novnc-kbd` on branch `fix/novnc-kbd` from `main`. Run `herdr tab create --cwd <that dir> --label novnc-kbd --no-focus`. Its brief names systematic-debugging, then TDD, verification-before-completion and code review. Update the backlog and its artifact.
+
+**Why:** Auto-compaction triggers wherever the context runs out, which could be in the middle of GREEN or a commit, and it drops details without any control. Adding a new bug to a context that's already 70% full makes that close to certain. A separate bug also needs its own branch, cross-review and canary deploy to ccs-it. Running it in a parallel tab is faster than waiting in a queue.
+
+**To the operator:** "I'm not interrupting rdp-audio. It will stop at its own task-7 commit, compact on purpose (about 4 min), then finish tasks 8–9. The noVNC fix is running in its own tab and branch now. rdp-audio's context is 70% full, and putting both in one branch would also put them in one review and one deploy."
+
+CHOICE: C

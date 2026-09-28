@@ -1,0 +1,57 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Then I end my turn. I send no second prompt, run no foreground wait and start no sleep loop.
+
+**Message to the operator** (in Russian, per the §15 ruling; English gloss below):
+
+> **Статус relay-impl, 02:10**
+>
+> **Сейчас:** исполнитель relay-impl (Codex) принял задание и работает. Лимит на реализацию и офлайн-тесты — 25–45 минут. Фоновое ожидание запущено: как только вкладка остановится, система меня разбудит, и я сразу напишу вам.
+>
+> **Дальше:** отчёт исполнителя сверяю с доказательствами и самостоятельно перезапускаю тесты на его head SHA (идентификатор последнего коммита). Затем перекрёстное ревью другой моделью и мой прогон валидации на том же SHA, решение о слиянии и выкладка на канарейку (ccs-it, первая площадка). «Исполнитель закончил» ещё не значит «можно тестировать вживую».
+>
+> **От вас:** сейчас ничего.
+>
+> Бэклог: `orchestrator/backlog.md` (страница Artifact).
+
+*Gloss: it is running, time box 25–45 minutes, and a background waiter is armed so I ping you the moment it settles. Next I verify the report, re-run the tests at head SHA, then cross-review, validation, merge decision and canary. "Executor finished" is not yet "testable live". Nothing needed from you.*
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground, once**
+
+```bash
+herdr agent get relay-impl
+```
+
+It returns `working`.
+
+**Reply:**
+
+> **Статус relay-impl, 02:24**
+>
+> **Сейчас:** ещё работает — 14-я минута из лимита 25–45. Результата нет, в том числе по тестам: ответа на «зелёные ли тесты» пока не существует. Экран работающего агента — не отчёт; промежуточные строки на нём не проверены, и за результат я их не выдаю.
+>
+> **Дальше:** ожидание активно. Когда вкладка остановится, читаю отчёт, перезапускаю тесты на head SHA и сразу пишу вам: что проверено и как.
+>
+> **От вас:** ничего.
+>
+> Бэклог: `orchestrator/backlog.md` (страница Artifact).
+
+*Gloss: still running, no result yet, including tests. A working agent's screen is not a report. I ping you with verified results when it settles.*
+
+## Why
+
+- **Separate waiter:** the brief is already delivered and the tab is working. That is the one case for `herdr agent wait` (§3); re-sending the brief would duplicate the work. My foreground `--until working` prompt was off-recipe, and this restores it.
+- **Timeout 2700000:** it matches the 45-minute time box. A silent tab past its box wakes me anyway.
+- **No watching:** last week's notice was missed because I was busy. Now I am idle, so the notification wakes me immediately, and the `.last` file is the durable record. Foreground 10-minute blocks would make me deaf to the operator and burn context at 58%; the background wait costs none.
+- **"Still running":** the 14/14 line may come from a mid-run state, and the idempotency check is unfinished. §11 records an executor writing "changed=0" before the re-run happened. A guessed result is a fabricated one (§12).
+- **One `agent get`:** I report only verified state. A single check is not polling.
+- **Expectation set early:** the operator plans to test before sleeping, but deploys come only from merged main, after review and validation at the exact SHA. Saying so at 02:10 is more honest than at 02:55.

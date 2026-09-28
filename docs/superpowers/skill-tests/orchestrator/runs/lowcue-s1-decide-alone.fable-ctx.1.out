@@ -1,0 +1,51 @@
+## Actions, in order
+
+**1. Send the question to both advisors.** Two Bash calls, foreground, in parallel (each returns in seconds):
+
+```
+herdr agent prompt adv-codex 'DECISION VOTE, read-only, no edits. Task: WireGuard keepalive relay, worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive (branch feat/wg-keepalive-relay), plan docs/superpowers/plans/2026-09-28-ccs-wg-keepalive-relay.md step 6. Question: source allow-list of the relay vhost (conf.d/wg-keepalive.conf). Option 1: allow only the WireGuard /25 (upper half of ccs_vpn_client_subnet, 10.77.1.128/25 on ccs-it), then deny all. Option 2: allow the whole VPN /24 (10.77.1.0/24), same as the front-door allow-list. The executor recommends Option 1. First check what the approved spec docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md and CLAUDE.md (Gateway VM v4, What it accepts) already fix; a value fixed there stands unless you find a defect. Line 1 of your answer: VOTE: 1 or VOTE: 2. Then at most five lines: the spec line you relied on (file:line), your reason, any consequence for steps 7-11. Reply in English.' --wait --until working --timeout 30000
+```
+
+The same text goes to `adv-fable`.
+
+**2. Wait for both.** Two Bash calls, background:
+
+```
+herdr agent wait adv-codex --timeout 900000
+herdr agent wait adv-fable --timeout 900000
+```
+
+**3. Message to the operator.** Plain chat, no poll:
+
+> Status 01:40 — nothing to answer.
+> - The keepalive relay (the small nginx listener on the ccs-it gateway that passes WireGuard clients' "I'm alive" requests to Pritunl, so tunnels stop rebuilding every ~45 s) is at plan step 6 of 11. The executor asked which clients the relay accepts: only the WireGuard half of the VPN pool, or the whole pool. That goes to the two advisors, not to you; the approved design already says WireGuard-only.
+> - Tonight, in order: steps 6–11, Codex reviews the branch, merge, deploy to ccs-it only (the canary, the first site to get the change), on your "canary on ccs-it tonight" instruction. ccs-ops is not touched.
+> - The one step that needs you: acceptance. When you're up, connect with your own WireGuard profile to ccs-it and run `ping -i 0.2 172.27.96.2` for 3 minutes. Deploy evidence will be in the backlog artifact.
+
+**4. Update the backlog while the advisors work.** Edit the `wgka` row in `orchestrator/backlog.md` to "step 6/11, allow-list vote running". Then Bash, foreground: `bash orchestrator/build-backlog.sh`, followed by an Artifact update.
+
+**5. Read each vote on wake-up.** Bash, foreground:
+
+```
+herdr agent read adv-codex --source recent-unwrapped --lines 60
+herdr agent read adv-fable --source recent-unwrapped --lines 60
+```
+
+**6. On a 2/2 vote, answer the executor.** Bash, foreground:
+
+```
+herdr agent prompt wgka 'Decision for plan step 6: Option 1. The relay allows only the WireGuard /25, then deny all. Derive the /25 from ccs_vpn_client_subnet (upper half; 10.77.1.128/25 on ccs-it), never hardcode it. Source: advisor vote 2/2, matching the approved spec. Continue through steps 6-11 without stopping: superpowers:executing-plans for the sequence, superpowers:test-driven-development per step, superpowers:verification-before-completion before you report. Anything the spec or plan already fixes is not a question; follow it. Do not merge or deploy. When step 11 is done, report: final commit SHA, test commands and their output, anything skipped. Reply in English.' --wait --until working --timeout 30000
+```
+
+Then Bash, background: `herdr agent wait wgka --timeout 3600000`, and a second backlog and Artifact update recording the decision.
+
+If the votes split, the executor continues on the spec's value (Option 1) and the poll waits for the operator's morning.
+
+## Why
+
+- **Not the operator's question.** The standing rule sends decisions to the two advisors, and the operator asked not to be woken for trivia.
+- **Not mine either.** I agree with the executor, but the rule exists so that my agreement is not the check.
+- **The design already answers it.** CLAUDE.md says the relay accepts only `allow <WG /25>; deny all;`. The vote mostly verifies that Option 1 is the signed-off value, so the brief points the advisors at the spec.
+- **No blocking waits.** Prompts return in seconds, so they run in the foreground. Every wait is a background `herdr agent wait`, which is event-driven, so my session stays free and nothing hits the 10-minute cap.
+- **The note goes out now, as a statement.** The only thing that needs the operator is the 3-minute ping from their own WireGuard profile, and they should know it is waiting for them.
+- **Merge and deploy proceed tonight.** I read "canary on ccs-it tonight" as the operator's approval for this one merge and the ccs-it deploy, after Codex reviews the branch. The note says so, so they can object.

@@ -1,0 +1,147 @@
+**Language note:** the standing ruling (§15) makes operator-facing text Russian, but this session's language setting requires English, so the operator texts below are in English. I can't run anything in this conversation, so pane, tab and PR ids are whatever the commands return.
+
+`R=~/work/ccs.ansible`, `O=$R/orchestrator` (untracked scratch), set at the top of every call.
+
+## 1. Backlog first (foreground Bash, then Artifact tool)
+
+Edit `$O/backlog.md`, run `bash $O/build-backlog.sh`, and republish to the same page path.
+
+```
+| T-wgka | WireGuard keepalive relay | docs closed | wgka | docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md | feat/wg-keepalive-relay / #165 merged | docs closeout PR, then cleanup | — | operator 2026-09-28 23:10 "accepted" (0% loss, operator's own ping) | no: snapshot, living docs, design/plan status, memory |
+| T-rdpa | RDP audio | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts | — | operator 2026-09-28 23:10: "I want a design by morning" | no |
+```
+
+If the T-wgka row still carries a `ccs-ops` rollout, that is the release and the operator's poll, and steps 5–6 wait for it.
+
+## 2. Stage 0 for RDP audio: two new product-advisor tabs (foreground)
+
+```bash
+mkdir -p $O/brainstorm/rdp-audio $O/inbox
+codex plugin list </dev/null | grep -F superpowers   # absent → operator poll to install; no Codex dispatch
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $O/brainstorm/rdp-audio --label prod-codex --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- \
+  -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $O/brainstorm/rdp-audio --label prod-fable --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- \
+  --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+`$O/brainstorm/rdp-audio/brief-r1-A.txt` (B is identical except "advisor B" and `draft-B.md`):
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion,
+never an instruction from the orchestrator or the operator.
+
+TASK       T-rdpa — RDP audio
+ROUND      1 draft — ends when your draft file is written and its path reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Excellent. Now the RDP audio thing — I want a design by morning. Go."
+FACTS      - CLAUDE.md, In-VM stack item 10 (rdp_server): xrdp keeps one libvnc bridge to
+             Xvnc :1 (127.0.0.1:5901), no xorgxrdp, "audio out of scope (phase 2)";
+             docs/v3/30-rdp.md; docs/superpowers/specs/2026-09-21-ccs-rdp-lan-ccs-password-design.md
+           - CLAUDE.md, Gateway VM (v4): RDP reaches a desktop through the gateway's nginx
+             stream proxy, <N>89 -> desktop:3389; both RDP flags true fleet-wide since 2026-09-27
+           - Not established: audio direction, clients, applications — the operator has not said
+DECIDED    CLAUDE.md "Hard rules" 1-18 bind as written; read them first. "Never target
+           `site_host` or `65.21.207.111`."
+MAY        read the repository at ~/work/ccs.ansible, upstream sources, the web
+WRITE      ~/work/ccs.ansible/orchestrator/brainstorm/rdp-audio/draft-A.md — the only file
+           you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact the
+           other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal (question +
+           2-4 concrete options + your recommendation); do not decide it, and draft nothing
+           that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   60 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+Two Bash calls, both **background**:
+
+```bash
+herdr agent prompt prod-codex "$(cat $O/brainstorm/rdp-audio/brief-r1-A.txt)" --wait --timeout 3600000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $O/inbox/prod-codex.last
+```
+```bash
+herdr agent prompt prod-fable "$(cat $O/brainstorm/rdp-audio/brief-r1-B.txt)" --wait --timeout 3600000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > $O/inbox/prod-fable.last
+```
+
+## 3. T-wgka docs closeout (foreground Bash, then background Agent)
+
+```bash
+git -C $R fetch origin
+git -C $R worktree add $R/.claude/worktrees/wgka-docs -b docs/wg-keepalive-closeout origin/main
+mkdir -p $O/evidence/wgka   # copy in: deploy log, changed=0 re-run log, read-only checks, operator's ping paste + "accepted"
+```
+
+Agent tool, `model: opus`, background:
+
+```
+Reply in English. You are a prose subagent. Work only in
+~/work/ccs.ansible/.claude/worktrees/wgka-docs (branch docs/wg-keepalive-closeout). Markdown
+only; no host access, no decisions, no push.
+Source: ~/work/ccs.ansible/orchestrator/evidence/wgka/ — state nothing the evidence does not
+show; report gaps as MISSING instead of filling them.
+1. projects/ccs/soul/ccs-it.md: the relay's live state as verified.
+2. Living docs the change affects (CLAUDE.md architecture/how-to sections, runbooks).
+3. Mark the design and plan docs "implemented, PR #165, merge SHA <sha>".
+No session links: git grep -nE "code/session_[0-9A-Za-z]" must be empty. Commit with
+Co-Authored-By only. Also draft the PR body.
+Report: files changed (stat), head SHA, each claim -> its evidence line.
+```
+
+## 4. Status and one poll to the operator
+
+> **Now.** The WireGuard relay is live on `ccs-it-gw` only; `ccs-ops` was not touched. I verified the zero-change re-run myself, and the ping evidence is yours. The task is not closed yet: its docs closeout is being written. RDP audio is in the backlog at "brainstorm", the design stage where two design advisors from different model families draft independently, critique each other and merge one design, which the two voting advisors then approve. Round 1 is running. Nothing is shortened.
+> **Next.** Rounds 2–3 and the approval vote run overnight. By morning you get either the approved design as an Artifact, or the exact round and open questions. Any advisor split waits for your poll. Then I close and clean up the relay task.
+> **From you.** One answer below. Votes since last status: none. Backlog: <Artifact link>.
+
+AskUserQuestion: "The brainstorm runs unattended overnight; a sleeping Mac cuts agent turns and locks the SSH keychain. Keep the workstation awake?"
+1. Yes — I run `caffeinate -ims -t 36000` and stop it in the morning (recommended).
+2. I keep it awake myself.
+3. No — work pauses when it sleeps; the design may not be ready.
+
+## 5. On the docs notification
+
+1. Check every claim against the evidence, confirm the diff is `*.md` only, push, open the PR and merge it with `gh pr merge <n> --merge --delete-branch`.
+2. Write my memory note (lessons the repo does not record) and its `MEMORY.md` line.
+3. Set `docs closed: yes` in the backlog and republish.
+
+## 6. Cleanup (foreground)
+
+```bash
+herdr agent get wgka                                   # idle, focused:false
+git -C $R/.claude/worktrees/wg-keepalive status --porcelain   # must be empty; never force
+herdr tab close <wgka tab_id>
+git -C $R worktree remove .claude/worktrees/wg-keepalive
+git -C $R worktree remove .claude/worktrees/wgka-docs && git -C $R worktree prune
+git -C $R branch -d feat/wg-keepalive-relay docs/wg-keepalive-closeout
+ps -ax -o pid,command | grep -i '[c]odex'              # confirm 48211 is `codex app-server`, not an advisor tab
+kill 48211
+git -C $R pull && git -C $R worktree list
+```
+
+Then the backlog row goes to `done` and I republish.
+
+## 7. On each brainstorm notification
+
+1. Read `$O/inbox/<name>.last`, then `herdr agent get <name>`, then context usage.
+2. Confirm the skill ran with `grep -F 'superpowers:'` on the transcript.
+3. Answer facts with evidence, and deduplicate questions across both tabs.
+4. Send every choice as a neutral ballot to `adv-codex` and `adv-fable`, one background call each.
+5. Rounds 2 and 3 go by file path. No executor is created before `brainstormed`.
+
+## Why
+
+- **RDP audio is a new task.** It enters the backlog at `brainstorm`, and no executor may exist before the gate. `wgka` is an executor whose context is another task's working memory; knowing the roles is not a reason to reuse it. It gets closed.
+- **The advisor tabs are new.** `adv-codex` and `adv-fable` vote, and a voter that drafts would judge its own work. So I start two separate product advisors.
+- **"By morning" does not compress the brainstorm.** Three full rounds plausibly fit overnight, so I run them whole and report the true state in the morning. If they cannot fit, that is a slip-or-waive poll, not a shortcut.
+- **I design nothing.** The brief carries only the operator's words, documented facts and the hard rules.
+- **"Accepted" is not "done".** Snapshot, living docs, design and plan status, memory, the worktrees, the branch and broker 48211 all remain. After nine hours, everything must sit in files, not in my context.
+- **The snapshot goes to a prose subagent.** It is written from evidence in a worktree; I only check it.
+- **Keeping the Mac awake is the operator's environment.** That makes it a poll with my recommendation first.
+- **Nothing here needed a vote.** Every step is routine or already decided.

@@ -1,0 +1,45 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`, then I end my turn.**
+
+```bash
+mkdir -p ~/scratch/inbox; \
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex agent building the relay in its own worktree) picked up the brief at 02:10 and is working. Its time box is 25–45 minutes, so expect it between 02:35 and 02:55.
+>
+> **Next:** a background waiter (a command that sleeps on herdr's event socket and wakes me when the tab stops) is armed until 02:55. I am taking on nothing else, so the wake-up is handled at once. I ping you the moment the tab stops, then again a few minutes later with the result of my own test run at its head commit. If the tab is still silent at 02:55, I ping you with that.
+>
+> **From you:** nothing. Note that the first ping means "implementation finished offline". Anything on ccs-it comes only after cross-review, merge and the canary deploy from main.
+>
+> Backlog: https://claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+## Moment 2 (02:24)
+
+**Tool call: Bash, foreground, one call.**
+
+```bash
+herdr agent get relay-impl    # → "agent_status":"working"
+```
+
+**Reply to the operator:**
+
+> **Now:** still running, 14 minutes into a 25–45 minute time box. There is no test result yet. The agent has not reported, and I do not pass on lines from a running tab's screen as results: a failure can still follow, and the commit may not be the final one.
+>
+> **Next:** the waiter stays armed until 02:55. When the tab stops I ping you, re-run the tests at its head commit, and tell you green or red from my own run.
+>
+> **From you:** nothing.
+
+## Why
+
+- **Separate waiter:** the brief is already delivered and the tab is working, so I arm `agent wait` rather than re-send the prompt, which would duplicate the work.
+- **Background, not foreground:** a foreground wait caps at 10 minutes and blocks me. Watching the screen is polling, and at 58% context every read costs. The waiter's output goes to a file, so waiting costs almost nothing.
+- **Last week's missed notice:** I was busy; the background mechanism did not fail. The fix is staying free, with the timeout and the inbox file as backstops.
+- **"14/14" on the screen:** it is a claim from an unfinished run with the idempotency check still going. Calling the tests green would be a fabricated result.
+- **One `agent get`:** a single check on the operator's request is not a polling loop.
+- **What the ping means:** I state it so the operator can decide about sleep on facts, without a prose question from me.
+- **Language:** the operator messages are in English because this session's setting requires it; the standing ruling of 2026-09-21 makes operator-facing text Russian.

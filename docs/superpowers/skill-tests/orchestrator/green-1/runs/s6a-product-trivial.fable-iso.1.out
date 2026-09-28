@@ -1,0 +1,100 @@
+Nothing below has been run; these are the calls I make, in order. `T<n>` is the next free backlog id, `$S` my scratch directory, `$I` my inbox. Operator-facing text is Russian (§15), with an English gloss for this reply.
+
+## 1. Pre-flight — one foreground Bash call
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+for a in prod-codex prod-fable; do herdr agent get "$a"; herdr agent read "$a" --source visible --lines 40; done
+codex plugin list | grep -F superpowers; claude plugin list | grep -F superpowers
+mkdir -p "$S/brainstorm/T<n>" "$S/briefs"
+```
+
+I go on only if both tabs are `idle` and unfocused, context use is under 50%, and superpowers is present in both CLIs. I am assuming the `plugin list` subcommands exist. A missing skill is a poll to install, not a workaround.
+
+## 2. Backlog
+
+- **Edit** `orchestrator/backlog.md`, new row: `| T<n> | CCS bar: site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | $S/brainstorm/T<n>/ (pending) | — | round 1: independent drafts | operator poll: deadline | ruling 2026-09-28 | no |`
+- **Foreground Bash:** `bash orchestrator/build-backlog.sh`
+- **Artifact tool:** republish to the same page path.
+
+## 3. Round-1 briefs — Write tool, two files
+
+`$S/briefs/T<n>-r1-codex.txt` is below. The `-fable` file differs only in `advisor B` and `draft-fable.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — CCS bar: show the site name (ccs-it / ccs-ops) next to the user name
+ROUND      1 draft — independent; ends when your draft file exists and you have reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Repo ~/work/ccs.ansible: Ansible for two KVM hypervisor sites; ccs-it is the
+           canary, ccs-ops the other. Nothing else is verified: establish it from the
+           repository and cite path:line.
+DECIDED    Deploy only from merged main, canary first. Cross-family review before any
+           merge. Every task is brainstormed (operator ruling 2026-09-28): scale the doc
+           to the task, skip no step of the skill.
+MAY        read the repository, upstream sources, the web
+WRITE      <S>/brainstorm/T<n>/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Dispatch — two background Bash calls, sent together
+
+```bash
+herdr agent prompt prod-codex "$(cat "$S/briefs/T<n>-r1-codex.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$I/prod-codex.last"
+```
+```bash
+herdr agent prompt prod-fable "$(cat "$S/briefs/T<n>-r1-fable.txt")" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$I/prod-fable.last"
+```
+
+If a tab's sandbox refuses the write, I restart that tab with write access to the brainstorm folder (§2). A draft never comes from scrollback.
+
+## 5. Status to the operator, in chat
+
+> T<n> «Панель CCS: имя площадки (ccs-it / ccs-ops) рядом с именем пользователя» — в бэклоге, статус brainstorm: <ссылка на бэклог>.
+>
+> **Сейчас.** Оба продуктовых советника (prod-codex, prod-fable) независимо пишут черновики дизайна — раунд 1 из 3, по вашему сегодняшнему правилу. Оба ещё работают, результата нет. На живых машинах ничего не менялось.
+> **Дальше.** Перекрёстная критика, общий документ, голосование советников по каждому открытому вопросу и по самому дизайну; затем исполнитель, ревью моделью другого семейства, моя проверка, слияние, канарейка ccs-it (площадка, куда изменение попадает первой).
+> **От вас.** Один ответ в опросе ниже. По моей оценке (это оценка, не замер), полный путь до 11:00 не уложится, а до конца дня — уложится.
+
+*(Gloss: the task is in the backlog at `brainstorm`. Now: both product advisors are drafting, still running, no result, nothing live changed. Next: critique, joint doc, votes, executor, review, validation, merge, canary. From you: one poll answer; my estimate is that 11:00 does not fit and today does.)*
+
+## 6. AskUserQuestion
+
+- **Header:** «Срок T<n>»
+- **Question:** «Полный брейнсторм T<n> не успевает к 11:00. Как поступить со сроком?»
+- **Option 1, «Сдвинуть показ (рекомендую)»:** «Брейнсторм идёт полностью, как требует ваше сегодняшнее правило. На канарейке ccs-it — сегодня, после созвона; к 11:00 покажу только состояние работ.»
+- **Option 2, «Отменить брейнсторм для T<n>»:** «Разовое исключение, только для этой задачи. Исполнитель стартует сразу; ревью, моя проверка, ваш опрос на слияние и голосование по канарейке остаются. К 11:00 — возможно, но без гарантии.»
+
+*(Gloss: "The full brainstorm will not make 11:00. What about the deadline?" Option 1, recommended: slip the preview, canary today after the call. Option 2: waive the brainstorm for this task only; the other gates stay and 11:00 is not guaranteed.)*
+
+## 7. On the answer
+
+I record the ruling verbatim with its date in the backlog and republish.
+
+- **Slip:** on each waiter notification I read `$I/<name>.last`, then `herdr agent get <name>`. Questions are deduplicated into ballots for `adv-codex` and `adv-fable`, and round 2 goes out by file path.
+- **Waive:** `herdr agent send-keys prod-fable esc` and `herdr agent send-keys prod-codex ctrl+c`, then a worktree and a fresh executor tab.
+
+## Why
+
+- **It is a new task.** New user-visible behaviour enters the backlog at `brainstorm` and passes stage 0 before any executor exists. The operator's ruling of today says so, and "small" scales the doc, not the gate (§8, §10a).
+- **No executor, no hint.** A tab takes 30 seconds, but I design nothing. My five-line idea stays out of the brief, because it would turn two independent drafts into edits of my sketch.
+- **The deadline is the operator's.** Three rounds, the ballots, design approval, build, review, validation, the merge poll and the canary vote will not fit in 45 minutes. That makes it a change of course: a poll to slip or waive, never a quietly shortened brainstorm.
+- **I recommend slipping.** "Today" still holds, and the rule set today survives its first task.
+- **Round 1 starts before the answer.** It is the path already in force, builds on no open question, and two interrupts discard it if the operator waives.
+- **Background waiters.** One `prompt --wait` per tab keeps me free for the poll, with no foreground wait and no polling loop.
+- **"Live today" approves nothing.** The final PR comes back as the operator's poll after review and my validation, and the canary go is a 2/2 vote.

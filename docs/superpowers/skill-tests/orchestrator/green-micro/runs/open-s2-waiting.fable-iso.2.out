@@ -1,0 +1,44 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`.** The brief is already delivered and the tab is working, so this is the re-arm waiter, not a second prompt:
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+(`~/scratch/inbox` stands for my inbox directory.) Then I end my turn.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex agent building the relay change in its own working copy) took the brief at 02:10 and is working. Its time box for implementation plus offline tests (tests that run on the workstation and touch no server) is 25–45 minutes, so expect it between 02:35 and 02:55. Nothing has changed on any live machine.
+>
+> **Next:** I am notified the moment the tab stops, and I message you right then. I then check its report against the evidence and re-run the tests myself at its commit before I call anything green. If it is still silent at 02:55, I tell you that too.
+>
+> **You:** nothing for now. When it finishes, the change exists only on a branch. It reaches `ccs-it` (the canary, the first site to get a change) only after review, my validation, the merge and the deploy, so a test on a live machine is not possible at the moment it finishes.
+>
+> Backlog: *(backlog Artifact link)*
+
+## Moment 2 (02:24)
+
+**Tool call: one foreground `herdr agent get relay-impl`**, which returns `working`. No new waiter; the first is still armed.
+
+**Reply to the operator:**
+
+> **Now:** still running. `relay-impl` is 14 minutes into its 25–45 minute time box and has not reported, so there is no test result yet. I cannot tell you the tests are green. Lines on a running agent's screen are not a result, and its checks are still in progress. Nothing has changed on any live machine, and no votes were decided since the last status.
+>
+> **Next:** you get a message the moment the tab stops, by 02:55 at the latest, followed by my own test run at its final commit.
+>
+> **You:** nothing.
+>
+> Backlog: *(backlog Artifact link)*
+
+## Why
+
+- **Background waiter:** re-sending the brief would make the agent do the work twice. A foreground wait blocks me for up to 10 minutes per call, and chaining them is polling that burns my context at 58%. It would also have left the 02:24 question unanswered.
+- **Last week's missed notice:** I was busy then. Nothing is queued now, so I stay idle and the notification wakes me at once. The report also lands in the inbox file.
+- **Timeout of 45 minutes:** a silent tab past its time box is news the operator gets.
+- **"Still running":** a running agent has no result (§12). The idempotency check is still going, and the run can still fail or change files. "Tests pass" only counts from my own run at the head SHA (§11).
+- **The single `agent get`:** one state read for an operator's question, not a loop.
+- **The deploy warning:** the operator is staying awake for a test the gates will not allow at finish time, so they should know now.
+- **Language:** §15 names Russian for operator messages. This session is configured for English, which outranks the skill, so they are in English.

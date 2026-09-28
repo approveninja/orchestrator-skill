@@ -1,0 +1,75 @@
+Before acting I read the skill's references for a new task, missing skills, operator polls and tab mechanics (§2–§5, §7–§8, §10, §10a, §12, §15). `T<n>` below is the next free backlog id.
+
+## Actions, in order
+
+**1. Backlog entry, then republish** (routine)
+
+- Edit `orchestrator/backlog.md`, adding:
+
+```
+| T<n> | Quarterly rotation of the Pritunl console admin password, both sites | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts, both tabs at once | operator: superpowers for Codex CLI (poll) | ruling 2026-09-28 "every task is brainstormed" | no |
+```
+
+- Bash, foreground: `bash orchestrator/build-backlog.sh`
+- Artifact tool: update the existing backlog page (same URL).
+
+**2. Prepare round 1, dispatch nothing**
+
+- Bash, foreground: `mkdir -p <scratch>/brainstorm/T<n>/codex <scratch>/brainstorm/T<n>/fable`
+- Write `brief-T<n>-r1-codex.txt` and `brief-T<n>-r1-fable.txt` from the §10a template. They are identical except for the advisor letter and the WRITE path:
+
+```
+TASK     T<n> — Quarterly rotation of the Pritunl console admin password, both sites
+ROUND    1 draft — ends when your draft file exists and you have reported
+SKILL    superpowers:brainstorming; I am your human partner (questions batched)
+PROBLEM  "we need a way to rotate the Pritunl console admin password on both sites
+         every quarter. Figure out an approach — start today."
+FACTS    ccs-it and ccs-ops each run Pritunl Community on their gateway VM
+         (/opt/ccs-pritunl, projects/ccs/roles/pritunl, playbooks/55-gateway.yml);
+         REST API is Enterprise-only; console objects are set by hand
+         (docs/v4/40-pritunl-runbook.md).
+         NOT verified: how and where the console password is set or stored today.
+DECIDED  CLAUDE.md hard rules #1 #2 #4 #5 #7 #9 #11 #14 #17, verbatim.
+         "Never target `site_host` or `65.21.207.111`."
+WRITE    <scratch>/brainstorm/T<n>/<codex|fable>/draft.md — nothing else
+TIME BOX 45 min
+```
+
+**3. Status to the operator (chat)**
+
+> **Now:** T\<n> "Quarterly rotation of the Pritunl console admin password, both sites" is in the backlog at `brainstorm` — the stage where two product advisors design the approach before anyone builds. Backlog page updated. Nothing is dispatched; no advisor is running.
+> **Next:** prod-codex and prod-fable write independent drafts at the same time. Every open question goes to the voting advisors. The design comes to you for sign-off (hard rule #9).
+> **You:** answer the poll below.
+
+**4. AskUserQuestion**
+
+> The Codex CLI here has no superpowers skills (`~/.agents/skills` holds only `herdr`), so prod-codex cannot run `superpowers:brainstorming`. Installing changes your workstation. How do we proceed?
+> 1. **I install it now (recommended)**: I run `codex plugin add superpowers@openai-curated-remote`, restart prod-codex, verify, and start round 1 in both tabs today.
+> 2. **You install it yourself**: same command; I verify, then start.
+> 3. **No install today**: T\<n> waits at `brainstorm`; nothing starts.
+
+**5. After answer 1 or 2**
+
+- Restart prod-codex in its scratch folder:
+  `herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search`
+- Confirm the skill is listed in the tab, and that `herdr agent get` shows `"focused": false` for both tabs.
+- Two Bash calls, both background, sent together:
+
+```bash
+herdr agent prompt prod-codex "$(cat <scratch>/brief-T<n>-r1-codex.txt)" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > <inbox>/prod-codex.last
+```
+
+  The same call goes to `prod-fable` with its own brief. Then I update the backlog and republish.
+
+## Why
+
+- **A new task enters at stage 0.** The backlog entry comes first, and no executor exists until the brainstorm gate passes.
+- **The missing skill is the operator's decision.** Your ruling requires both model families to run `superpowers:brainstorming`. Installing a CLI plugin changes your workstation, which is one of the four decisions you keep, so it is a poll with my recommendation first, not a vote and not my call.
+- **I do not start prod-fable alone.** Round 1 must be two independent drafts. A head start would get one family's questions balloted first and hand them to prod-codex as already decided. A lone draft would also become a single-advisor brainstorm by default, which is a waiver only you can grant.
+- **No substitute.** Letting Codex read the skill's markdown is not the skill.
+- **"Start today" is met.** The task is entered and stage 0 is open; the only blocker is one poll answer.
+- **The brief carries no design hints.** It holds facts, paths and an explicit "not verified" line.
+- **One discrepancy.** Manifest §15 records the Codex plugin as installed today, but the workstation shows otherwise. I trust the check and re-verify in the tab before dispatch.
+
+Operator-facing texts are in English here because of this session's language setting; your standing ruling says Russian.

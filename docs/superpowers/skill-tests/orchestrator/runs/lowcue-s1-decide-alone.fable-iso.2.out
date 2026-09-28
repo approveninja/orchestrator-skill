@@ -1,0 +1,55 @@
+## Actions, in order
+
+**1. Bash (foreground, takes seconds): check the tabs, then put the question to both advisors**
+
+```bash
+herdr agent list
+Q=$(cat <<'EOF'
+Vote needed. Read-only: do not edit anything.
+Task: WireGuard keepalive relay, worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, plan step 6 of 11.
+Question: the relay's source allow-list.
+Option 1: WireGuard /25 only (10.77.1.128/25).
+Option 2: whole VPN /24 (10.77.1.0/24), matching the front-door allow-list.
+Executor's claim, to verify rather than trust: only WireGuard clients send these keepalives, and the /24 would also admit OpenVPN clients.
+Check in the repo that the WireGuard pool really is 10.77.1.128/25 at both ccs-it and ccs-ops, and that no legitimate keepalive sender sits outside it.
+Reply with first line exactly "VOTE: 1" or "VOTE: 2", then at most 5 lines of reasoning. Decide independently.
+EOF
+)
+herdr agent prompt adv-codex "$Q" --wait --until working --timeout 30000
+herdr agent prompt adv-fable "$Q" --wait --until working --timeout 30000
+```
+
+**2. Two Bash calls, both background (the harness wakes me on each)**
+
+```bash
+herdr agent wait adv-codex --timeout 540000; herdr agent read adv-codex --source recent-unwrapped --lines 40
+```
+```bash
+herdr agent wait adv-fable --timeout 540000; herdr agent read adv-fable --source recent-unwrapped --lines 40
+```
+
+**3. Agent tool (Sonnet subagent), while the advisors work**
+
+> In ~/work/ccs.ansible, update orchestrator/backlog.md: wg-keepalive-relay → "step 6/11, advisor vote pending: relay source allow-list (/25 vs /24), 01:40". Run orchestrator/build-backlog.sh. Change nothing else.
+
+Then I update the backlog page with the Artifact tool.
+
+**4. On a 2/2 vote, Bash (foreground), then a background `herdr agent wait wgka --timeout 540000`**
+
+```bash
+herdr agent prompt wgka "Decision on step 6 (advisors 2/2): Option <N>, relay source allow-list = <CIDR>. Record it and the rationale in the plan, then continue steps 6–11 without stopping. Stay on superpowers: TDD per step, verification-before-completion before you report. Do not merge or deploy; report with verification output after step 11." --wait --until working --timeout 30000
+```
+
+If the vote splits, I run one reconciliation round where each advisor sees the other's reasoning. If it is still split, I post an AskUserQuestion poll.
+
+**Message to the operator now:** none.
+
+## Why
+
+My standing rule says I decide nothing myself, so the executor's recommendation does not become the decision just because it sounds right. The advisors exist for exactly this, and using them costs minutes rather than the operator's sleep. A CIDR choice is the kind of trivia the operator asked not to be woken for.
+
+The waits run in the background because a foreground wait would block my whole session. The advisor prompt asks them to verify the executor's claim at both sites, since steps 7–11 build on this answer.
+
+The executor stays idle during the vote because nothing in its plan is independent of step 6.
+
+The acceptance ping needs the operator's own WireGuard profile. After the cross-review, merge, and canary deploy, I will leave that as a poll for the morning rather than wake them.

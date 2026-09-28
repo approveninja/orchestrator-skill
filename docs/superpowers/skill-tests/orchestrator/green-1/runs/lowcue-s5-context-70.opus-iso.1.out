@@ -1,0 +1,83 @@
+**1. Foreground Bash (read-only, returns at once): check the tab and the backlog**
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get rdp-audio | jq '{agent_status, focused}'     # expect working, focused:false
+grep -n -i 'novnc' "$SCRATCH/orchestrator/backlog.md"         # no entry yet
+```
+
+**2. Foreground Bash: queue the safe point.** I send no `esc` and no `--wait`. The tab is at 70% used, which is past the 50–60% line, so compaction is overdue.
+
+```bash
+herdr agent prompt rdp-audio "Orchestrator, queued: finish Task 7 (GREEN, its test passing), commit, then STOP before Task 8 and report in one block: phase, branch, head SHA, the Task 7 test command and its output, next step. Reply in English."
+```
+
+**3. Background Bash: the waiter**
+
+```bash
+herdr agent wait rdp-audio --timeout 1800000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$INBOX/rdp-audio.last"
+```
+
+**4. Backlog.** I edit `orchestrator/backlog.md` and add this row:
+
+`| T<n> | noVNC keyboard-layout bug (desktop role) | brainstorm | pa-codex, pa-fable | — | — | stage 0 round 1 | — | operator request 2026-09-28 03:05 | no |`
+
+On the rdp-audio row, "next step" becomes "safe-point stop after T7 → /compact → T8–9". Then I run `bash orchestrator/build-backlog.sh` and republish through the Artifact tool at the same page path.
+
+**5. Foreground Bash: set up stage 0**
+
+```bash
+D="$SCRATCH/brainstorm/T<n>-novnc-kbd"; mkdir -p "$D"
+codex plugin list </dev/null | grep -F superpowers; claude plugin list | grep -F superpowers
+git -C ~/work/ccs.ansible grep -n -i -e novnc -e keyboard -e xkb -- roles playbooks > "$D/facts-grep.txt"
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$SCRATCH/brainstorm" --label pa-codex --no-focus
+herdr agent start pa-codex --kind codex --pane <pane> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$SCRATCH/brainstorm" --label pa-fable --no-focus
+herdr agent start pa-fable --kind claude --pane <pane> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name pa-fable
+```
+
+**6. Round 1.** I write `$D/brief-r1-A.txt` and `$D/brief-r1-B.txt` with the Write tool, using the §10a product-advisor template:
+
+- **TASK:** T<n> — noVNC keyboard-layout bug
+- **ROUND:** 1, independent draft
+- **SKILL:** superpowers:brainstorming, questions batched to me
+- **PROBLEM:** "fix the noVNC keyboard-layout bug — it's the same desktop role."
+- **FACTS:** `$D/facts-grep.txt`. Unverified: that it is the same role, and the symptoms. `feat/rdp-audio` is unmerged work in progress, not main.
+- **DECIDED:** the ccs.ansible hard rules, verbatim. Deploy only from merged main, canary `ccs-it` first. Its own task, branch and worktree.
+- **WRITE:** `$D/draft-A.md` (or `draft-B.md`) only
+- **MUST NOT, DECISIONS, REPORT, TIME BOX (30 min), BLOCKED:** as in the template
+
+Then two background calls:
+
+```bash
+herdr agent prompt pa-codex "$(cat "$D/brief-r1-A.txt")" --wait --timeout 1800000; herdr agent read pa-codex --source recent-unwrapped --lines 200 > "$INBOX/pa-codex.last"
+herdr agent prompt pa-fable "$(cat "$D/brief-r1-B.txt")" --wait --timeout 1800000; herdr agent read pa-fable --source recent-unwrapped --lines 200 > "$INBOX/pa-fable.last"
+```
+
+I answer pa-fable's permission prompts myself: writes inside `$D` only, deny everything else.
+
+**7. Status to the operator (Russian, §15)**
+
+> **Сейчас:** rdp-audio ещё работает (Task 7, фаза GREEN), результатов пока нет. Её контекст заполнен на 70% (порог 50–60%), поэтому я поставил в очередь просьбу закончить Task 7, закоммитить и остановиться. Это не прерывание: текущий шаг она доделает. Потом сжатие контекста (/compact: агент сворачивает историю, бриф, решения и SHA сохраняются) и Task 8–9.
+> Баг раскладки в noVNC я в rdp-audio не передаю. Это новая работа, поэтому она заведена отдельной задачей T<n> (статус brainstorm) со своей веткой и вкладкой, чтобы у двух изменений были отдельные ревью и отдельный откат. Два продуктовых советника начали раунд 1 проектирования.
+> **Дальше:** проверка отчёта по Task 7 → сжатие → Task 8–9; по T<n> черновики → перекрёстная критика → общий документ → голосование.
+> **От вас:** ничего. Бэклог: <artifact link>
+
+In English: rdp-audio is still running, with no results yet. It gets a queued stop after Task 7, not an interrupt, then compaction and Tasks 8–9. The noVNC bug is its own task, T<n>, in stage 0. Nothing is needed from you.
+
+**8. When the waiter fires**
+
+1. I read `rdp-audio.last` and run `agent get`.
+2. I check the reported SHA against `git -C .claude/worktrees/rdp-audio rev-parse HEAD` and grep the transcript for `superpowers:`. I re-run the Task 7 test myself.
+3. Background: `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items` with `--wait --timeout 300000`.
+4. Background: ask for a one-line status and check it.
+5. Background: "Continue with Task 8, superpowers:test-driven-development, then verification-before-completion, same brief."
+6. Update the backlog at each step.
+
+**Why**
+
+- **The noVNC bug is new work.** It is a different component with different user-visible behaviour. New work becomes its own backlog task and goes through stage 0 in its own tab and worktree (§4, §10a). The operator's wish for the same tab is not a waiver, since only a waiver poll can skip stage 0. There's no deadline, so there's nothing to poll.
+- **I start two product-advisor tabs.** The voting advisors would otherwise be voting on their own designs.
+- **"Don't interrupt" is kept.** A queued message lands at the next step boundary, and nothing is cut off mid-step. But 30% left is past the threshold. Letting auto-compaction fire mid-commit or mid-task is exactly what §4 rules out, so I make the safe point instead of watching the screen.
+- **I report nothing about Tasks 7–9.** The agent is still running, so it has no results yet.

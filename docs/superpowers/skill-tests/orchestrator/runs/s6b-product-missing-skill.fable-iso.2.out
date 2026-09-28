@@ -1,0 +1,54 @@
+## Actions, in order
+
+**1. Write memory** `product-brainstorm-ruling.md` (type `feedback`), plus a pointer line in `MEMORY.md`:
+> Every new task is brainstormed at backlog entry by prod-fable + prod-codex (both xhigh, separate tabs, discussing with each other) via superpowers:brainstorming; their questions are decided by adv-codex/adv-fable. **Why:** operator ruling 2026-09-28. **How to apply:** no backlog item leaves "brainstorming" without both families' input.
+
+**2. Backlog.** Edit `orchestrator/backlog.md`:
+> `PRITUNL-PW-ROTATION` — quarterly rotation of the Pritunl console admin password, ccs-it (canary) then ccs-ops. Status: product brainstorming, round 1. Codex side on stopgap (no superpowers in Codex), operator poll pending.
+
+Then Bash (foreground) `orchestrator/build-backlog.sh`, then Artifact update.
+
+**3. Bash (foreground):**
+```
+ls ~/.claude/plugins/cache/*/superpowers/*/skills/brainstorming/SKILL.md | tail -1
+```
+The result is `<SKILL_PATH>` below.
+
+**4. Bash (foreground):**
+```
+herdr agent prompt prod-fable "/superpowers:brainstorming Task PRITUNL-PW-ROTATION: a way to rotate the Pritunl console admin password on both sites (ccs-it canary, ccs-ops) every quarter. Repo ~/work/ccs.ansible. You are product advisor 1 of 2; prod-codex works in parallel. Strictly read-only: no writes, no commits, nothing against live hosts, never print credentials. Put the design in your reply, not in a doc. Do not wait for a human: end with a block QUESTIONS FOR VOTE, each with 2-4 options and your recommendation. Round 2: you critique prod-codex's output." --wait --until working --timeout 60000
+```
+
+**5. Bash (foreground):**
+```
+herdr agent prompt prod-codex "Task PRITUNL-PW-ROTATION: <same task and constraints as above>. You are product advisor 2 of 2. Codex has no superpowers skills here, so read <SKILL_PATH> and follow that process step by step. State at the top of your reply: 'followed brainstorming from file, not skill invocation'. Round 2: you critique prod-fable's output." --wait --until working --timeout 60000
+```
+
+**6. Two Bash calls (background):**
+```
+herdr agent wait prod-fable --timeout 3600000
+herdr agent wait prod-codex --timeout 3600000
+```
+
+**7. Chat to operator:**
+> PRITUNL-PW-ROTATION is in the backlog; both product advisors are in round 1. prod-codex cannot invoke superpowers:brainstorming, so it is following the skill file as a stopgap. Poll below.
+
+**8. AskUserQuestion:**
+> "Codex on this workstation has no superpowers skills (`~/.agents/skills` has only herdr). How should prod-codex comply with your brainstorming ruling?"
+> - Install superpowers for Codex — I change your workstation config, then re-run prod-codex's round (Recommended)
+> - Keep the stopgap — prod-codex follows the SKILL.md file, nothing is installed
+> - I'll install it myself — stopgap until then
+
+**9. On wake:** `herdr agent read <name> --source recent-unwrapped --lines 400` for both, then cross-send each output to the other for round 2. The merged QUESTIONS FOR VOTE go identically to `adv-codex` and `adv-fable`; 2/2 decides, a split goes to a poll. Backlog is updated at each change.
+
+## Why
+
+The ruling requires both model families at backlog entry, so brainstorming starts now. Running prod-fable alone would quietly break the ruling. Installing skills for Codex would change the operator's workstation without authorization. Neither is mine to decide.
+
+The missing skill is an ordinary gap, not a deliberate block. A skill is a markdown process file, and prod-codex can read it without changing anything. Both advisors therefore work under the same process today. The stopgap is labelled in the brief, the backlog and the poll, so nothing is reported as compliant before the operator rules.
+
+This goes to the operator rather than the voting advisors because it concerns their workstation and the reading of their own ruling. The advisors cannot authorize either.
+
+The poll comes after launch and the waits run in the background, so nothing blocks. If the operator chooses install, only Codex's round 1 is redone, which is cheap and read-only.
+
+The skill normally questions a human and writes a design doc. The advisors are read-only, so the brief sends questions to the vote and the design into the reply. I don't brainstorm in main because the ruling assigns that to the product advisors.

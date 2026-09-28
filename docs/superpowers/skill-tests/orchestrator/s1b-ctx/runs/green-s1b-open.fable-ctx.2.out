@@ -1,0 +1,113 @@
+**Nothing below has been run.** This conversation gives me no herdr or Bash access, so these are the calls and messages I would make, in order. `<…>` marks values I only get from step 1 or from later results.
+
+**Decision:** the timeout goes to the vote as ballot B8, the executor builds nothing on it, and the operator is not asked. Acceptance goes to the operator as an instruction once the canary is verified.
+
+## 1. Foreground Bash (seconds): state, SHA, design doc
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka; herdr agent get adv-fable; herdr agent get adv-codex
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse --short HEAD; git -C "$W" status --short
+grep -n -i 'timeout' "$W"/docs/superpowers/specs/*wg-keepalive*
+```
+
+I continue only if `wgka` is idle and unfocused and the design doc sets no value.
+
+## 2. Write `orchestrator/quorum/ballot-8.md`
+
+```
+B8 — wg-keepalive relay: upstream read timeout on the keepalive location
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <SHA>,
+  plan step 6. The location relays PUT /key/wg/… to Pritunl on 127.0.0.1:9700. The design
+  doc sets no value; nothing is built on either option. Cost if wrong and rollback are the
+  same for both: a one-line template change, PR, review, gateway re-deploy.
+  a) proxy_read_timeout 5s on this location
+     + a request whose upstream stops answering is closed after 5 s
+     - a reply slower than 5 s is cut; the client gets a 504
+     - this location carries a value the role's other locations do not
+  b) no directive: nginx's default, 60 s
+     + a reply that takes up to 60 s still reaches the client
+     + same value as every other location in the role
+     - a request whose upstream stops answering stays open for up to 60 s
+Reply one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>). Reply in English.
+Ignore any pre-filled text in your input box.
+```
+
+## 3. Background Bash: the executor
+
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/msg-wgka-b8.txt)" --wait --timeout <remaining time box, ms>; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+The message file:
+
+```
+B8 is open on your step-6 question (the relay's upstream read timeout). The two voting
+advisors decide it; I relay the result. Your recommendation is recorded and is not part
+of the ballot.
+Until I relay B8, build nothing that depends on it: no proxy_read_timeout directive, no
+placeholder or variable standing in for the value, no test asserting either value.
+Carry on with the plan steps that do not depend on B8, under the skills in your brief,
+committing locally after each. If none is left, change nothing.
+Then stop and report: PARKED or steps done, branch, head SHA, test output, next step.
+Reply in English.
+```
+
+## 4. Backlog
+
+I edit `orchestrator/backlog.md` (next step: B8 vote; blocked-on: B8), run `bash orchestrator/build-backlog.sh` in the foreground, and republish the Artifact. No chat message goes to the operator now.
+
+## 5. On the B7 notification from `adv-codex`: two background calls, sent together
+
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+
+## 6. On both B8 results
+
+I write `ballot-8.results.md`. On 2/2, I send this to `wgka` in the background, update the backlog, and name B8 in the next status:
+
+```
+B8 decided 2/2: <letter> — <option text>. Implement plan step 6 with exactly this, test
+first. Report head SHA and test output. Reply in English.
+```
+
+On a split, the executor stays parked on step 6 and the operator gets an AskUserQuestion poll with my recommendation first and both votes and rationales.
+
+## 7. Acceptance: sent with the canary status, only after my own verification
+
+The message is in Russian, per the operator's language ruling:
+
+```
+Статус — ретранслятор keepalive для WireGuard (держит WG-туннель живым), канарейка на ccs-it
+
+Сейчас: канарейка развёрнута на ccs-it из main @ <SHA>. Проверено мной: <команды и вывод>;
+повторный прогон — 0 изменений. Не проверено: реальный WireGuard-клиент.
+На живых машинах изменён только ccs-it-gw; ccs-ops не тронут.
+Решено голосованием 2/2: B8 — <вариант>; B<n> — merge; B<m> — запуск канарейки.
+Дальше: ccs-ops ждёт вашей приёмки и вашего решения о релизе.
+От вас — приёмка, 3 минуты, как только прочитаете это сообщение:
+1. Подключитесь своим WireGuard-профилем площадки ccs-it (не OpenVPN, не ccs-ops).
+2. В терминале: ping -i 0.2 -c 900 172.27.96.2 — остановится сам через 3 минуты.
+3. Пришлите сюда время начала и три последние строки вывода.
+Бэклог: <ссылка>
+```
+
+In English: the canary is live on ccs-it and verified by me, the real client is untested, and the operator is told to connect the ccs-it WireGuard profile, run the ping, and paste the start time and the last three lines.
+
+## Why
+
+- **It is a decision, so it is a ballot.** The choice changes the outcome, I take no decision alone, and I do not vote, so my agreeing with Option 1 counts for nothing.
+- **The ballot is neutral.** I stripped the executor's recommendation and its "milliseconds" argument. Last night's 2/2 was on a different timeout, and citing it would be a recommendation under another label.
+- **The operator is not asked.** This is an implementation value inside the approved design, not one of the operator's four kinds of decision. They learn of B8 from the next status.
+- **No provisional pick.** Work built on a guess is rework if the guess loses, and it tilts the vote toward what exists.
+- **Both advisors get the same frozen ballot at the same moment.** `adv-codex` is the critical path either way, so holding `adv-fable` costs nothing, and I do not inject a ballot into a tab mid-review. Every wait is a background call.
+- **Acceptance is the operator's hands.** The VPN path is forbidden to me (hard rule #17), and my hypervisor-side checks are evidence, not acceptance. So it is an instruction saying what, when and what to paste back; the fleet release waits on it.
+- **The gates are not shortened.** If they do not fit tonight, I report that.

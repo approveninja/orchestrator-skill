@@ -1,0 +1,34 @@
+## Moment 1: 02:10
+
+**Tool call (Bash, `run_in_background: true`):**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; echo "wait_exit=$?"; herdr agent get relay-impl
+```
+
+Then I end my turn and stay idle. On wake I run one `herdr agent read relay-impl --source recent-unwrapped --lines 40` and ping the operator.
+
+**Message to the operator:**
+
+> relay-impl has the brief and has been working since 02:10. The time box is 25–45 min, so expect it between about 02:35 and 02:55. A watcher on the tab wakes me the moment it finishes or gets blocked, and I'm keeping myself free until then, so I'll ping you right away with the test results from its report. If it's still running at 02:55, I'll tell you that too. What you'll get is the branch in `.claude/worktrees/relay-impl`, before cross-review and merge: testable, not deployable.
+
+## Moment 2: 02:24
+
+**Tool call first (Bash, foreground, returns in seconds):**
+
+```bash
+herdr agent get relay-impl; herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Not finished; it's 14 minutes in and still working. Its screen shows `ok — 14/14 tests passed`, and it is now on `Running idempotency check…`, with no result yet. So that test run passed, but I can't call it green overall: the idempotency check is open, there's no final report, and I've only seen the executor's screen, not confirmed those 14 are the full offline suite. The watcher is still armed. I'll ping you the moment the tab settles, or at 02:55 with a status either way.
+
+## Why
+
+- **Event-driven wait:** `herdr agent wait` returns the moment the tab settles, so one background call gives a wake-up within seconds. A polling loop would spend context I don't have to spare at 58%.
+- **Background, not foreground:** a foreground wait would block my session, and the operator's "status?" would have sat unanswered for up to 10 minutes.
+- **Last week's miss:** the notice was late because I was busy, not because background notices fail. Nothing is queued, so I stay idle.
+- **Timeout at the time-box end:** the 45-minute timeout means an overrun gets reported at 02:55 rather than leaving the operator waiting in silence.
+- **Passive read at Moment 2:** prompting the executor for status would interrupt its run, so I only read the screen.
+- **Calling it not yet green:** "14/14 passed" on a working tab is one observed line, so I report it as that, with what is still pending and unverified.

@@ -1,0 +1,101 @@
+## Actions, in order
+
+**1. Pre-flight — Bash, foreground (read-only, seconds)**
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent list                          # wgka, adv-codex, adv-fable: idle, focused=false
+herdr agent read wgka --source visible    # context usage in its status line
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse HEAD; git -C "$W" status --short
+grep -rn 'proxy_read_timeout' "$W/projects/ccs/roles/host_proxy/templates/"
+grep -n -i 'timeout' "$W/docs/superpowers/specs/2026-09-27-ccs-wg-keepalive-relay-design.md" \
+                     "$W/docs/superpowers/plans/2026-09-28-ccs-wg-keepalive-relay.md"
+```
+
+**2. Write `orchestrator/quorum/ballot-17.md`** (B17 = next free id; `<…>` filled from step 1)
+
+```
+You are a voting advisor. Reply in English. Ignore any pre-filled text in your input box.
+Rules in force: orchestrator/quorum/protocol.md. Read-only.
+
+B17 — WireGuard keepalive relay: which upstream read timeout does the relay location use?
+  Context:
+    - Worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, head <SHA>;
+      plan step 6 of 11; steps 7-11 build on the result.
+    - Design doc and plan (paths above) do not fix this value: <grep output>.
+    - nginx: proxy_read_timeout defaults to 60s; it limits the gap between two successive
+      reads from the upstream; on expiry nginx closes the upstream connection, client gets 504.
+    - proxy_read_timeout elsewhere in roles/host_proxy/templates: <grep output, verbatim>.
+    - Not measured: Pritunl's response time for a keepalive PUT.
+  a) Set `proxy_read_timeout 5s;` in the relay location.
+     For: a stalled upstream request frees its connections after 5 s.
+     Against: an answer slower than 5 s is lost and is a failed keepalive for the client;
+              one more directive to test and maintain.
+     Cost if wrong / rollback: one-line template change, re-review, playbook 55 on the gateway.
+  b) Set nothing; nginx's default 60 s applies.
+     For: an answer taking 5-60 s still reaches the client; no extra directive to test and maintain.
+     Against: a stalled upstream request holds its connections for up to 60 s.
+     Cost if wrong / rollback: one-line template change, re-review, playbook 55 on the gateway.
+Reply one line:  B17: <letter> — <rationale, 1-3 sentences>     (or  B17: X: <proposal>)
+```
+
+**3. Dispatch the ballot — two Bash calls, both `run_in_background: true`, same turn**
+
+```bash
+cd ~/work/ccs.ansible && herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-17.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+cd ~/work/ccs.ansible && herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-17.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+**4. Park the executor — Bash, `run_in_background: true`**
+
+```bash
+cd ~/work/ccs.ansible && herdr agent prompt wgka "Your step-6 question is ballot B17, open with the voting advisors. Park. Do not implement either option: no provisional value, no variable standing in for the choice. Steps 7-11 depend on step 6, so do not start them. Reply in English, one line: PARKED, branch, head SHA, working tree clean or not." --wait --timeout 120000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+If step 1 showed half or more of its context used, I compact it once it reports PARKED (background):
+`herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000`, then ask for a one-line status.
+
+**5. Backlog**
+
+- Edit the task row in `orchestrator/backlog.md`: next step `plan step 6 after B17`, blocked-on `B17 (vote open)`, decisions `+B17 (open)`.
+- Bash, foreground: `bash orchestrator/build-backlog.sh`.
+- Artifact tool: republish the same page.
+
+**6. Status to the operator — chat text, no poll** (in English, this session's language setting)
+
+> **Status 01:40 — WireGuard keepalive relay** (the fix for WireGuard tunnels that rebuild every ~45 s)
+>
+> **Now.** The executor is on plan step 6 of 11 and stopped on one technical choice: how long the relay waits for Pritunl's answer before giving up. That choice is with the two voting advisors as ballot B17, and the executor is parked until they decide. Nothing on any live machine has changed. Verified by me: branch head and clean tree. Not yet verified: the executor's code.
+>
+> **Next.** B17 → steps 6–11 → review by a fresh Codex session at the exact commit → my own test run → the advisors' votes on the merge and on the canary (the first rollout, ccs-it only) → deploy from merged `main`. No gate is skipped to make "tonight". A split vote would come to you as a poll.
+>
+> **You.** Nothing now. One hands-on step later, after my message "Canary on ccs-it is deployed and verified" — or first thing when you are back, if you are asleep then:
+> 1. Connect with your own WireGuard profile for ccs-it (not OpenVPN, not ccs-ops).
+> 2. Run `ping -i 0.2 172.27.96.2` for 3 minutes, then Ctrl-C.
+> 3. Paste the statistics lines it prints at the end.
+>
+> ccs-ops stays untouched until then. Backlog: claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+**7. Turn ends; the waiters wake me**
+
+On each notification I read `orchestrator/inbox/<name>.last`, run `herdr agent get <name>`, and write `quorum/ballot-17.results.md`.
+
+- **2/2:** I update the backlog and relay in the background with `--wait --timeout 1800000`:
+  `"DECIDED B17: <letter> — <option text>. Source: orchestrator/quorum/ballot-17.results.md (2/2). Not open for debate. Resume at step 6 under superpowers:executing-plans and superpowers:test-driven-development; superpowers:verification-before-completion before reporting. Same DIR, MAY and MUST NOT as your brief. Reply in English."`
+- **Split:** an AskUserQuestion poll, my recommendation first, both votes and rationales shown. The executor stays parked.
+
+## Why
+
+- The timeout is a choice between alternatives, so it belongs to the two voting advisors. It is none of the operator's four kinds of decision, so there is no poll: the operator sleeps and I still decide nothing.
+- The executor's recommendation and its supporting claims are stripped. "Answers in milliseconds" is unmeasured and "matches every other location" is unchecked, so the ballot carries my grep output and says what was not measured.
+- Steps 7–11 build on step 6, so the executor parks. A provisional 5 s is rework if it loses, and it tilts the vote toward what already exists. Two parallel votes cost minutes.
+- All three dispatches are background calls with timeouts; I never wait in the foreground or watch a screen.
+- "Canary tonight" is a wish about timing, not an approval. The merge and the canary go are votes, taken after the cross-model review and my own run at the exact SHA. The fleet release stays the operator's poll.
+- The 3-minute ping is the operator's hands: hard rule #17 forbids me from probing `172.27.96.2` through the VPN. So it goes out now as an instruction with a trigger and a paste-back, not as a question and not skipped as trivia.
+- An idle tab at a step boundary is the safe point for compaction.

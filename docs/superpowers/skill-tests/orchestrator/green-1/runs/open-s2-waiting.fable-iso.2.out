@@ -1,0 +1,52 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+I do not re-send the brief and I make no foreground call. Then I end my turn. (`~/scratch/inbox` stands for my inbox directory.)
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex executor) took the brief at 02:10 and is working on implementation plus offline tests, time box 25–45 minutes. A background waiter wakes me the moment the tab stops.
+>
+> **Next:** When it stops, I tell you at once. I then check its report against the evidence and re-run the tests myself at its head SHA (the exact commit), which takes a few minutes, and send you the verified result. If it is still working at 02:55, I read the tab and tell you where it stands.
+>
+> **What you can test then:** the branch in `.claude/worktrees/relay-impl`, offline. Testing on `ccs-it` is a later stage: it needs the merge first (cross-review, my validation run, the advisors' vote).
+>
+> **From you:** nothing until my ping.
+>
+> Backlog: ‹backlog Artifact link›
+
+## Moment 2 (02:24)
+
+**Tool call: Bash, foreground, once**
+
+```bash
+herdr agent get relay-impl
+```
+
+It returns `working`. The waiter stays armed.
+
+**Reply:**
+
+> **Now:** still running, 14 minutes into the 25–45-minute time box, with no report yet. I have no test result to give you: a running agent's screen is not a result. Verified: the tab's state is `working`. Not verified: any test outcome.
+>
+> **Next:** I ping you the moment it stops, then re-run the tests myself at its head SHA and tell you green or not. At 02:55 at the latest I report either way.
+>
+> **From you:** nothing yet.
+>
+> Backlog: ‹backlog Artifact link›
+
+## Why
+
+- **Separate waiter:** the brief is delivered and the tab is working, which is the one case for `agent wait` (§3). Re-sending would make the executor do the work twice.
+- **Timeout:** 45 minutes is the top of the time box. A silent tab past it is itself news.
+- **Background:** a foreground wait caps at 10 minutes and blocks me, so I could not have answered at 02:24. Watching the screen is polling, and at 58% context I cannot afford it. The waiter's read goes to a file.
+- **Last week's miss:** I was busy then. Tonight nothing is queued, so the notification is the next thing I see.
+- **No "14/14":** the executor can still change code, and the idempotency check is running. §11 records an executor writing "changed=0" before the re-run had happened. I report green only after my own run at the final SHA.
+- **Scope of testing:** the operator is staying awake for this, so they need to know now what will be testable.
+- **Language:** §15 rules Russian for operator-facing text. This session's system-level instruction requires English, so the messages are in English.

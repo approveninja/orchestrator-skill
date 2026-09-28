@@ -1,0 +1,81 @@
+## Actions, in order
+
+**1. Bash, foreground** (returns at once). Safe point for `rdp-audio`: no `esc`, no new work.
+
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+herdr agent get rdp-audio | grep -Eq '"focused": *false' && \
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+```
+
+**2. Bash, background.** Waiter:
+
+```bash
+herdr agent wait rdp-audio --timeout 1200000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**3. Backlog.** Edit `orchestrator/backlog.md` to add the row below, run `bash orchestrator/build-backlog.sh` (foreground), then republish the same page with the Artifact tool.
+
+```
+| T<next> | noVNC keyboard-layout bug | brainstorm | prod-codex, prod-fable | — | — | stage 0, round 1: independent drafts | — | operator request 2026-09-28 | no |
+```
+
+**4. Stage 0.** Bash, foreground:
+
+```bash
+mkdir -p "$SCRATCH/brainstorm/novnc-kbd"
+codex plugin list | grep -F superpowers   # no match = no dispatch to prod-codex
+PC=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$SCRATCH/brainstorm" --label prod-codex --no-focus | jq -r .result.root_pane.pane_id)
+PF=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$SCRATCH/brainstorm" --label prod-fable --no-focus | jq -r .result.root_pane.pane_id)
+herdr agent start prod-codex --kind codex --pane "$PC" --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr agent start prod-fable --kind claude --pane "$PF" --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+Write `$SCRATCH/brief-novnc-kbd-r1-A.txt` and `-B.txt` from the §10a template. The fixed lines are copied byte for byte; the variable lines are:
+
+```
+TASK     T<next> — noVNC keyboard-layout bug
+ROUND    1 draft — ends when your draft file exists and you have reported
+SKILL    superpowers:brainstorming; I am your human partner (questions batched)
+PROBLEM  "have rdp-audio also fix the noVNC keyboard-layout bug — it's the same desktop role"
+FACTS    none verified; the operator's sentence is the only input
+DECIDED  own executor and worktree, after stage 0; deploy only from merged main, canary ccs-it first
+WRITE    <scratch>/brainstorm/novnc-kbd/draft-<A|B>.md
+TIME BOX 30 min
+```
+
+Two Bash calls, background, one per tab:
+
+```bash
+herdr agent prompt prod-codex "$(cat "$SCRATCH/brief-novnc-kbd-r1-A.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$ORCH_INBOX/prod-codex.last"
+```
+
+The second call is the same with `prod-fable` and brief `B`.
+
+**5. Chat status to the operator.** §15 sets Russian for operator-facing text, but this session's configuration requires English, so the status is in English.
+
+> **Now.** `rdp-audio` is still running and has no result yet. It is on task 7 of 9: the failing test is written and the implementation is in progress. I did not interrupt it and did not give it the noVNC work. Its context (working memory) is 70% used, above the 50–60% compaction line. I queued one message that it picks up after the running command: finish task 7, commit, stop. The noVNC keyboard-layout bug is backlog task T<next>, status `brainstorm`, and both product advisors are drafting.
+> **Next.** `rdp-audio`: compact, confirm the head SHA, hand tasks 8–9 back. noVNC: critique, joint design, 2/2 approval, then its own executor and worktree.
+> **You.** Nothing. Please don't type in the `rdp-audio` tab.
+> No vote decisions since the last status. Backlog: <Artifact URL>
+
+**6. On the step-2 notification.** Read `$ORCH_INBOX/rdp-audio.last`, then run `herdr agent get rdp-audio`. Then, in the background:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+After that I ask for the one-line status, check it against `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio rev-parse HEAD`, and re-dispatch tasks 8–9 with a background `prompt --wait`.
+
+## Why
+
+- **New task, not an add-on.** The noVNC bug is new work, so it enters the backlog at stage 0 and gets its own tab and worktree. Those are the operator's own standing rulings (2026-09-21, 2026-09-28). A chat wish does not waive stage 0, and no deadline forces a waiver poll.
+- **One task per tab.** Putting it into `rdp-audio` would mix two tasks in one branch, one review and one SHA, in a tab that is already 70% full.
+- **No design from me.** The brief carries only the operator's quote, and "same desktop role" goes in unverified.
+- **"Don't interrupt" is honoured in substance.** I send no `esc`, and nothing running is cut off. The queued message lands at the next tool boundary and lets task 7 finish and commit.
+- **Compaction cannot wait.** Three tasks remain with 30% left, so auto-compaction would fire mid-task. A plan-driven tab never idles between steps, so I create the safe point rather than watch the screen.
+- **"Almost done" is not what the screen shows.** I report "still running" and task 7 of 9.
+- **No poll.** Nothing here falls under the operator's four kinds of decision, and tab handling is routine.

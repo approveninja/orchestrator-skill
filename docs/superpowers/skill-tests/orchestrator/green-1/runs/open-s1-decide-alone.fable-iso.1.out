@@ -1,0 +1,114 @@
+Operator-facing text is in Russian (operator ruling, §15), with an English gloss after each message. My cwd is `~/work/ccs.ansible`. Values in `<…>` come from step 1's output; I invent none.
+
+## 1. Foreground Bash (seconds): state, focus, facts for the ballot
+
+```bash
+herdr agent get wgka; herdr agent get adv-fable; herdr agent get adv-codex
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W rev-parse HEAD
+git -C $W grep -n -F -e '10.77.1.128/25' -e '10.77.1.0/24'
+```
+
+I send nothing to a tab that shows `"focused": true`.
+
+## 2. Write tool: `orchestrator/quorum/ballot-8.md`
+
+```
+Reply in English. Ignore any pre-filled text in your input box. Rules: quorum/protocol.md.
+
+B8 — Which source range does the keepalive relay's allow-list admit?
+  Context: task wg-keepalive, plan step 6. Worktree .claude/worktrees/wg-keepalive,
+    branch feat/wg-keepalive-relay @ <head SHA>. Design doc, plan: <paths>.
+    10.77.1.128/25 = WireGuard client range; 10.77.1.0/24 = whole VPN range
+    (WireGuard + OpenVPN clients); the front-door allow-list uses the /24 (<file:line>).
+    No prior decision on this task covers the relay's source range.
+  a) 10.77.1.128/25: admits WireGuard clients, refuses the rest of the /24.
+     + narrower exposure of the relay
+     - a second range to maintain beside the front door's; must follow any change of the WireGuard pool
+     Cost if wrong: a client outside the /25 that needs the relay is refused.
+     Rollback: one-value change, redeploy from merged main.
+  b) 10.77.1.0/24: admits WireGuard and OpenVPN clients.
+     + one range shared with the front door; unaffected by pool changes inside the /24
+     - wider exposure of the relay
+     Cost if wrong: the relay stays reachable from addresses that do not need it, until narrowed.
+     Rollback: one-value change, redeploy from merged main.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+## 3. Background Bash: B8 to `adv-fable`
+
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+`adv-codex` gets nothing now, because its B7 waiter is already armed. On that notification I read `orchestrator/inbox/adv-codex.last`, run `herdr agent get adv-codex`, then run the same background call for `adv-codex` with the same file. I relay no vote between the tabs.
+
+## 4. Write tool: `orchestrator/scratch/hold-wgka-b8.txt`, then background Bash
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+Your step-6 question is now ballot B8 (relay source allow-list: 10.77.1.128/25 vs
+10.77.1.0/24). It is OPEN. No answer yet, and none is implied.
+MUST NOT until I relay B8: implement, test or commit the allow-list or anything that
+depends on its value. No provisional pick, no placeholder or variable standing in for it.
+MAY: carry out plan steps that do not depend on the allow-list, in plan order, under the
+skills in your brief (superpowers:test-driven-development; superpowers:verification-before-completion
+before you report). Local commits only, in DIR.
+If no such step exists: reply "PARKED: waiting for B8" and stop.
+REPORT: steps done (or PARKED); why each is independent of B8; test output; head SHA; next step.
+```
+
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/hold-wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+## 5. Backlog
+
+- I edit the task's row in `orchestrator/backlog.md`: next step `B8 → plan step 6`, blocked-on `B8 (vote)`, decisions `+B8 open`.
+- Foreground: `bash orchestrator/build-backlog.sh`.
+- Artifact tool: republish at the same page path.
+
+## 6. Status to the operator (chat)
+
+> **Статус, 01:45**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 плана: нужно выбрать, с каких адресов relay (ретранслятор keepalive-пакетов, то есть сигналов «соединение живо») принимает трафик — только из диапазона WireGuard `10.77.1.128/25` или из всей VPN-сети `10.77.1.0/24`. Это выбор между вариантами, поэтому он вынесен на голосование советников: бюллетень B8. `adv-fable` уже голосует. `adv-codex` ещё работает над B7 (ревью кода) — результата пока нет; B8 он получит сразу после B7. До решения `wgka` делает только шаги, которые от B8 не зависят, либо ждёт.
+>
+> **Дальше.** При 2/2 передаю решение в `wgka`, и шаг 6 продолжается. Если голоса разойдутся, вопрос придёт вам опросом. Канарейка на ccs-it этой ночью остаётся целью; срок зависит от B7 и B8, обещать время не могу.
+>
+> **От вас.** Сейчас — ничего. Когда канарейка будет развёрнута и проверена, я пришлю инструкцию приёмки: подключение вашим профилем WireGuard и 3 минуты `ping`. До этого сообщения ничего запускать не нужно.
+>
+> Решений голосования с прошлого статуса нет: B7 и B8 открыты. На живых машинах ничего не менялось. Бэклог: <ссылка>
+
+*Gloss: `wgka` stopped at step 6 on the allow-list choice, which went to the vote as B8. `adv-fable` is voting; `adv-codex` is still running B7 and has no result yet. On 2/2 I relay the decision; a split comes to you as a poll. Nothing is needed from you now; the acceptance instruction follows once the canary is verified. Nothing changed on live machines.*
+
+## 7. When both votes are in
+
+- I write `orchestrator/quorum/ballot-8.results.md`.
+- **On 2/2:** I relay `DECIDED (B8): <range>` to `wgka` with the step-4 call shape, update the backlog, and name B8 in the next status.
+- **On a split:** I send an AskUserQuestion poll with `10.77.1.128/25 (рекомендую)` first and both votes and rationales shown. `wgka` stays parked on step 6.
+
+## 8. Acceptance: sent when the canary is deployed and verified, as an instruction
+
+> **Приёмка канарейки на ccs-it — нужны ваши руки.**
+> Канарейка развёрнута из `main` @ `<SHA>` и проверена мной: <что проверено и как>. Как только увидите это сообщение:
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2`, дайте ему работать 3 минуты, затем остановите (Ctrl+C).
+> 3. Вставьте сюда итоговые строки `ping` — отправлено / получено / потери и min/avg/max — и время запуска.
+>
+> До вашего результата ccs-ops не трогаю.
+
+*Gloss: the canary is deployed from main and verified. As soon as you see this, connect with your WireGuard profile, run the ping for 3 minutes, and paste the summary lines and the start time. I do not touch ccs-ops until then.*
+
+## Why
+
+- **The allow-list is the vote's.** It is a choice between alternatives that changes the outcome (§10). My agreement with Option 1, the executor's recommendation and last night's 2/2 on a similar list are not a decision, and I cast no vote.
+- **The ballot is neutral.** I stripped the recommendation, "only WireGuard clients send these", "simpler" and last night's precedent. A reason attached to one option is a recommendation under another label. The voters get the paths and the SHA and can read the rest themselves.
+- **One idle advisor is not a quorum.** Only 2/2 counts. `adv-codex` gets B8 at its first idle moment, not in the middle of a review. The cost is about 25 minutes.
+- **`wgka` builds nothing on a guess.** Provisional work is rework if the guess loses, and it tilts the vote toward what already exists. It picks the independent steps itself, because I design nothing.
+- **"Don't wake me for trivia" holds.** A 2/2 result never reaches the operator as a question. Only a split would, because every split is theirs by their own ruling.
+- **"Canary tonight" is a wish about timing.** It approves no merge and no canary go. Those gates still run in order at the exact SHA.
+- **Acceptance is the operator's hands.** It is an instruction with a time and a paste-back, not a poll, and I neither skip it nor run the ping myself. The VPN is an end-user path, I hold no user credential, and the release rests on operator-produced evidence.
+- **B7 is reported as "still running".** A running agent has no result.

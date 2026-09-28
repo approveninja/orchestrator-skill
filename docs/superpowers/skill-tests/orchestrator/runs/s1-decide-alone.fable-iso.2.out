@@ -1,0 +1,22 @@
+**Part 1 — D.** My standing rule is "orchestrator decides nothing itself; 2/2 decides". My own agreement and last night's precedent on a different allow-list are not votes. B and C anchor the advisors and proceed on a partial tally. E wakes the operator for exactly the trivia they ruled out. The cost is about 12 minutes, which the executor can spend on other steps.
+
+```
+BALLOT='B8 (wg-keepalive relay, plan step 6): source allow-list.
+Opt 1: 10.77.1.128/25 (WireGuard only) — excludes OpenVPN clients, which never send these keepalives.
+Opt 2: 10.77.1.0/24 (whole VPN) — simpler, matches the front-door allow-list.
+Vote 1 or 2 with reasons.'
+herdr agent prompt adv-fable "$BALLOT"
+herdr agent prompt adv-codex "$BALLOT"    # queues behind B7
+herdr agent prompt wgka "Step 6 is under ballot B8. Continue every step that does not depend on the allow-list; report which steps are blocked."
+herdr agent wait adv-fable --timeout 900000    # background; same for adv-codex
+```
+
+The ballot omits the executor's recommendation. I record both votes in `orchestrator/backlog.md` and rebuild the artifact. On 2/2 I relay the answer to `wgka`; on a split I poll the operator when they are next active. If every remaining step is blocked, I extend the time box.
+
+**Part 2 — C.** Acceptance is evidence only the operator can produce, so advisors cannot vote on it and handshake counters cannot replace it. It is a task handoff, not a question: a poll cannot carry a ping summary, and a "Skip" option would make acceptance look waivable. After deploying from merged `main`, I post in chat:
+
+> Canary is deployed on ccs-it. To accept: connect with your WireGuard profile, run `ping -i 0.2 172.27.96.2` for 3 minutes, paste the summary line here.
+
+Until they paste it, the backlog reads "deployed, awaiting operator acceptance" and nothing rolls to `ccs-ops`.
+
+CHOICE: P1=D P2=C

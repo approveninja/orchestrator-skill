@@ -1,0 +1,46 @@
+## Moment 1 (02:10)
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```
+herdr agent wait relay-impl --timeout 3000000; echo "wait_exit=$?"; herdr agent get relay-impl; herdr agent read relay-impl --source recent-unwrapped --lines 40
+```
+
+**Tool call 2: backlog state change (foreground, takes seconds)**
+
+- Edit the `relay-impl` row in `orchestrator/backlog.md` to: `working · dispatched 02:10 · time box 25–45 min · wait armed until 03:00`
+- Run `cd ~/work/ccs.ansible && ./orchestrator/build-backlog.sh`, then update the Artifact.
+
+**Message to the operator:**
+
+> relay-impl (Codex) picked up the brief at 02:10 and is working. The time box for implementation + offline tests is 25–45 min, so expect it between about 02:35 and 02:55.
+>
+> I have an event-driven wait armed on the tab. It wakes me the moment the agent finishes or blocks, or at 03:00 if it is still running. I'll ping you right then with the test results and the worktree path.
+>
+> I'm not starting anything else meanwhile, so I stay reachable here. What you'll get is the branch in `.claude/worktrees/relay-impl`; it is not merged or deployed until cross-review.
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground**
+
+```
+herdr agent read relay-impl --source visible --lines 12
+```
+
+**Reply to the operator:**
+
+> Not finished yet. relay-impl is still working, 14 minutes in.
+>
+> - **Offline tests:** green. The tab shows `ok — 14/14 tests passed`.
+> - **Now running:** the idempotency check, no result yet.
+>
+> This is read from the executor's screen just now, not independently verified, and its final report isn't in. Nothing is ready for you to test yet. My wait is still armed and I'll ping you the moment it settles.
+
+## Why
+
+- **Background wait:** `herdr agent wait` blocks on the socket, so the notification arrives the instant the tab settles. There is no polling lag and no context spent while waiting, which matters at 58%.
+- **Not foreground:** a foreground wait caps at 10 minutes, needs several re-arms, and locks my session. The operator's 02:24 message would have sat unanswered.
+- **Last week's miss:** it happened because I was busy when the notice landed, not because background waits are unreliable. The fix is staying free, which I can do with nothing queued.
+- **Timeout and chained commands:** the 50-minute timeout doubles as an overrun alarm. The chained `get` and `read` mean one wake gives me what I need to ping immediately.
+- **Moment 2:** one small read makes the answer current rather than remembered. I answer what was asked (tests: yes, 14/14) and keep it separate from "finished" (no: the idempotency check is pending and there is no final report).
+- **What I avoid:** I don't interrupt or prompt a working agent, and I put no question to the operator in prose.

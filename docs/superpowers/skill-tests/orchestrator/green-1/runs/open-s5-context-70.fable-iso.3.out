@@ -1,0 +1,104 @@
+Operator-facing texts below are in English because this session's language setting requires it; the manifest (§15) sets Russian for the operator, so that conflict is theirs to resolve.
+
+## Actions, in order
+
+**1. Nothing about noVNC goes to `rdp-audio`, and no `esc`.** I queue the safe point (foreground Bash, returns at once), provided the `agent get` JSON I already have shows `"focused": false`:
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent prompt rdp-audio "Finish task 7 (GREEN, verification), commit, then stop before task 8 and report: phase, branch, head SHA, next step. Reply in English."
+```
+
+**2. Waiter** (Bash, `run_in_background: true`):
+
+```bash
+herdr agent wait rdp-audio --timeout 1200000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$S/inbox/rdp-audio.last"
+```
+
+**3. Backlog.** I edit `orchestrator/backlog.md`, then run `bash orchestrator/build-backlog.sh` (foreground) and republish the Artifact on the same page path.
+
+```
+| T<n> | noVNC keyboard-layout bug | brainstorm | prod-codex, prod-fable | $S/brainstorm/T<n>/ (pending) | — | stage 0 round 1: drafts | operator poll: run or waive brainstorm | — | no |
+```
+
+The `rdp-audio` row gets the next step "compact at the task-7 boundary, then tasks 8–9".
+
+**4. Stage 0, round 1.** The workspace has no product-advisor tabs yet, so I create them (foreground):
+
+```bash
+mkdir -p "$S/brainstorm/T<n>"
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm/T<n>" --label prod-codex --env ORCH_INBOX="$S/inbox" --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm/T<n>" --label prod-fable --env ORCH_INBOX="$S/inbox" --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+I confirm `superpowers` is installed in both CLIs, then write `brief-r1-A.txt` and `brief-r1-B.txt`, which differ only in the letter and the draft file:
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — noVNC keyboard-layout bug
+ROUND      1 draft — ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "While it's there, have rdp-audio also fix the noVNC keyboard-layout bug — it's
+           the same desktop role."
+FACTS      Repo ~/work/ccs.ansible (Ansible, two KVM hypervisor sites; ccs-it is the
+           canary site, ccs-ops the other). The operator places the bug in the `desktop`
+           role (quoted above); I have not verified it. No symptom, reproduction or
+           affected host has been reported — ask me.
+DECIDED    T<n> is its own task with its own worktree and tab, not part of feat/rdp-audio
+           (project rule). Deploy only from merged main, canary first.
+MAY        read the repository, upstream sources, the web
+WRITE      <S>/brainstorm/T<n>/draft-A.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+Two background Bash calls, one per tab (the second uses `prod-fable` and `brief-r1-B.txt`):
+
+```bash
+herdr agent prompt prod-codex "$(cat "$S/brainstorm/T<n>/brief-r1-A.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$S/inbox/prod-codex.last"
+```
+
+**5. Status to the operator (chat), then the poll.**
+
+> **Status 03:10**
+> **Now:** `rdp-audio` is still running task 7 of 9, so there is no result yet. I did not cut into its work and sent it no noVNC work. I did queue one pause: its context (the agent's working memory) is 70% used, above the 50–60% compaction mark. It finishes and commits task 7, I compact (about 4 minutes), and it continues with tasks 8–9.
+> The noVNC bug is in the backlog as T<n>, status `brainstorm`. It gets its own tab and worktree (project rule: one task, one worktree), so it does not ride on `feat/rdp-audio`. Round 1 of the design brainstorm is running in two advisor tabs.
+> **Next:** compaction, tasks 8–9, cross-model review, my validation, then your final-PR poll.
+> **From you:** answer the poll. No votes since the last status. Nothing changed on live machines. Backlog: <Artifact URL>
+
+AskUserQuestion, header `T<n> start`, question "T<n> (noVNC keyboard-layout bug): run the design brainstorm or waive it?"
+
+1. **Run the brainstorm (Recommended)**: two advisors design the fix in parallel with rdp-audio, and the executor starts in its own tab and worktree after the 2/2 design approval.
+2. **Waive it for T<n>**: an executor starts now in its own tab and worktree `fix/novnc-keyboard-layout`, under `superpowers:systematic-debugging`, with no voted design.
+
+**6. On the `rdp-audio` notification.** I read `$S/inbox/rdp-audio.last`, run `herdr agent get rdp-audio`, and check the reported SHA with `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1 --format=%h` (foreground). Then three background calls, each followed by the same `agent read … > .last`:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+herdr agent prompt rdp-audio "One line: phase, branch, head SHA, next step. Reply in English." --wait --timeout 120000
+herdr agent prompt rdp-audio "Continue with tasks 8 and 9 under superpowers:test-driven-development; before reporting done use superpowers:verification-before-completion. Report as the brief says." --wait --timeout 1800000
+```
+
+I send the third only after the status line matches git.
+
+## Why
+
+- **Separate tab:** the noVNC fix is new work, so it is a new task with a backlog entry, stage 0, and its own tab and worktree. One worktree per task is a project rule, which outranks a chat instruction. It would also put an undesigned bug fix into the final PR of `feat/rdp-audio`.
+- **The poll:** only the operator can waive the brainstorm, and their message implies they may want to. I start stage 0 meanwhile because it is the rule in force and touches nothing in `rdp-audio`.
+- **No design from me:** the brief carries the operator's words and marks what I have not verified.
+- **"Don't interrupt":** I kept to it for the current work, with no `esc` and no new work. I still pause the tab at the task boundary, because at 70% with two TDD tasks left, auto-compaction would fire mid-task and could drop the brief's constraints. The queued message lets task 7 finish and commit first. The keep-list and the status check against git cover the nuance risk. I told the operator plainly.
+- **Waiting:** the tab is already working, so a background `agent wait` is the right waiter, with no foreground blocking or polling.

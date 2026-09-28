@@ -1,0 +1,65 @@
+## Actions, in order
+
+**0.** `Skill: superpowers:verification-before-completion`
+
+**1. Bash, foreground.** Check what the executor actually ran:
+```
+herdr agent read rdp-lang --source recent-unwrapped --lines 500 | grep -nE 'ansible-playbook|PLAY RECAP|changed=|ssh |site_(it|ops)|172\.27\.96\.'
+```
+
+**2. Bash, foreground, then background.**
+```
+herdr agent prompt rdp-lang "<message below>" --wait --until working --timeout 60000
+herdr agent wait rdp-lang --timeout 540000        # run_in_background: true
+```
+> Report for feat/rdp-lang @ 4ba90e0 is not accepted yet: claims need evidence. Do not edit, commit, or run any playbook. Reply in English.
+> 1. "Idempotent re-run: changed=0": give the exact command, cwd, `-l` target and raw PLAY RECAP. You have no host access here. State plainly whether anything you ran connected to a real host (ccs-it, ccs-ops, any 172.27.96.x), was a local or check run, or was not run.
+> 2. The test command and raw output for the 23 tests.
+> 3. The ansible-lint command and raw output.
+> 4. For writing-plans, test-driven-development and verification-before-completion: the plan file path and where the failing test preceded the implementation.
+>
+> "Not done" is an acceptable answer; a guess is not.
+
+**3. Bash, background.** My own verification, offline only:
+```
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang && { git rev-parse HEAD; git status --porcelain; git diff --stat origin/main...HEAD; git grep -nE "code/session_[0-9A-Za-z]"; (cd projects/ccs && for t in tests/*.sh; do echo "== $t"; bash "$t" </dev/null || echo "FAILED: $t"; done; ansible-playbook --syntax-check playbooks/50-vm-app.yml </dev/null); ansible-lint </dev/null; } >/tmp/rdp-lang-verify.log 2>&1; tail -40 /tmp/rdp-lang-verify.log
+```
+
+**4. Agent tool, `model: opus`, background.** Cross-review by a fresh Claude reviewer:
+> You did not author this code. Run /code-review on origin/main...4ba90e0 in ~/work/ccs.ansible/.claude/worktrees/rdp-lang. Read-only: no edits, commits, playbooks or ssh. Requirements: [my original brief]. Check idempotency, rendered-file byte changes, and whether deploy restarts xrdp or tigervnc@1. Give findings with file:line and a verdict for this SHA. Reply in English.
+
+**5. Backlog.** Set the `rdp-lang` row in `orchestrator/backlog.md` to "reported done, verification and cross-review running", run `build-backlog.sh`, update the Artifact.
+
+**6. Message to the operator:**
+> Not merged yet. The executor says done, but I haven't verified it, and one line can't be true as written: it reports an idempotent re-run with changed=0, yet executors have no host access. I'm finding out what it ran.
+>
+> Running now, all read-only: my own run of the tests and lint on 4ba90e0, the mandatory cross-review (Codex wrote it, so a fresh Claude reviews), and an evidence request to the executor.
+>
+> If all come back clean, I merge on your "merge" and deploy from main: your desktop first, then the other five ccs-it desktops. Realistic time until you can test is about 20 minutes, not 15. Your RDP address is 172.27.96.2:789. If any check fails, nothing is merged or deployed tonight.
+
+**7. When all three are clean:**
+1. Push the branch; a Sonnet subagent writes the PR body; `gh pr create`, then `gh pr merge <n> --merge --delete-branch`.
+2. `cd ~/work/ccs.ansible && git pull --ff-only && cd projects/ccs`
+3. Background, `--check --diff` first, then for real, then again for changed=0:
+   ```
+   ANSIBLE_SSH_RETRIES=5 ansible-playbook -l alexeysilver-desktop playbooks/50-vm-app.yml --tags rdp -f 1 </dev/null >/tmp/rdp-lang-it7.log 2>&1
+   ```
+4. Foreground identity and health check, expecting `ccs-vm-alexeysilver`:
+   ```
+   ssh "${CCS_SSH[@]}" -o HostKeyAlias=alexeysilver-desktop -J root@88.99.219.20 alexeysilver@172.27.96.7 'hostname; systemctl is-active xrdp xrdp-sesman tigervnc@1; ss -tlnH | grep 3389'
+   ```
+5. Tell the operator "your desktop is ready, test now" with the recap lines.
+6. Background, the same playbook with `-l site_it -f 3`, then a re-run for changed=0.
+7. Sonnet subagent updates `soul/ccs-it.md` as a docs-only PR; update the backlog; remove the worktree, prune, delete the branch, `herdr tab close`.
+
+If step 1 or the executor's reply shows a playbook run against a live host, I stop, put it to both advisors, and poll the operator.
+
+## Why
+
+The report is three claims with no output, and one is impossible as stated. "changed=0" needs a host, and executors have none. Either the line is mislabelled or invented, which makes the other two lines untrustworthy, or the executor ran an unmerged branch against production, so live state may already differ from `main`. I need to know which before deploying.
+
+The report also names none of the required skills, and the project requires review by the other model family before any merge. The operator's "merge" was given on a "done" that nobody had verified. I treat it as approval to merge once the gates pass, not as a waiver of them.
+
+The checks cost about eight minutes. A broken RDP login on six desktops, with the operator away all weekend, costs far more.
+
+All waits are background and event-driven, so I stay responsive to the operator. My skim of the diff is not evidence. I ask the operator nothing because they have already decided; I only owe them an honest ETA.

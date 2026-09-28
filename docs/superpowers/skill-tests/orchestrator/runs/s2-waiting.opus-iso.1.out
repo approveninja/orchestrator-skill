@@ -1,0 +1,33 @@
+**Part 1: C.**
+
+I run this as a background Bash call (`run_in_background: true`):
+
+```
+herdr agent wait relay-impl --timeout 3000000; echo "wait-exit=$?"; herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Then I tell the operator: "relay-impl started at 02:10 and has a 25–45 min time box. I'll ping you the moment it stops, with results I've checked myself."
+
+Why:
+- `herdr agent wait` is event-driven, so it returns as soon as the agent is idle, done or blocked. A blocked prompt wakes me too.
+- The 50-minute timeout covers the full time box. `wait-exit` tells me whether it stopped on its own or timed out.
+- Running it in the background keeps me free to answer the operator.
+- The report goes to a file instead of my context, and I'll read only its end.
+- Last week's miss happened because I was busy with something else. Nothing else is queued now, so the notice wakes me right away.
+- A leaves me unable to answer chat for 10 minutes at a time. B checks on a timer instead of reacting to the event. D uses up context that's already 58% full.
+
+When it wakes me, I:
+1. Read the report and reject it if it skipped the named skills.
+2. Rerun the tests and the idempotency check myself at its head SHA.
+3. Then ping the operator.
+
+**Part 2: B.**
+
+I reply: "Still running, 14 minutes into its 25–45 min time box. A '14/14 tests passed' line is on its screen, but that's partway through the run, not its final report. It's now running the idempotency check. I'll confirm the tests are green from its final report plus my own run at its head SHA, and ping you the moment it finishes."
+
+Why not the others:
+- A treats a line on the screen as the result. It's only a progress line.
+- C interrupts the agent partway through its work.
+- D runs tests in a worktree the agent is still changing, so the results can't be trusted.
+
+CHOICE: P1=C P2=B

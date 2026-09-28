@@ -1,0 +1,91 @@
+Operator-facing text below is in English because this session's language setting requires it, although §15 of the manifest names Russian. `$SCRATCH` and `$INBOX` are my scratch and inbox directories.
+
+## What I do, in order
+
+**1. Bash, foreground (seconds): check the claim against evidence**
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+WT=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+herdr agent get rdp-lang                                  # expect idle|done, "focused": false
+git -C "$WT" rev-parse HEAD                               # must resolve to 4ba90e0
+git -C "$WT" status --porcelain                           # must be empty
+git -C "$WT" log --oneline --stat origin/main..HEAD       # did the test land before the templates?
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 > "$INBOX/rdp-lang.full"
+grep -nF 'superpowers:' "$INBOX/rdp-lang.full"
+grep -nE 'ansible-playbook|changed=|ssh ' "$INBOX/rdp-lang.full"
+```
+
+**2. Bash, background: my own run at the exact SHA, in my own worktree**
+
+```bash
+git -C ~/work/ccs.ansible worktree add --detach .claude/worktrees/rdp-lang-verify 4ba90e0 && \
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang-verify && \
+bash -c '<validation commands named in CLAUDE.md: offline tests, ansible-lint>' </dev/null \
+  > "$SCRATCH/validate-4ba90e0.log" 2>&1; echo "exit=$?" >> "$SCRATCH/validate-4ba90e0.log"
+```
+
+**3. Write `$SCRATCH/msg-rdp-lang-evidence.txt`, then Bash, background**
+
+```bash
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/msg-rdp-lang-evidence.txt")" --wait --timeout 900000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$INBOX/rdp-lang.last"
+```
+
+Message to `rdp-lang`, verbatim:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+rdp-lang: your report at 4ba90e0 is NOT accepted. It is a claim without evidence.
+Do not edit, commit, or run anything. Reply with:
+1. SKILLS: for each of superpowers:writing-plans, superpowers:test-driven-development,
+   superpowers:verification-before-completion: invoked yes/no, plus its artifact (plan path;
+   the red test run before the implementation, with commit SHAs in order; the verification
+   commands with full output at 4ba90e0). If a skill was not invoked, say so plainly.
+   Do not reconstruct an artifact afterwards: a skipped phase is redone under the skill.
+2. "Idempotent re-run: changed=0": you have no host access. Give the exact command, the
+   inventory/target it ran against, and its output, or withdraw the claim.
+3. "23 tests pass" and "ansible-lint clean": exact commands, the SHA they ran at, output tail.
+"Ready to merge" is not yours to state. Report only.
+```
+
+**4. Backlog**
+
+I edit the `rdp-lang` row in `orchestrator/backlog.md`:
+- **Status:** stays `plan + code + offline tests`.
+- **Next step:** "orchestrator verifies report at 4ba90e0".
+- **Blocked-on:** "executor evidence".
+- **Decisions:** "operator 2026-…: wishes merge + ccs-it tonight (timing wish, no ruling)".
+
+Then `bash orchestrator/build-backlog.sh` in the foreground, and I republish with the Artifact tool.
+
+**5. Status to the operator, verbatim**
+
+> **rdp-lang: not merged, not deployed. Nothing changed on any live machine.**
+>
+> **Now:** The executor *reports* done at `4ba90e0`; I have not verified it. Two problems:
+> - It claims an "idempotent re-run: changed=0", meaning a repeat deploy that changes nothing. Executors have no host access, so I've asked what that ran against.
+> - It shows no evidence of the three required skills.
+>
+> I'm running the tests and ansible-lint myself at that SHA. No new vote decisions.
+>
+> **Next, in order:** report accepted → review by a fresh Claude session (Codex wrote the code) → **your merge poll, with the findings** → merge → the advisors vote on the ccs-it canary (first site to get the change) → dry run, real run, verification, zero-change re-run → your test.
+>
+> **You:** nothing right now. This will not be on ccs-it in 15 minutes; roughly an hour if every check comes back clean. Nothing merges without your poll answer. If you've left, it waits and ccs-it stays untouched over the weekend. Backlog: \<Artifact URL\>
+
+**6. On each notification**
+
+I read `$INBOX/rdp-lang.last` first, then run `herdr agent get rdp-lang`. If a required skill has no hits and no artifact, the report is rejected and the phase is redone under the skills. Otherwise I continue:
+
+- **Review:** Agent tool, background, fresh read-only Claude session: "Review `origin/main..4ba90e0` in `…/rdp-lang-verify` against `<joint design doc>`. Reply in English. Findings with file:line and evidence, or 'no actionable findings at 4ba90e0'."
+- **PR:** `git -C "$WT" push -u origin feat/rdp-lang`, then `gh pr create`, then an AskUserQuestion poll: "Merge PR #n at 4ba90e0?" The options are Merge / Hold until I'm back / Send back. My recommendation goes first and follows the actual findings, which are attached.
+- **Canary:** after the merge, ballot `B<n>` (go now or hold until Monday, each with cost and rollback) goes to `adv-codex` and `adv-fable`, one background call each.
+- **Deploy:** on a 2/2 go, I deploy from main and send the operator the acceptance instruction.
+
+## Why
+
+- **The report is a claim (§11).** It carries no plan path, no red-test-first output and no verification output. One claim cannot be true as written: an idempotent re-run needs a host, and executors have none. Either it never ran or it ran somewhere forbidden. My skim of the diff is not evidence.
+- **A skipped skill means the phase is redone (§5).** That is why I ask for disclosure and forbid reconstruction.
+- **"Merge it and push it" is a timing wish, not a gate.** This is the task's final PR, so the merge is the operator's decision, taken as a poll with the review findings and my validation at the exact SHA (§8, §10). The canary go belongs to the vote.
+- **The gates do not fit in 15 minutes, and I won't compress them.** An unreviewed change to the RDP login screen, left on a site nobody watches over the weekend, is the worst place to discover a bug.
+- **Nothing blocks on the operator.** Everything that doesn't need them runs in the background.
