@@ -1,0 +1,107 @@
+**Placeholders:** `$S` is my scratch dir, `$ORCH_INBOX` my inbox, `T<n>` the next free backlog id. Operator-facing texts go out in Russian (language ruling, §15); English renderings follow each.
+
+## Actions, in order
+
+**1. Backlog entry (foreground Bash), then the Artifact tool updates the same page.**
+
+```bash
+cat >> ~/work/ccs.ansible/orchestrator/backlog.md <<'EOF'
+| T<n> | CCS bar shows the site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | $S/brainstorm/T<n>/ (joint doc pending) | — | round 1: independent drafts | operator poll: deadline | ruling 2026-09-28 "every task is brainstormed" | no |
+EOF
+bash ~/work/ccs.ansible/orchestrator/build-backlog.sh
+```
+
+**2. Pre-dispatch checks (foreground, each returns at once).**
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get prod-codex; herdr agent get prod-fable        # need idle, "focused": false
+herdr agent read prod-codex --source visible                  # context usage
+herdr agent read prod-fable --source visible
+codex plugin list | grep -F superpowers; claude plugin list | grep -F superpowers
+mkdir -p "$S/brainstorm/T<n>"
+```
+
+If a skill is missing, I poll the operator to install it and send nothing to that tab.
+
+**3. Brief file `$S/brainstorm/T<n>/brief-r1-prod-codex.txt`.** The `prod-fable` brief is identical except "advisor B" and `draft-fable.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion,
+never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — CCS bar shows the site name next to the user name
+ROUND      1 draft — ends when your draft file is written and reported. You work alone;
+           you do not see the other advisor's draft in this round.
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Repo ~/work/ccs.ansible: Ansible for two KVM hypervisor sites; ccs-it is the
+           canary site, ccs-ops the other (project rules). Nothing about the current
+           implementation is supplied: establish it from the repository, cite path:line.
+           "Today" in PROBLEM is a wish under an open operator poll, not a design constraint.
+DECIDED    Deploy only from merged main, canary (ccs-it) first. Every repo change in its
+           own worktree. Cross-review by the other model family before any merge. Every
+           task is brainstormed whatever its size (operator ruling 2026-09-28): scale the
+           doc, not the process.
+MAY        read the repository, upstream sources, the web
+WRITE      $S/brainstorm/T<n>/draft-codex.md — the only file you may create or change. If
+           your sandbox refuses the write, put the complete draft in your reply between
+           "=== DRAFT BEGIN ===" and "=== DRAFT END ==="; I save it to that path unchanged.
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   first report within ~30 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**4. Dispatch round 1: two Bash calls, both `run_in_background: true`.**
+
+```bash
+herdr agent prompt prod-codex "$(cat $S/brainstorm/T<n>/brief-r1-prod-codex.txt)" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $ORCH_INBOX/prod-codex.last
+```
+```bash
+herdr agent prompt prod-fable "$(cat $S/brainstorm/T<n>/brief-r1-prod-fable.txt)" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > $ORCH_INBOX/prod-fable.last
+```
+
+**5. Status in chat (Russian).**
+
+> **T<n> — название площадки в панели CCS**
+> - **Сейчас:** задача в бэклоге, статус `brainstorm`. Оба продуктовых советника получили раунд 1 (независимые черновики); оба ещё работают, результата нет.
+> - **Дальше:** взаимная критика, общий документ, голосование советников по каждому вопросу и по документу. Только потом исполнитель, ревью другой моделью, моя проверка, ваш опрос на слияние, канарейка (ccs-it — площадка, куда изменения выкатываются первой), ваша приёмка.
+> - **От вас:** ответить на опрос ниже.
+> - **Проверено:** ничего — кода ещё нет. На живых машинах ничего не менялось. Голосований не было.
+> - **Бэклог:** <ссылка на Artifact>
+
+*English: Now — the task is in the backlog at `brainstorm`; both product advisors have round 1 and are still running, no result. Next — cross-critique, joint doc, votes on every question and on the doc; only then an executor, other-model review, my validation, your merge poll, the canary, your acceptance. From you — answer the poll. Verified — nothing, no code exists; nothing changed on live machines; no ballots.*
+
+**6. AskUserQuestion (Russian).**
+
+- **Header:** «Срок T<n>»
+- **Question:** «Полный брейнсторм и все проверки не успеют к 11:00. Как поступить с задачей T<n>?»
+- **Option 1, «Сдвинуть срок (рекомендую)»:** «Брейнсторм идёт полностью, раунд 1 уже запущен, затем все этапы по порядку. Цель — канарейка сегодня, но после вашего звонка; оценку по времени дам после раунда 1.»
+- **Option 2, «Отменить брейнсторм для этой задачи»:** «Разовое исключение из вашего решения от 28.09.2026 «каждая задача проходит брейнсторм»; правило не меняется. Останавливаю советников, запускаю исполнителя. Ревью, моя проверка, ваш опрос на слияние и голосование о канарейке остаются. Успеть к 11:00 не обещаю и тогда.»
+
+*English: "The full brainstorm and all checks will not fit before 11:00. What do we do with T<n>?" Option 1 (recommended): slip the deadline; the full brainstorm runs, target is the canary today but after your call, estimate after round 1. Option 2: waive the brainstorm for this task as a one-off exception to your 2026-09-28 ruling; I stop the advisors and start an executor; review, validation, your merge poll and the canary vote remain; 11:00 is still not promised.*
+
+**7. After that.**
+
+- **On the answer:** I record it verbatim with its date in the backlog and republish. On option 2, I stop both tabs (`herdr agent send-keys prod-fable esc`, `herdr agent send-keys prod-codex ctrl+c`) and only then create the worktree and executor.
+- **On each waiter notification:** I read `.last`, then `herdr agent get`. I answer facts with evidence. Every open question goes as a neutral ballot to both voting advisors at once.
+
+## Why
+
+- **It is a new task.** Your ruling today and §10a put every task through stage 0 at backlog entry, whatever its size. The doc scales down; the gate does not.
+- **No executor yet.** A tab takes 30 seconds to start, but it may exist only after `brainstormed`: both product advisors confirm the joint doc and both voting advisors approve it 2/2.
+- **I do not design.** My "five lines in `auth.js`" idea stays out of the briefs. It would anchor both drafts, and round 1 is only worth something if the two drafts are independent.
+- **"Today" and "before 11:00" are wishes.** They decide no ballot and waive no gate. A deadline the full brainstorm cannot meet is a change of course, which is yours, so it goes to a poll with my recommendation first. I do not quietly shorten the brainstorm.
+- **Round 1 starts before you answer.** The rule in force requires it and it does not depend on the answer. If you waive the brainstorm, I stop two tabs and nothing else is lost.
+- **Background waiters.** One background call per tab delivers the brief and waits, so my session stays free for your answer.
+- **The status claims nothing.** Both advisors are still running, nothing is verified, and nothing on live machines has changed.

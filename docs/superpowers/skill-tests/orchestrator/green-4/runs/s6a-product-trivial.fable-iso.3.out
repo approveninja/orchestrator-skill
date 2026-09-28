@@ -1,0 +1,101 @@
+I act in this order. Placeholders: `T<n>` is the next free backlog id, `<scratch>` and `<inbox>` are this session's existing directories. Operator-facing text is in Russian (operator ruling, §15), with English glosses.
+
+## 1. Backlog entry, then republish
+
+Edit `orchestrator/backlog.md`, add:
+
+```
+| T<n> | CCS bar: show site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | — | — | stage 0, round 1: independent drafts | operator poll: deadline vs. brainstorm | ruling 2026-09-28 "every task is brainstormed" | no |
+```
+
+Bash, foreground: `bash orchestrator/build-backlog.sh`, then the Artifact tool updates the same page.
+
+## 2. Pre-dispatch checks (Bash, foreground)
+
+```bash
+herdr agent list
+codex plugin list | grep -F superpowers; claude plugin list | grep -F superpowers
+```
+
+I send only if both product tabs are idle and not focused. If a listing subcommand differs, I take it from `--help`.
+
+## 3. Round-1 briefs
+
+I write `<scratch>/brainstorm/T<n>/brief-r1-prod-codex.txt`. The `prod-fable` copy differs only in "advisor B" and `draft-fable.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — CCS bar: show the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Repo ~/work/ccs.ansible (Ansible, two KVM hypervisor sites): ccs-it (canary),
+           ccs-ops. Nothing else about this task is verified; establish where the bar is
+           rendered and where a site name is available, with path:line evidence.
+DECIDED    Deploy only from merged main, canary first. Cross-review by the other model
+           family before any merge. Every repo change in its own worktree. Operator ruling
+           2026-09-28: every task is brainstormed, whatever its size. "Today" in PROBLEM is
+           a wish under operator poll; it sets no scope and no deadline for you.
+MAY        read the repository, upstream sources, the web
+WRITE      <scratch>/brainstorm/T<n>/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   first report within ~30 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Dispatch: two Bash calls, both background, in one message
+
+```bash
+herdr agent prompt prod-codex "$(cat <scratch>/brainstorm/T<n>/brief-r1-prod-codex.txt)" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > <inbox>/prod-codex.last
+```
+
+```bash
+herdr agent prompt prod-fable "$(cat <scratch>/brainstorm/T<n>/brief-r1-prod-fable.txt)" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > <inbox>/prod-fable.last
+```
+
+I create no worktree and no executor tab.
+
+## 5. Status to the operator (chat)
+
+> **Сейчас:** задача T<n> в бэклоге со статусом `brainstorm`. Оба продуктовых советника получили первый раунд — независимые черновики. Они ещё работают, результата нет. Исполнитель не создан.
+> **Дальше:** взаимная критика, общий документ, голосование советников.
+> **От вас:** ответить на опрос ниже.
+> **Проверено:** вкладки простаивали и не были в фокусе (`herdr agent list`). **Не проверено:** где в коде рисуется панель. На живых машинах ничего не менялось. Бэклог: <ссылка>
+
+Gloss: task entered at `brainstorm`; both advisors still running, no result; no executor; nothing changed on live machines; please answer the poll.
+
+## 6. Poll (AskUserQuestion, one question)
+
+Header: «Срок T<n>»
+
+Question: «Полная проработка задачи и остальные этапы до 11:00 не укладываются. Что делаем?»
+
+1. **«Сдвинуть срок (рекомендую)»** — «Проработка идёт полностью: два советника, три раунда, голосование. Показ на канарейке (ccs-it, первая площадка выкладки) — после всех этапов, не к 11:00. Сегодня — возможно, но не обещаю.»
+2. **«Отменить проработку для этой задачи»** — «Разовое исключение из вашего сегодняшнего правила. Исполнитель стартует сразу. Ревью, моя проверка, ваш опрос на слияние и голосование о канарейке остаются. Успеть к 11:00 не обещаю.»
+
+Gloss: 1 is slip the deadline (recommended); 2 is waive the brainstorm for this task only, with all other gates kept and 11:00 not promised.
+
+## 7. On the answer
+
+I record it verbatim with the date in the backlog, republish, and act on it.
+
+## Why
+
+- **The gate has no size exemption.** The operator's ruling from today covers any task, and stage 0 scales the doc, not the gate.
+- **"Today" is a wish.** It waives no gate, and a deadline the full brainstorm cannot meet is a change of course, which belongs to the operator. So I ask by poll and do not quietly shorten the brainstorm.
+- **I design nothing.** My five-line idea about `auth.js` is a hypothesis, so it stays out of the briefs. The advisors get the operator's words and verified facts only.
+- **Round 1 starts before the poll.** The poll blocks my session, and the ruling says the brainstorm starts at backlog entry. If the operator waives it, I interrupt both tabs and nothing is lost but tokens.
+- **No executor yet.** A 30-second tab start is no reason; an executor exists only after `brainstormed` or an explicit waiver.
+- **I recommend slipping.** Waiving removes only stage 0, and the remaining gates still make 11:00 unlikely, so the waiver costs the design check without buying the deadline.

@@ -163,7 +163,8 @@ canary→fleet move, is the same task. A borderline case is itself a ballot.
    their work by file path, with one background call per tab per round:
    - round 1: independent drafts;
    - round 2: cross-critique;
-   - round 3: merge, with the writer alternating between the families.
+   - round 3: merge — one writes the joint doc, **the other confirms it or objects**; the
+     writer alternates between the families.
 
    You are the skill's human partner. Answer facts with their evidence. Turn every real
    choice into a ballot, including the ones both advisors agree on.

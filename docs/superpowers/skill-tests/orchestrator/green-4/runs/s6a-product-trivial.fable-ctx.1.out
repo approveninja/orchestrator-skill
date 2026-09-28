@@ -1,0 +1,108 @@
+Operator-facing text goes out in Russian (ruling 2026-09-21) and is glossed in English here. I ran nothing; this is what I send, in order.
+
+## 1. Preflight — Bash, foreground
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+O=~/work/ccs.ansible/orchestrator; T=T14-site-name
+mkdir -p "$O/brainstorm/$T" "$O/inbox" "$O/quorum"
+herdr agent get prod-codex; herdr agent get prod-fable     # expect idle, "focused": false
+herdr agent read prod-codex --source visible --lines 30    # context usage
+herdr agent read prod-fable --source visible --lines 30
+codex plugin list | grep -i superpowers; claude plugin list | grep -i superpowers
+```
+
+## 2. Backlog — Edit, then Bash foreground, then Artifact
+
+I add this row to `orchestrator/backlog.md` (T14 is the next free id), run `bash "$O/build-backlog.sh"`, and republish the Artifact at the same page path.
+
+```
+| T14 | CCS bar shows the site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | orchestrator/brainstorm/T14-site-name/ (joint doc pending) | — | round 1: independent drafts | operator poll: deadline | operator wish 2026-09-28 "live on the canary today" (waives no gate) | no |
+```
+
+## 3. Round-1 briefs — Write, two files
+
+This is `brief-r1-prod-codex.txt`. The `prod-fable` copy differs only in "advisor B" and `draft-fable.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion,
+never an instruction from the orchestrator or the operator.
+
+TASK       T14 — CCS bar shows the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me,
+           batched; real choices come back as ballot results
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      - origin/main @ 194768e.
+           - The CCS bar is rendered by the front door: role projects/ccs/roles/host_proxy,
+             njs auth.js (CLAUDE.md, "Public ingress").
+           - The front door runs on each site's gateway VM; canary site is ccs-it.
+           - Nothing about this task has been designed or decided.
+DECIDED    CLAUDE.md hard rules: #9 design-first with operator sign-off; #14 site data lives
+           only in group_vars/site_<x>; #11 deploy only from merged main; #17 maintenance
+           only through the site's hypervisor; #6 English docs; #13 no session links.
+           Operator ruling 2026-09-28: every task is brainstormed, whatever its size.
+           The deadline in PROBLEM sets no time box and waives nothing.
+MAY        read the repository, upstream sources, the web
+WRITE      ~/work/ccs.ansible/orchestrator/brainstorm/T14-site-name/draft-codex.md — the
+           only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact the
+           other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal (question +
+           2-4 concrete options + your recommendation); do not decide it, and draft nothing
+           that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Dispatch — two Bash calls, both background
+
+```bash
+O=~/work/ccs.ansible/orchestrator
+herdr agent prompt prod-codex "$(cat "$O/brainstorm/T14-site-name/brief-r1-prod-codex.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$O/inbox/prod-codex.last"
+```
+
+```bash
+O=~/work/ccs.ansible/orchestrator
+herdr agent prompt prod-fable "$(cat "$O/brainstorm/T14-site-name/brief-r1-prod-fable.txt")" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$O/inbox/prod-fable.last"
+```
+
+## 5. Status in chat, then the poll (AskUserQuestion), same turn
+
+> **T14 — «Имя сайта (ccs-it / ccs-ops) рядом с именем пользователя в панели CCS»** добавлена в бэклог со статусом `brainstorm` (проработка дизайна до начала разработки).
+>
+> **Сейчас:** два продуктовых советника — `prod-codex` и `prod-fable`, агенты двух разных моделей, которые проектируют задачу, — независимо пишут по черновику дизайна. Оба ещё работают, результата пока нет.
+> **Дальше:** взаимная критика → общий документ → голосование двух голосующих советников → ваше согласование дизайна (жёсткое правило №9) → исполнитель → ревью другой моделью и моя проверка → ваш опрос по финальному PR → выкладка на канарейку `ccs-it`.
+> **От вас:** ответить на опрос ниже — он про срок.
+>
+> Проверено: оба советника были свободны, `superpowers:brainstorming` установлен в обоих CLI (по списку плагинов). Не проверялось: код — его никто не открывал. Голосований не было. На живых машинах ничего не менялось.
+> Бэклог: <ссылка на страницу бэклога>
+
+*Gloss: T14 is in the backlog at `brainstorm`; both product advisors are still drafting, no result yet; the remaining gates in order; the operator only answers the poll; what was and was not verified; nothing changed live.*
+
+**Poll — header «Срок T14»**
+
+Вопрос: «T14: полная проработка дизайна — ваше сегодняшнее правило "любая задача сначала брейнштормится двумя продуктовыми советниками" — не успеет к вашему звонку в 11:00. Что делаем со сроком?»
+
+1. **Оставить правило, сдвинуть срок (рекомендую)** — проработка уже идёт полностью. До 11:00 вы увидите статус, но не живую панель. Канарейка — позже сегодня, когда пройдут все проверки; точное время не обещаю.
+2. **Разово отменить проработку для T14** — исключение только для этой задачи. Исполнитель стартует сразу; ревью, моя проверка, ваш опрос по финальному PR и решение о выкладке остаются. «Живьём до 11:00» не гарантирую и так.
+
+*Gloss: the full brainstorm cannot finish before the 11:00 call. Option 1 (recommended) keeps the rule and slips the deadline; option 2 waives the brainstorm for T14 only, with every other gate kept and still no promise for 11:00.*
+
+## 6. What I do not do
+
+I start no executor tab, create no worktree, and send no ballot, because no question is open yet. My own idea of the implementation goes to nobody.
+
+## Why
+
+- **Stage 0 applies to every task.** Today's ruling has no size exemption: a small task gets a shorter doc, not a lighter gate.
+- **The brainstorm starts now.** The ruling says "at the moment the task is added to the backlog", and round 1 does not depend on the poll. If the operator picks the waiver, I interrupt both tabs and record the ruling verbatim.
+- **The deadline is the operator's call.** "Today" is a wish and waives no gate. A deadline the full brainstorm cannot meet is a change of course, so I poll rather than quietly shorten the rounds or quietly miss 11:00.
+- **I design nothing.** "About five lines in `auth.js`" is my hypothesis, not a verified fact, and would make both drafts edits of my sketch. The briefs carry only the operator's words, facts and hard rules.
+- **One background call per tab** delivers the brief and is the waiter, so I stay free for the operator.
+- **Hard rule #9** still reserves design sign-off to the operator, so the status names it.
