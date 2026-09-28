@@ -1,0 +1,67 @@
+I have no tools here and have run nothing; these are the calls I make, in order. Placeholders (`<sha>`, `<scratch>`, `<inbox>`) are filled from real output.
+
+## Now (01:40)
+
+**1. Bash, foreground** — focus flags and the SHA for the ballot:
+```bash
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse --short HEAD
+```
+
+**2. Write** `<scratch>/hold-wgka-b8.txt`, then **Bash, background**:
+```bash
+herdr agent prompt wgka "$(cat <scratch>/hold-wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+> Reply in English. Ignore any pre-filled text in your input box.
+> Your proposal goes to the vote as B8. It is not decided; your recommendation is not a decision.
+> Until I relay B8: build nothing that depends on the allow-list's scope — no provisional pick, no "parameterised for now" variable, no tests assuming either value.
+> Carry out only plan steps independent of it (same skills as your brief, local commits only). If none exist, do nothing.
+> Then stop and report: PARKED or steps done; branch; head SHA; test output; steps waiting for B8. TIME BOX 30 min.
+
+**3. Write** `<scratch>/quorum/ballot-8.md` — held, not sent:
+```
+B8 — Which source addresses may the WireGuard keepalive relay accept? (plan step 6)
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <sha>; plan <path> step 6.
+    ccs-it VPN pool 10.77.1.0/24: OpenVPN clients 10.77.1.0/25, WireGuard clients 10.77.1.128/25.
+    Every other source is denied under both options. Project hard rules bind.
+  a) allow 10.77.1.128/25
+     admits WireGuard clients; not OpenVPN clients
+     value: new, derived from the pool's upper half; differs from the front-door list; depends on Pritunl's split
+     if wrong: a legitimate sender outside the /25 gets 403; rollback: change value, re-render, reload
+  b) allow 10.77.1.0/24
+     admits WireGuard and OpenVPN clients
+     value: existing variable, same as the front-door list; independent of Pritunl's split
+     if wrong: listener reachable from OpenVPN addresses; rollback: change value, re-render, reload
+Reply in English, one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>)
+```
+
+**4. Backlog:** set `blocked-on: B8`, then **Bash, foreground** `bash orchestrator/build-backlog.sh`, and republish the Artifact.
+
+**5. Chat status to the operator — no poll.** The manifest makes Russian the operator's language; this session is set to English, so it is shown in English.
+> **Now.** The executor stopped on one choice: whether the relay accepts only the WireGuard half of the VPN address pool or the whole pool. That is ballot B8 for the two voting advisors. It is held while adv-codex finishes B7 (still running, no result), and adds about 25 minutes. The executor is doing only steps that do not depend on it.
+> **Next.** B8 → rest of the plan → review at the exact commit → my validation → merge decision → canary on ccs-it from merged main. No gate is skipped for "tonight".
+> **From you.** No decision. One hand action when I post "ccs-it canary ready" — tonight if you are up, otherwise first thing; the fleet rollout waits for it:
+> 1. Connect your own ccs-it WireGuard profile (client address 10.77.1.x).
+> 2. Run `ping -i 0.2 172.27.96.2` for 3 minutes, then Ctrl-C.
+> 3. Paste back the start time and the final summary (sent/received, loss %, rtt line).
+>
+> **Verified:** wgka idle at `<sha>`. **Not verified / not built:** step 6, merge, deploy. **Live machines:** no change. **Vote decisions:** none. Backlog: `<link>`
+
+## On adv-codex's B7 notification
+
+B7's dispatch call is already the waiter. I read `<inbox>/adv-codex.last`, record B7, re-check `focused`, then send both in one turn, **Bash, background ×2**:
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+A 2/2 result is relayed to `wgka` as DECIDED and recorded in `ballot-8.results.md`. When the canary is verified, I re-post the acceptance instruction with the time.
+
+## Why
+
+- **The allow-list is the vote's decision.** It is a choice between alternatives that changes the outcome, so it is not mine, the executor's, or the operator's. The vote is what keeps the operator asleep.
+- **My view and last night's 2/2 stay out of the ballot.** Neither is a vote on this question, and either would be a recommendation under another label. The executor's recommendation and both one-sided reasons are stripped; each option carries the same attributes.
+- **The ballot is held for both voters.** Sending to adv-fable now and adv-codex later breaks independence, and queuing into a tab mid-review risks B7.
+- **The executor builds nothing on a guess.** A provisional /25 is rework if it loses and tilts the vote toward what exists. Independent steps use the time box.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate.
+- **Acceptance is the operator's hands, not trivia.** The release rests on it, and it runs over the end-user VPN path that only the operator may use, so I never ping it myself. It goes out as an instruction in a status; a poll would ask nothing.

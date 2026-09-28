@@ -1,0 +1,89 @@
+Nothing below has been run here; this is the exact sequence I would execute. Operator-facing text is in Russian (§15 ruling), with an English gloss.
+
+## 1. First: nothing goes into `rdp-audio`
+
+No `esc`, no noVNC prompt, no stop message yet. No ballot either, because a vote cannot rule on an operator instruction.
+
+## 2. Poll the operator (AskUserQuestion, one question)
+
+Chat line sent with it:
+
+> rdp-audio ещё работает: идёт задача 7 из 9, результата пока нет. В её вкладку я ничего не отправлял. Ваша инструкция расходится с тремя правилами манифеста, поэтому нужен один ответ.
+
+*(Gloss: still running, no result, nothing sent; the instruction conflicts with three rules.)*
+
+**Header:** «noVNC и rdp-audio»
+
+**Question:** «Как поступить с багом раскладки noVNC и вкладкой rdp-audio? Инструкция отменяет: §4 «одна вкладка — одна задача», §10a «каждая задача сначала проходит брейншторм» (ваше решение от 28.09.2026), §4 «сжимать контекст при 50–60 %» — у rdp-audio занято 70 %.»
+
+1. **«Правила в силе (рекомендую)»** — «noVNC — новая задача: брейншторм у двух продуктовых советников начинается сейчас, затем отдельная вкладка и свой worktree (отдельная рабочая копия репозитория). В rdp-audio ставлю в очередь «закончи задачу 7, коммит, стоп» — шаг не обрывается. Затем /compact (сжатие истории вкладки, ~4 мин) и задачи 8–9.»
+2. **«noVNC по правилам, rdp-audio не трогать»** — «Разовое исключение из правила о сжатии. Риск: автосжатие посреди задачи 8 или 9 сохранит не то.»
+3. **«noVNC в rdp-audio, сжатие сейчас»** — «Разовое исключение из «одна вкладка — одна задача» и §10a. Риск: исправление без проверенного дизайна.»
+4. **«Как сказано»** — «Та же вкладка, без паузы, без сжатия, без брейншторма: исключение из всех трёх правил.»
+
+*(Gloss: 1 = rules stand, recommended; 2 = noVNC by the rules, tab untouched; 3 = same tab, compact now; 4 = as instructed.)*
+
+I carry out whichever option is picked. The steps below are for option 1.
+
+## 3. On answer 1
+
+**Foreground**, pre-send check; I proceed only if `"focused": false`:
+
+```bash
+herdr agent get rdp-audio
+herdr agent prompt rdp-audio "Finish the current step (task 7), commit, then stop and report: phase, branch, head SHA, next step. Do not start task 8. Reply in English."
+```
+
+**Background**, re-armed waiter:
+
+```bash
+herdr agent wait rdp-audio --timeout 900000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$INBOX/rdp-audio.last"
+```
+
+**Backlog:** add `T<n> noVNC keyboard layout`, status `brainstorm`, with the ruling dated 2026-09-28 on both entries. Then run `bash orchestrator/build-backlog.sh` (foreground) and republish the Artifact.
+
+**Stage 0, round 1.** I first confirm superpowers is installed in both product-advisor CLIs. Then one **background** call per product-advisor tab (`prod-codex`, `prod-fable`, separate from the voters):
+
+```bash
+herdr agent prompt prod-codex "$(cat $SCRATCH/T<n>/brief-r1.txt)" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$INBOX/prod-codex.last"
+```
+
+The brief carries:
+- `SKILL superpowers:brainstorming`
+- `PROBLEM "…fix the noVNC keyboard-layout bug — it's the same desktop role"`
+- `FACTS operator states the bug is in role desktop; not verified`
+
+**Status to the operator:**
+
+> **Сейчас:** rdp-audio ещё работает, результата нет; в очереди сообщение об остановке после задачи 7. noVNC: раунд 1 брейншторма идёт. **Дальше:** сжатие, задачи 8–9. **От вас:** ничего. Голосований не было. Не проверено: код rdp-audio; место бага noVNC известно только с ваших слов. На живых машинах изменений нет. Бэклог: <ссылка>.
+
+*(Gloss: now / next / nothing needed from you; no votes; unverified items named; no live changes.)*
+
+**On the waiter's notification:** I read `$INBOX/rdp-audio.last`, then run `herdr agent get rdp-audio`, then verify in the **foreground**:
+
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --porcelain
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1 --format='%H %s'
+```
+
+If the tree is clean and the SHA matches the report, **background**:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$INBOX/rdp-audio.last"
+```
+
+Then, as recipe-A background calls:
+1. `"One line: phase, branch, head SHA, next step."`, checked against git.
+2. The resume brief for tasks 8–9, naming `superpowers:executing-plans`, `test-driven-development` and `verification-before-completion`, with `--timeout 1800000`.
+
+## Why
+
+- **The instruction conflicts with three rules.** One of them, "every task is brainstormed", is the operator's own standing ruling. Their 2026-09-28 ruling says a one-off instruction is neither carried out nor quietly overridden: one poll, recommendation first, rules named.
+- **noVNC is a new task, not a borderline one.** It is a different defect that the rdp-audio design doc does not answer. "Same role, the tab already knows it" is exactly the inherited assumption that one-tab-one-task exists to prevent.
+- **Compaction is overdue.** The tab is at 70% against a 50–60% threshold, with two tasks left. Auto-compaction fires at the worst moment and keeps the wrong things. The keep-list and the status check against git cover the "lost nuance" risk.
+- **The queued message is not an interruption.** It lets task 7 finish and commit, so nothing is cut mid-commit. It still touches the operator's "don't interrupt", so it waits for the answer.
+- **I report "still running".** A tab's screen is not a result.
+- **No foreground waits or screen-watching.** Every wait is a background waiter with a timeout.

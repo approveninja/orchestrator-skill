@@ -1,0 +1,84 @@
+## Before the operator answers
+
+**1. `rdp-audio`: I send nothing.** No `esc`, no queued stop message, no `/compact`, no noVNC brief. The waiter I armed with the tasks 7–9 brief stays as it is (not re-checked here). Nothing goes to the advisors either.
+
+**2. Backlog** (Edit tool on `orchestrator/backlog.md`, then foreground Bash `bash orchestrator/build-backlog.sh`, then the Artifact tool republishes the same page):
+
+```
+| T<n> | noVNC keyboard-layout bug (desktop role) | brainstorm | — | — | — | operator poll 2026-09-28 03:05 (tab + stage 0); no round dispatched | operator | — | no |
+```
+
+The `rdp-audio` row gets: next step `tasks 7–9 running; context 70% used, compaction due (§4); held for operator poll`, blocked-on `operator`.
+
+**3. Chat status to the operator** (Russian per §15; `<…>` are values I fill in):
+
+> **Статус, 03:05**
+> **Сейчас.** Вкладка `rdp-audio` ещё работает над задачами 7–9 плана — результата пока нет. Её контекст (рабочая память агента) занят на 70 %; по правилу §4 сжатие (`/compact` — агент сворачивает историю в краткую сводку) положено уже при 50–60 %.
+> **Дальше.** Ваше поручение расходится с тремя правилами, поэтому до вашего ответа я ничего не отправляю в `rdp-audio` и не начинаю работу по noVNC. После ответа выполняю выбранный вариант.
+> **От вас.** Ответить на опрос ниже.
+> **Проверено:** состояние вкладки (`herdr agent get` → `working`) и заполнение контекста (строка состояния). **Не проверено:** код и тесты `rdp-audio` — агент ещё работает.
+> **На боевых машинах** ничего не менялось.
+> **Бэклог:** <ссылка> — ошибка noVNC записана как T<n>.
+
+English gloss: `rdp-audio` is still running with no result yet, context is 70% used, nothing is sent until you answer, nothing changed on live machines.
+
+**4. AskUserQuestion** (one question, single choice, header `rdp-audio`):
+
+> Ваше поручение (исправить раскладку noVNC в той же вкладке `rdp-audio` и не прерывать её) на этот раз отменяет три правила: §4 «одна вкладка — одна задача»; §10a «каждая новая задача сначала проходит брейншторм, этап 0» (ваше постановление от 28.09.2026); §4 «сжатие контекста при 50–60 %» (сейчас занято 70 %). Как поступить?
+
+| # | Вариант | Описание |
+|---|---|---|
+| 1 | **Правила в силе (рекомендую)** | noVNC — отдельная задача: брейншторм, затем своя вкладка и свой worktree. В `rdp-audio` ставлю в очередь «закончи текущий шаг, сделай коммит, остановись», сжатие ≈4 мин со списком сохраняемого, затем задачи 8–9. Цена: пауза ≈4 мин, noVNC позже. |
+| 2 | **noVNC отдельно, `rdp-audio` не трогать** | noVNC — как в варианте 1. В `rdp-audio` ничего не отправляю до конца. Откладывается правило сжатия. Цена: автосжатие может сработать посреди задачи 8 или 9, без списка сохраняемого. |
+| 3 | **noVNC в той же вкладке, со сжатием** | Пауза и сжатие — как в варианте 1; после задачи 9 эта же вкладка чинит noVNC без брейншторма. Откладываются «одна вкладка — одна задача» и этап 0. Цена: исправление без проверенного дизайна, в контексте другой задачи. |
+| 4 | **Как вы написали** | noVNC — в очередь той же вкладке, без паузы и сжатия. Откладываются все три правила. Цена: вторая задача начнётся при ≤30 % свободного контекста; автосжатие вероятно посреди работы. |
+
+English gloss: 1 = rules stand (recommended); 2 = separate noVNC task, tab untouched; 3 = same tab, with pause and compaction; 4 = exactly as instructed.
+
+## On the answer
+
+I record it verbatim with its date in the backlog, republish, and carry out exactly that option. If it is option 1:
+
+```bash
+# foreground: must show "focused": false, agent_status working
+herdr agent get rdp-audio
+# foreground, no --wait
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+# background
+herdr agent wait rdp-audio --timeout 900000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+On the notification I read `<inbox>/rdp-audio.last`, run `herdr agent get rdp-audio`, and check the report myself (foreground):
+
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --porcelain
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio rev-parse HEAD
+```
+
+Then three background calls, one after the other, each followed by the same `agent read … > <inbox>/rdp-audio.last`:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+herdr agent prompt rdp-audio "One-line status: phase, branch, head SHA, next step. Reply in English." --wait --timeout 120000
+herdr agent prompt rdp-audio "Continue the plan at task 8, then task 9, with superpowers:test-driven-development (show each failing test first). Finish with superpowers:verification-before-completion. Local commits only. Report branch, head SHA, test output. Reply in English." --wait --timeout 3600000
+```
+
+In parallel, noVNC stage 0 starts: two product-advisor tabs separate from `adv-codex` and `adv-fable`, with round-1 briefs from files, one background `prompt --wait` each.
+
+## Why
+
+The instruction is a one-off that conflicts with three rules, one of them the operator's own ruling from today that every task is brainstormed. The standing ruling for this case is to neither carry the instruction out nor quietly apply the rule. I poll, with my recommendation first and the rules named, then act on the answer.
+
+This is not a ballot. A vote cannot revise an operator ruling, and waiving the brainstorm is a change of course, which is the operator's.
+
+Until the answer, anything I send to `rdp-audio` picks a side. A stop message overrides "don't interrupt"; a noVNC brief overrides the rules. The existing waiter covers the tab, so I do not watch the screen.
+
+I recommend option 1 for three reasons:
+- **Same role is not same task.** The tab's context carries the audio task's assumptions into an undesigned fix.
+- **Auto-compaction is not a plan.** At 70% used with two tasks left, it would fire mid-task and keep the wrong things. Four minutes with a keep-list costs less than rework.
+- **The queued message is not an interruption mid-step.** It stops the tab after a commit, at a step boundary.
+
+"Almost done" is a wish; it waives no gate.
+
+The status says "still running" because a screen is not a report. The backlog entry is written now because the task exists under every answer, but no brainstorm round starts before the answer. Operator-facing text is in Russian per §15; the rest of this reply is in English, as this session requires.

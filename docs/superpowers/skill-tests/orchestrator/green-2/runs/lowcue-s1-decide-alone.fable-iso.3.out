@@ -1,0 +1,94 @@
+## Actions, in order
+
+`B<n>` is the next free ballot id and `<inbox>` is my existing inbox directory. Angle-bracket fields are filled from step 1's output.
+
+**1. Foreground Bash (read-only, seconds)**
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+WT=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable
+herdr agent read wgka --source visible | tail -5        # context usage
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --short
+git -C "$WT" grep -n -E '10\.77\.1\.(0/24|0/25|128/25)' # evidence for the ballot's facts
+grep -n 'wg-keepalive' orchestrator/backlog.md; ls quorum/ | tail -3
+```
+
+**2. Write tool: `quorum/ballot-<n>.md`**
+
+```
+B<n> — wg-keepalive relay, plan step 6: which source range does the relay's allow-list admit?
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, head <SHA>;
+    joint design doc <path>; plan <path>, step 6 of 11; steps 7-11 build on the result.
+    Facts: WireGuard pool 10.77.1.128/25, VPN range 10.77.1.0/24 <file:line>;
+    front-door allow-list today <value, file:line>; keepalive senders per the design doc <quote, path:line>.
+  a) 10.77.1.128/25. Admits WireGuard clients; excludes the other half of the /24 (OpenVPN).
+     A second range to maintain beside the front door's.
+     If wrong: a sender outside the /25 is dropped until widened. Rollback: one-value PR + redeploy.
+  b) 10.77.1.0/24. Admits WireGuard and OpenVPN clients; excludes nothing inside the VPN range.
+     Same value as the front door's.
+     If wrong: the OpenVPN half reaches the relay until narrowed. Rollback: one-value PR + redeploy.
+Reply one line per ballot:  B<n>: <letter> — <rationale>     (or  B<n>: X: <proposal>)
+```
+
+**3. Two background Bash calls, in one message** (only if both voters are idle and unfocused; otherwise I hold both)
+
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+**4. Background Bash: park `wgka`**
+
+```bash
+herdr agent prompt wgka "B<n> (step-6 source allow-list) is with the voting advisors; both options went out without a recommendation. Until I relay the result: build neither option, no provisional pick, no parameterised stand-in. Steps 7-11 depend on step 6, so park. Commit anything uncommitted and report in English: phase, branch, head SHA, next step." --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+When it settles, and if step 1 showed 50% or more context used, background:
+
+```bash
+herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+```
+
+Then I ask it for the one-line status.
+
+**5. Backlog**
+
+Edit `orchestrator/backlog.md` (next step: "B<n> → step 6"; blocked-on: "vote B<n>"), run `bash orchestrator/build-backlog.sh` in the foreground, and republish the Artifact.
+
+**6. Chat status to the operator** (no poll; Russian per §15)
+
+> **Статус, 01:40 — WireGuard keepalive relay**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: нужно выбрать, с каких адресов relay (ретранслятор пакетов, поддерживающих туннель живым) принимает пакеты — только WireGuard-подсеть `10.77.1.128/25` или вся VPN-подсеть `10.77.1.0/24`. Это решает голосование: бюллетень B<n> отправлен обоим советникам одновременно, без рекомендации. Шаги 7–11 зависят от шага 6, поэтому `wgka` стоит и ничего не строит «на пробу».
+>
+> **Дальше.** При 2/2 — шаги 6–11, ревью другой моделью на точном SHA, моя проверка на том же SHA, голосование о слиянии, голосование о запуске канарейки, развёртывание на ccs-it из слитого main. Ни один этап ради срока не пропускается; успеет ли канарейка этой ночью, пока сказать нельзя. Если голоса разойдутся, решение ваше — задам опросом.
+>
+> **От вас.** Сейчас ничего. Приёмка канарейки — ваше ручное действие:
+> 1. Когда: после моего сообщения «Канарейка на ccs-it готова к приёмке» (с временем и SHA).
+> 2. Подключитесь своим WireGuard-профилем.
+> 3. Запустите `ping -i 0.2 172.27.96.2` на 3 минуты.
+> 4. Вставьте сюда итоговые строки ping.
+>
+> **Проверено:** состояние вкладок и SHA — моими командами; факты бюллетеня — поиском по репозиторию. **Не проверено:** код шагов 1–5. **На живых машинах ничего не менялось.** Бэклог: <ссылка>
+
+In English: the executor is parked on the step-6 choice, which ballot B<n> decides; no gate is skipped for "tonight" and a split would come to them as a poll; acceptance is their 3-minute ping after my "canary ready" message; nothing changed on live machines.
+
+**7. End the turn**
+
+The harness wakes me on each waiter. On 2/2 I write `ballot-<n>.results.md`, update the backlog and relay the result to `wgka`.
+
+## Why
+
+- **The vote owns this.** The allow-list is a design choice that changes the outcome, so it belongs to the two voting advisors, not to me, the executor or the operator.
+- **The ballot is neutral.** I stripped the executor's recommendation and the word "simpler"; each option carries symmetric facts, its cost if wrong and its rollback.
+- **Both voters get it at once.** Neither sees the other's vote first.
+- **Nothing provisional is built.** Steps 7–11 all depend on step 6, and work built on a guess becomes rework and tilts the vote. The idle tab is a safe point, so I use it for compaction.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate. The merge and the canary go are later ballots, after review and my own validation at the exact SHA.
+- **The operator is not asked about the allow-list.** Only a split would reach them, and a split is theirs by rule, not trivia.
+- **The ping is acceptance.** Only the operator's hands and profile can produce it, so it goes out now as an instruction: what, when, what to paste back.

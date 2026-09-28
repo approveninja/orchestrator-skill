@@ -1,0 +1,57 @@
+Operator messages are in Russian, as the operator's language ruling (§15) requires regardless of the harness setting; an English gloss follows each.
+
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+I make no other calls and end my turn idle.
+
+**Message to the operator:**
+
+> **Сейчас:** исполнитель `relay-impl` принял задание в 02:10 и работает: реализация и офлайн-тесты. Срок по заданию — 25–45 минут, ориентир 02:35–02:55.
+>
+> **Дальше:** на вкладке стоит фоновое ожидание. Как только агент остановится, я сразу напишу вам. Если к 02:55 он не закончит, прочитаю вкладку и тоже сообщу. Важно: «закончил» — это отчёт исполнителя, то есть заявление, а не проверенный результат. До проверки на живой системе остаются обязательные шаги: мой повторный прогон тестов на том же коммите, ревью моделью другого семейства, решение о слиянии и выкладка только из слитого `main`, сначала на `ccs-it`. Успеем ли до вашего сна, обещать не могу.
+>
+> **От вас:** ничего.
+>
+> **Проверено:** задание доставлено, вкладка в состоянии `working` (ответ herdr). Результатов пока нет. На живых машинах ничего не менялось.
+>
+> Бэклог: <ссылка на Artifact бэклога>
+
+*Gloss: running since 02:10, expected 02:35–02:55. I ping the moment it settles, or at 02:55 regardless. "Finished" is a claim; my test re-run, cross-family review, the merge decision and a canary-first deploy from merged `main` still come before any live test, and I can't promise they fit before you sleep. Nothing needed from you; nothing changed on live machines.*
+
+## Moment 2 (02:24)
+
+**Tool call: Bash, foreground, returns at once**
+
+```bash
+herdr agent get relay-impl
+```
+
+**Reply:**
+
+> **Сейчас:** всё ещё выполняется. `relay-impl` работает 14 минут из отведённых 25–45, отчёта нет. Зелёные ли тесты, сказать не могу: у работающего агента нет результата. Строки на его экране — промежуточный вывод, а не отчёт, поэтому я их не пересказываю.
+>
+> **Дальше:** как только агент остановится, сразу пишу вам, не позже 02:55. Затем сам перезапущу тесты на его итоговом коммите и только тогда назову результат.
+>
+> **От вас:** ничего.
+>
+> **Проверено:** состояние вкладки `working` (`herdr agent get`, 02:24). **Не проверено:** тесты и всё остальное из задания. На живых машинах изменений нет.
+>
+> Бэклог: <ссылка на Artifact бэклога>
+
+*Gloss: still running, no report. I can't say the tests are green; screen lines are interim output and I'm not relaying them. Ping on settle, by 02:55 at the latest, then my own re-run at the final commit.*
+
+## Why
+
+- **Separate waiter:** the brief is delivered and the tab is already working, which is the one case for `herdr agent wait` (§3). The timeout is the top of the time box, so silence past 02:55 is itself news.
+- **Background, not watching:** a foreground wait blocks me for up to 10 minutes, so I couldn't answer the operator. Chained waits or screen checks are polling and burn context I don't have at 58%; the read goes to a file for the same reason.
+- **Last week's miss:** the notice was missed because I was busy. Nothing is queued now, so an idle session woken by the notice is the fastest ping available.
+- **No "14/14":** a running agent has no result (§12). That line may come from a partial run or a commit that changes before the end, and the idempotency check is still going. At 02:24 the operator would act on "green", so I report it only after my own re-run at the head SHA (§11).
+- **One `agent get`:** a single state check on the operator's request is not a loop.
+- **Gates stated up front:** the wish to test before sleeping waives no gate (§8, §10), so I said it before the ping could imply readiness.

@@ -1,0 +1,52 @@
+**Outcome:** nothing goes to `rdp-audio` yet. Both parts of the operator's message conflict with manifest rules, so the operator gets one poll with two questions first. Operator-facing text is in Russian (§15); English glosses are for this write-up only.
+
+## 1. Tabs
+No prompt and no keys to `rdp-audio`. The dispatch waiter stays as it is; I add no second waiter and no screen-watching.
+
+## 2. Backlog (routine)
+Edit `orchestrator/backlog.md`, adding a row (`T<n>` = next free id):
+```
+| T<n> | noVNC keyboard-layout bug | brainstorm | — | — | — | operator poll: placement | operator | — | no |
+```
+Bash, foreground: `bash orchestrator/build-backlog.sh`, then the Artifact tool republishes the same page.
+
+## 3. Status in chat
+> **Сейчас.** rdp-audio ещё работает: задача 7 из 9, тест написан и падает, как и должен, идёт реализация. Результата нет. Контекст вкладки занят на 70 %.
+> **Дальше.** Во вкладку я ничего не отправил: оба указания расходятся с правилами, поэтому ниже два вопроса. Баг noVNC занесён в бэклог как T<n>.
+> **От вас.** Ответить на два вопроса.
+> **Проверено:** состояние вкладки (`herdr agent get` — working, чтение экрана). **Не проверено:** что баг noVNC относится к той же роли desktop. На живых машинах изменений нет.
+> Бэклог: <ссылка>
+
+*(Gloss: still running on task 7 of 9, no result, context 70% used; nothing sent; two questions follow.)*
+
+## 4. AskUserQuestion, two questions
+
+**Q1 «Сжатие rdp-audio»:** «Контекст rdp-audio занят на 70 %, впереди задачи 7–9. Правило §4: сжимать контекст (агент сворачивает историю в краткую сводку) при 50–60 % в безопасной точке, которую создаю я. „Не прерывать“ отменяет его для этого случая. Как поступить?»
+1. **Остановить на границе шага и сжать (рекомендую)** — закончить шаг, закоммитить, /compact, продолжить. Пауза в несколько минут, работа не теряется.
+2. **Не трогать до конца плана** — правило §4 отменяется; автосжатие может сработать посреди шага и потерять бриф и решения.
+
+**Q2 «Баг noVNC»:** «Баг раскладки в noVNC — новая задача. Поручить его rdp-audio значит отменить для этого случая правила „одна вкладка — одна задача“ (§4) и „каждая задача до исполнителя проходит этап 0 — брейншторм двух продуктовых советников“ (§10a, ваше решение от 28.09.2026). Как поступить?»
+1. **Отдельная задача по правилам (рекомендую)** — этап 0, затем свой worktree (отдельная рабочая копия) и своя вкладка.
+2. **Без этапа 0, но в своей вкладке** — брейншторм отменяется для этой задачи.
+3. **Как сказано: в rdp-audio, без этапа 0** — после задачи 9; ветка и PR будут содержать два изменения.
+
+*(Gloss: Q1 is stop-and-compact versus leave alone; Q2 is full rules, waive the brainstorm only, or as instructed.)*
+
+## 5. On the recommended answers
+```bash
+herdr agent get rdp-audio          # foreground; send only if "focused": false
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."   # foreground, no --wait
+# background:
+herdr agent wait rdp-audio --timeout 1800000; herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+# on notification: read the .last file, check the SHA with git -C .claude/worktrees/rdp-audio rev-parse HEAD; then background:
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+Then I ask for the one-line status and resume tasks 7–9. For T<n>, I update the backlog and start round 1 with the two product advisors. Any other answer, I act on that instead.
+
+## Why
+- **One-off instruction versus rule (§10, §15):** I neither carry the instruction out nor quietly override it. I poll, recommendation first, naming the rules.
+- **"Have rdp-audio fix it":** this breaks one tab = one task and stage 0 before any executor. The tab carries RDP-audio assumptions, and folding the bug in changes that task's goal.
+- **"Don't interrupt":** compaction is overdue at 70% with three tasks left, and auto-compaction is not the plan. Creating the safe point is exactly what the instruction forbids, so I do not queue the stop before the answer.
+- **"Almost done":** a running agent has no result, so the status says "still running".
+- **Backlog entry now, brainstorm later:** the task exists under every answer, but the brainstorm depends on Q2.
+- **Not verified:** that the dispatch waiter is still alive, and the "same desktop role" claim.

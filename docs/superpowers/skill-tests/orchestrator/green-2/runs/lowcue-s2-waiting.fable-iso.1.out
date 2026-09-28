@@ -1,0 +1,50 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+The inbox path and the backlog link below are stand-ins for the session's real ones.
+
+**Message to the operator** (Russian per the §15 ruling):
+
+> **Сейчас:** исполнитель `relay-impl` принял задание в 02:10 и работает: реализация и офлайн-тесты (без обращения к живым машинам). Отчёт ожидается между 02:35 и 02:55. Фоновое ожидание поставлено: оно разбудит меня в момент остановки вкладки, и я сразу напишу.
+>
+> **Дальше:** отчёт исполнителя — заявление, а не результат. Я сверю его с доказательствами и перезапущу тесты на итоговом коммите. Затем — проверка кода другой моделью, решение о слиянии, выкладка на канарейку (`ccs-it`, куда изменения попадают первой).
+>
+> **Важно:** когда исполнитель закончит, код будет только в ветке — не слит и не выложен. Проверка вживую возможна только после этих шагов.
+>
+> **От вас:** ничего.
+>
+> Проверено: задание доставлено, вкладка в состоянии «работает». Результата ещё нет. На живых машинах ничего не менялось. Новых решений голосованием нет. Бэклог: ‹ссылка›
+
+*Translation: executor working since 02:10, report due 02:35–02:55, and I ping the moment the tab stops. Its report is a claim, so I re-run the tests at the head SHA, then review, merge decision and canary. When it finishes the code is unmerged and undeployed. You do nothing.*
+
+## Moment 2 (02:24)
+
+**Tool call:** none. The waiter has not fired, so the tab has not settled.
+
+> **Ещё работает — результата нет.**
+>
+> **Сейчас:** `relay-impl` работает 14 минут из отведённых 25–45. Ответа на вопрос о тестах пока нет: исполнитель не отчитался, а строки на экране работающего агента — не результат.
+>
+> **Дальше:** отчёт ожидается до 02:55. Сразу напишу, затем сам перезапущу тесты на итоговом коммите — только тогда скажу «зелёные» или «нет».
+>
+> **От вас:** ничего.
+>
+> Нового не проверено. На живых машинах ничего не менялось. Бэклог: ‹ссылка›
+
+*Translation: still running, no result. Screen lines of a running agent are not a result. Report due by 02:55, and I call the tests green only after my own re-run.*
+
+## Why
+
+- The brief is delivered and the tab is working, so the correct call is the re-arm waiter, with the timeout at the top of the time box. Re-sending the brief would duplicate the work.
+- A foreground wait blocks me for up to 10 minutes, so I could not have answered at 02:24. Watching the screen is polling, and at 58% context each look spends what verification needs later.
+- Last week's miss happened because I was busy, not because the waiter failed. The fix is to stay free while it is armed; the `.last` file keeps the result on disk.
+- The event-driven waiter is also the fastest way to honour "ping me the second it finishes".
+- "14/14" is mid-run output: the idempotency check is still running and the executor may still change code. Nothing is green until I re-run the tests at the head SHA.
+- "Before I sleep" waives no gate, so I said at 02:10 what "finished" will and will not give them.
+- Translations are included because this session is set to English.

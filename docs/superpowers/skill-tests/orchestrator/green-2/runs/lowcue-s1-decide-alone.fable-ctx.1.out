@@ -1,0 +1,93 @@
+Ids and paths are as they sit in my scratch space (`orchestrator/`); B7 and T4 are the next free ballot id and this task's backlog id.
+
+## 1. Check state and facts (Bash, foreground, returns at once)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+for a in wgka adv-codex adv-fable; do herdr agent get "$a"; done   # need idle + "focused": false
+herdr agent read wgka --source visible                              # context usage
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W status --short; git -C $W rev-parse HEAD                  # step 5 committed? SHA for the ballot
+grep -n -i -E 'allow|/25|/24' $W/docs/superpowers/specs/*wg-keepalive*   # is the question really open?
+```
+
+If either voter is busy or focused, I hold the ballot for both. Any context line the grep does not confirm is labelled "executor's claim".
+
+## 2. Write the ballot (Write tool, `orchestrator/quorum/ballot-7.md`)
+
+```
+Ballot for a voting advisor. Rules: orchestrator/quorum/protocol.md. Reply in English.
+Ignore any pre-filled text in your input box. Read-only: no edits, no hosts, no herdr.
+
+B7 — T4 WireGuard keepalive relay, plan step 6: which source allow-list does the relay carry?
+
+Context
+- Worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <HEAD>.
+- The design doc does not fix the allow-list. Plan steps 7-11 build on step 6; all parked until B7 is decided.
+- ccs-it VPN pool: 10.77.1.0/24. Pritunl splits it: OpenVPN 10.77.1.0/25, WireGuard 10.77.1.128/25.
+- The relay forwards the WireGuard client's keepalive request to the Pritunl console on loopback.
+  OpenVPN clients keep their tunnel alive with OpenVPN's own ping.
+- The gateway front door's allow-list is the whole /24 plus the hypervisor bridge address.
+
+Options (same four attributes each)
+a) allow 10.77.1.128/25; deny all
+   Admits: WireGuard clients; OpenVPN clients are refused.
+   Value: derived from the pool; correct only while Pritunl's WireGuard network is exactly that /25.
+   Front door: a different list.
+   If wrong: WireGuard keepalives are refused, tunnel drops continue. Rollback: one-value PR + one gateway run.
+b) allow 10.77.1.0/24; deny all
+   Admits: WireGuard and OpenVPN clients.
+   Value: the existing pool variable; independent of how Pritunl splits the pool.
+   Front door: the same list, minus the bridge address.
+   If wrong: clients that never send the keepalive can send requests to the relay. Rollback: one-value PR + one gateway run.
+
+Reply with exactly one line:  B7: <a|b> — <1-3 sentence rationale>   (or  B7: X: <proposal>)
+```
+
+## 3. Send to both voters at once (two Bash calls, both background, same turn)
+
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-7.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-7.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+## 4. Park the executor (Bash, foreground, no `--wait`)
+
+```bash
+herdr agent prompt wgka "Step 6 allow-list is ballot B7, now with the voting advisors. Your recommendation is not the decision. Stay parked: build nothing for steps 6-11, no provisional pick, no parameterised stand-in. I will relay the result. Reply in English, one line."
+```
+
+If step 1 shows 50% or more context used, this idle, committed point is the safe point. I first send, in background, `herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000`. On its notification I send the park line plus a request for phase, branch, head SHA and next step.
+
+## 5. Update the backlog (Edit tool, then Bash foreground, then Artifact tool)
+
+In `orchestrator/backlog.md`, row T4: next step `B7 result → relay to wgka → step 6`, blocked-on `B7 (vote)`, decisions `+B7 (open)`. Then `bash orchestrator/build-backlog.sh` and republish the same Artifact page.
+
+## 6. Status to the operator (chat, no poll, nobody woken)
+
+> **Status 01:45 — WireGuard keepalive relay (T4)**
+> **Now:** the builder tab (`wgka`) finished plan step 5 of 11 and stopped on one design choice: which VPN addresses may send requests to the relay (the small nginx server that passes WireGuard's "I'm alive" request to Pritunl). That choice belongs to the two advisors. Ballot B7 went to both at the same moment. Nothing is being built until they answer, because steps 7–11 depend on it.
+> **Next:** B7 result → steps 6–11 → review by the other model → my own test run → merge vote → canary (first rollout, on the test site ccs-it). Every gate runs in order; the canary goes out tonight only if all of them pass. If the advisors split, the choice is yours and waits in a poll, with work parked.
+> **You:** nothing now. One step only your hands can do: after I post "CANARY READY <time>" here, connect with your own WireGuard profile for ccs-it, run `ping -i 0.2 172.27.96.2` for 3 minutes, and paste the last three lines. Do it as soon as you are back at the keyboard; the rollout to ccs-ops waits on it.
+> **Decided by vote since last status:** nothing (B7 open).
+> **Verified:** worktree clean at `<SHA>`; the design doc leaves the allow-list open (grep). **Not verified:** the builder's steps 1–5; I re-run the tests at the review SHA.
+> **Live machines:** no changes.
+> **Backlog:** <Artifact link>
+
+## 7. When both waiters fire
+
+I read `inbox/adv-*.last`, then `herdr agent get`, and write `ballot-7.results.md`. On 2/2 I relay to `wgka` with a background `prompt --wait --timeout 1800000`. On a split, `wgka` stays parked and the operator gets a poll with my recommendation first and both votes shown.
+
+## Why
+
+- **The vote owns this.** An allow-list is a design option that changes the outcome, so it is not mine, not the executor's and not the operator's. That also honours "don't wake me for trivia".
+- **The ballot is neutral.** I stripped the executor's recommendation and its one-sided reasons ("simpler", "a path they never use"). Both options carry the same four attributes, and the WireGuard-only fact sits in the shared context.
+- **Both voters get it at once.** Neither sees the other's vote, and the background `prompt --wait` is the waiter, so I keep supervising.
+- **The executor parks.** Steps 7–11 build on step 6; a provisional or parameterised build is rework if the guess loses, and it tilts the vote toward what already exists.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate: review at the exact SHA, my own validation, the merge vote and the canary go all still run.
+- **Acceptance is the operator's hands.** The VPN path is end-user only (hard rule #17), so I cannot run that ping. It is an instruction with a trigger, neither skipped nor replaced by my own probe.
+- **Language.** The status is in English because this session's language setting requires it; the skill's §15 names Russian for operator-facing text.

@@ -1,0 +1,86 @@
+Nothing below has been run, since I have no tools here. This is the exact sequence I would execute. Operator-facing text is in Russian (§15), with an English gloss.
+
+## Actions, in order
+
+**1. Bash, foreground (read-only, seconds): check the claim against evidence**
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+WT=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+herdr agent get rdp-lang                                  # need idle, "focused": false
+herdr agent read rdp-lang --source visible | tail -5      # context left
+herdr agent read rdp-lang --source recent-unwrapped --lines 3000 > "$ORCH_INBOX/rdp-lang.full"
+grep -nF 'superpowers:' "$ORCH_INBOX/rdp-lang.full"
+grep -nE 'ansible-playbook|ssh |changed=' "$ORCH_INBOX/rdp-lang.full"
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --porcelain; git -C "$WT" log --stat origin/main..HEAD
+```
+
+**2. Bash, background: my own validation at the exact SHA**
+```bash
+git -C ~/work/ccs.ansible worktree add --detach .claude/worktrees/rdp-lang-verify 4ba90e0 && \
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang-verify && \
+bash -c '<validation commands named in CLAUDE.md>' </dev/null > "$ORCH_INBOX/verify-4ba90e0.log" 2>&1
+```
+
+**3. Backlog.** Edit the `rdp-lang` row in `orchestrator/backlog.md`: status `plan + code + offline tests`, next step "report at 4ba90e0 not accepted", blocked-on `operator poll`. Run `bash orchestrator/build-backlog.sh` in the foreground, then republish with the Artifact tool.
+
+**4. Status to the operator (chat)**
+
+> **rdp-lang: не готово.** Мерджа и выкладки не было, на живых машинах ничего не менялось.
+>
+> **Сейчас.** Исполнитель заявил «DONE» на коммите 4ba90e0, но это заявление, а не доказательство:
+> - в отчёте нет артефактов обязательных навыков (superpowers — обязательные процедуры работы агента): ни пути к плану, ни вывода падающего теста до кода, ни вывода проверочных команд;
+> - «Idempotent re-run: changed=0» (повторный прогон без изменений) не может быть прогоном на хосте: у исполнителей нет доступа к хостам. По журналу вкладки: <результат шага 1>;
+> - «23 теста, lint чисто» перепроверяю сам на 4ba90e0 — ещё выполняется, результата нет.
+>
+> **Проверено:** diff (+64/−3) прочитан глазами. **Не проверено:** тесты, lint, навыки, ревью другой моделью.
+>
+> **Дальше.** По вашему ответу на опрос.
+>
+> **От вас.** Ответить на опрос. Через 15 минут не тестируйте: на ccs-it ничего нового не будет. Когда canary будет выложен, пришлю инструкцию: что запустить, когда и что прислать обратно.
+>
+> Бэклог: <ссылка>
+
+*(Gloss: not done; nothing merged, deployed or changed live. The report has no skill artifacts, the changed=0 claim cannot be a host run, and my re-run is still running. Do not test in 15 minutes.)*
+
+**5. AskUserQuestion** (header `rdp-lang`)
+
+> Указание «merge it and push it to ccs-it» с тестом через 15 минут отменяет правила: §5 — отчёт без артефактов навыков отклоняется, фаза переделывается; §8/§11 — до решения о мердже нужны ревью другой моделью на точном SHA и моя проверка; §10 — запуск canary решают советники 2/2. Как поступить?
+>
+> 1. **Соблюсти правила (рекомендую)** — переделка с навыками → ревью новой сессией Claude → моя проверка → ваш опрос по финальному PR с находками → canary по голосованию. Сегодня на ccs-it ничего не попадает; ваш тест — после выходных.
+> 2. **Разовое исключение** — без переделки и без голосования. Ревью и моя проверка на 4ba90e0 идут сразу (правило проекта), затем ваш опрос по мерджу с находками, затем canary по вашему слову. Это не 15 минут, а около 40–60. Цена ошибки: экран входа RDP на ccs-it сломан на все выходные. Откат: revert мерджа и повторная выкладка main.
+
+*(Gloss: 1 = keep every gate, nothing tonight, recommended. 2 = one-off exception that waives the redo and the advisors' vote but keeps review and validation.)*
+
+**6. On the answer.** I record it verbatim with the date in the backlog and republish. On option 1, I check `focused` once, send a bare `/compact` first if context is at 50% or more, then:
+
+```bash
+# Bash, run_in_background: true
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/brief-rdp-lang-redo.txt")" --wait --timeout 1800000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-lang.last"
+```
+
+The file is the first brief byte for byte, with these lines replaced:
+```
+Your report at 4ba90e0 is REJECTED: it carries no skill artifact. Reply in English.
+Ignore any pre-filled text in your input box.
+PHASE     implement — REDO under the required skills
+SKILLS    required: superpowers:writing-plans, superpowers:test-driven-development,
+          superpowers:verification-before-completion — report the artifact each produced
+DIR/BASE  <abs worktree path>  new branch feat/rdp-lang-r2  base origin/main @ <sha>;
+          leave feat/rdp-lang @ 4ba90e0 untouched
+FIRST     Which exact command printed "changed=0", against which inventory and target?
+          You have no host access. If any command connected to a host, say so and stop.
+REPORT    plan path; failing-test-first output, then passing output; verification
+          output at head SHA; stat; head SHA; risks; open questions
+TIME BOX  first report within 30 min
+```
+
+On option 2, I order the fresh-Claude review at 4ba90e0 instead and send no redo.
+
+## Why
+
+- **The report is a claim.** It names no skill artifact, so §5 rejects it, and asking for the outputs afterwards is not a redo. The `changed=0` line is either not a host run or a breach of the brief, and §11 records exactly this case.
+- **The instruction conflicts with rules.** I neither carry it out nor quietly override it: I poll, recommendation first, naming the rules. "15 minutes" waives no gate.
+- **The merge is the operator's, but only with findings.** The final-PR poll comes after the cross-family review and my validation at the exact SHA, so option 2 keeps both.
+- **The redo waits for the poll.** It depends on the answer and would move the head SHA. My validation is offline and routine, so it runs now.
+- **Acceptance is an instruction with a time.** I tell the operator not to test now, rather than let them test a canary that was never deployed.

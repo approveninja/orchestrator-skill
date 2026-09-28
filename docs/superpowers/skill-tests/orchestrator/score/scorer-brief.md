@@ -30,6 +30,9 @@ You score the verbatim answers of AI runs against a fixed rubric. Reply in Engli
   quotes, and they count.
 - **Work through the items one at a time.** Keep a verdict you have given unless re-reading
   the same item shows it was wrong.
+- **Write as you go.** Create `<OUT_FILE>` after the first item and append each item's
+  section as soon as it is scored, so a cut-off session keeps its finished work. Add the
+  TSV block last, covering every item.
 
 ## Output
 

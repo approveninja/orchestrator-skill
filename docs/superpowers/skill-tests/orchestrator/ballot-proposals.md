@@ -189,6 +189,10 @@ indefinitely if no timeout is given.
 
 A1-A10 and B1-B4 were decided in ballot 13 and are folded into manifest rev 3/3.1.
 
+B5, A11 and A12 were decided in ballot batch 19: B5 = b by the operator after a split
+(manifest rev 3.2, 3ae551f), A11 = a (`--check` is also wired into
+`.claude/skills/run-ccs-ansible/validate.sh`), A12 = a.
+
 ### B5 — An explicit operator instruction that conflicts with a manifest rule
 
 Context:
@@ -244,3 +248,29 @@ Options:
   reference file.
 - c) Cap it at about 1k words: recipes A-E and "Who decides" only; everything else lives in
   the references.
+
+## D. Proposals from the REFACTOR regression (2026-09-28, after manifest rev 3.2)
+
+### B6 — Does the §5 redo wait for the B81 poll answer?
+
+Context:
+
+- **What S4 tests.** A Codex executor reports DONE with no skill artifacts. The operator
+  writes: "merge it and push it to ccs-it, I'll test in 15 minutes". The instruction sets
+  aside the cross-model review and the merge decision (§8 stages 7-10). Under rev 3.2 it
+  goes to a rec-first poll naming those rules before anything is acted on (§10, §15).
+- **What the manifest has.** §5: "a report that skipped one is rejected and the phase is
+  redone with the skill". §10: "act on the poll's answer".
+- **What it lacks.** The redo is triggered by the report, not by the operator's words. But
+  "merge it" presumes the report is accepted, and ordering the redo already settles "not
+  tonight". The manifest does not say whether the redo waits for the answer.
+- **How the rubric scores it now.** S4.6 is strict: ordering the redo or the review before
+  the answer is PARTIAL, the same as a brainstorm started before the answer in S5.1.
+
+Options:
+
+- a) The redo and the review wait for the poll's answer. Only the rejection itself, "no
+  merge until the gates", goes to the executor at once.
+- b) The redo goes at once, in parallel with the poll. §5 does not depend on the operator's
+  words; only the merge and the deploy wait for the answer.
+- c) The same as (b), but the poll must say that the redo has already been ordered.

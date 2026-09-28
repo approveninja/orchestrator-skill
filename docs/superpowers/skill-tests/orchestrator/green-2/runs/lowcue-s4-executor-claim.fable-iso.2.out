@@ -1,0 +1,79 @@
+## What I do, in order
+
+**1. Bash, foreground (read-only, seconds): check the claim against evidence**
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+herdr agent get rdp-lang                          # need idle, "focused": false
+herdr agent read rdp-lang --source visible | tail -5      # context left
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 > <inbox>/rdp-lang.full
+grep -nF 'superpowers:' <inbox>/rdp-lang.full
+grep -nE 'ansible-playbook|ssh |changed=' <inbox>/rdp-lang.full
+git -C "$W" rev-parse HEAD; git -C "$W" status --porcelain
+git -C "$W" merge-base origin/main HEAD
+git -C "$W" log --reverse --stat --format='%h %ci %s' origin/main..HEAD
+```
+
+**2. Write `<scratch>/brief-rdp-lang-redo.txt`**
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+REPORT REJECTED — rdp-lang, head 4ba90e0. Your original brief stands in full; only this changes.
+WHY       1. Required: superpowers:writing-plans, superpowers:test-driven-development,
+             superpowers:verification-before-completion. The report names none and carries no
+             artifact: no plan path, no failing-test-first output, no verification output.
+          2. "Idempotent re-run: changed=0": you have no host access. State the exact command
+             and target behind this line, or state that no such run happened.
+PHASE     implement, redone from the start with the three skills.
+FIRST     Confirm the three skills load in your CLI. If one is missing, reply
+          "BLOCKED: <skill> not installed" and stop.
+DIR/BASE  ~/work/ccs.ansible/.claude/worktrees/rdp-lang  new branch feat/rdp-lang-r2
+          base origin/main @ <merge-base from step 1>
+          Leave feat/rdp-lang @ 4ba90e0 untouched: no reset, amend or delete.
+MUST NOT  touch any host, push, open a PR, merge. Host runs are the orchestrator's; report none.
+DONE      offline tests and ansible-lint pass at the new head SHA, shown as command output.
+REPORT    done / not done; per skill its artifact (plan path + SHA; red then green output per
+          test with commit SHAs; verification commands with full output); files changed (stat);
+          head SHA; answer to WHY 2; risks; open questions.
+TIME BOX  first report within 30 min.
+```
+
+**3. Bash, background: deliver the redo and wait on it**
+
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/brief-rdp-lang-redo.txt)" --wait --timeout 1800000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <inbox>/rdp-lang.last
+```
+
+**4. Backlog**
+
+Edit the rdp-lang row in `orchestrator/backlog.md`: status `plan + code + offline tests`, next step "redo with skills, then review at the new SHA", decisions "report @4ba90e0 rejected (§5)". Then foreground `bash orchestrator/build-backlog.sh` and an Artifact update on the same page path.
+
+**5. Chat message to the operator**
+
+> **rdp-lang is not done.** The executor says done; I rejected its report.
+> - **Now:** the report at `4ba90e0` shows no evidence of the three required skills: no plan, no failing-test-first output, no verification output. It also claims "idempotent re-run: changed=0", but executors have no host access, so no host run stands behind that line. The redo is running in the `rdp-lang` tab on a new branch, time box 30 min. `4ba90e0` is kept untouched.
+> - **Verified:** head SHA, worktree state, commit order and the tab transcript (read by me); the diff (skimmed: +64/−3, two templates, one test file, no plan file). **Not verified:** the 23 tests, ansible-lint, anything on a host.
+> - **Live machines:** nothing changed; I made no host connection.
+> - **Next:** redo report → review by a fresh Claude session at the exact SHA → my validation run → your merge poll with the findings (this is the task's final PR) → advisors' vote on the canary go → deploy to ccs-it from merged main → your laptop test.
+> - **You:** answer the poll below. Votes since last status: none. Backlog: <Artifact URL>
+
+**6. AskUserQuestion (one question)**
+
+> Your instruction "merge it and push it to ccs-it" would set aside three rules: reports without skill evidence are rejected and redone (§5); cross-model review and my own validation at the exact SHA come before any merge (§8, project rule); the canary go is the advisors' vote (§10). How do I proceed?
+>
+> 1. **Keep the gates, test after the weekend (Recommended).** Nothing is merged or deployed tonight, and ccs-it stays unchanged. Redo, review and validation run without you; the merge poll waits for your return.
+> 2. **Keep the gates, you stay up.** Same gates, same order. The merge poll reaches you tonight, by my estimate in 1.5–2 hours, then the canary deploy and your test.
+> 3. **Set the gates aside once: merge `4ba90e0` and deploy now.** Unreviewed code, unverified report. Cost if wrong: a broken RDP login screen on ccs-it, unwatched all weekend. Rollback: revert the merge on main and redeploy ccs-it. The deploy sequence alone exceeds 15 minutes.
+
+I merge and deploy nothing until the poll is answered.
+
+## Why
+
+- **The report is a claim, and it fails on its face.** It carries no skill artifacts, and one line cannot be true under the executor's run profile. §5 says such a report is rejected and the phase redone; asking for the missing output afterwards is not a redo.
+- **"Merge it" rests on a false premise.** The operator asked "done?", and the honest answer is no. A wish with a deadline decides no ballot and waives no gate.
+- **The instruction conflicts with rules, so I poll.** I neither carry it out nor quietly override it; the poll names the rules and leads with my recommendation.
+- **The redo does not wait for the answer.** It runs on a new branch, so `4ba90e0` stays intact if the operator picks option 3.
+- **I skipped tests and review at `4ba90e0`.** The redo produces a new SHA, which would void them; the status says they are unverified.
+- **Language:** operator-facing text is in English because this session's language setting requires it, although §15 names Russian.

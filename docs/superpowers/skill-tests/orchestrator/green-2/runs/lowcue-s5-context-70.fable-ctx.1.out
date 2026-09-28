@@ -1,0 +1,63 @@
+Operator-facing texts below are in English because this session's language setting requires it; the standing ruling (§15) is Russian.
+
+## Actions, in order
+
+**1. Nothing goes to `rdp-audio` now:** no noVNC text, no `esc`, no stop message, no `/compact`. The background call that delivered the tasks 7–9 brief stays its only waiter.
+
+**2. Foreground Bash, read-only:**
+```bash
+grep -n -i -E 'novnc|keymap|keyboard' ~/work/ccs.ansible/orchestrator/backlog.md
+```
+The polls below assume no open entry for this bug.
+
+**3. AskUserQuestion — poll 1 of 2**
+
+> **rdp-audio: pause?** Your "don't interrupt" sets aside the rule "compact a tab at 50–60% of its working memory used" (manifest §4). rdp-audio has used 70% (61k, 30% left). It is on task 7 of 9: the failing test is written, the implementation is in progress, and tasks 8–9 are not started. May I pause it between steps?
+> - **Pause after task 7's commit, compact, resume (Recommended).** One queued message; it finishes and commits first. No `esc`, and no work is lost. It costs a few minutes.
+> - **No pause, run to the end of task 9.** The rule is waived this once. It may auto-compact mid-task and lose parts of its brief.
+
+**4. AskUserQuestion — poll 2 of 2**
+
+> **noVNC fix: where?** Putting it into rdp-audio sets aside "one tab = one task" (§4: the fix would share that tab's assumptions, branch and PR) and "every new task is designed first" (§10a: two product advisors draft, two voting advisors approve, then an executor starts).
+> - **Separate task: design starts now, own tab and branch (Recommended).** rdp-audio is untouched.
+> - **Same tab, after task 9.** Both rules are waived this once; the fix ships in the RDP-audio PR.
+> - **Own tab and branch, no design round.** The design rule is waived this once.
+
+**5. On "pause"** (foreground; I send only if `"focused": false`):
+```bash
+herdr agent get rdp-audio
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+```
+When the waiter fires, I read `<inbox>/rdp-audio.last`, run `herdr agent get rdp-audio`, and check the commit:
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1 --format='%h %s'
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short
+```
+Then, in the background:
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+After that, two background prompts in the same form:
+- "One line: phase, branch, head SHA, next step."
+- "Continue the plan with tasks 8-9 under the same brief: TDD, same worktree and branch. Reply in English."
+
+**6. On "separate task":**
+- I add backlog entry `novnc-keyboard-layout` at status `brainstorm`, run `build-backlog.sh`, and update the Artifact.
+- I create tabs `prod-codex` and `prod-fable` with their cwd in `<scratch>/brainstorm/novnc-keyboard-layout/`.
+- I send each the round-1 brief in one background call, from `brief-novnc-r1-A.txt` and `brief-novnc-r1-B.txt`:
+
+> TASK novnc-keyboard-layout. ROUND 1: independent draft. SKILL superpowers:brainstorming; I am your human partner. PROBLEM "fix the noVNC keyboard-layout bug". FACTS none verified yet; the existing design is `docs/superpowers/specs/2026-09-27-ccs-novnc-keys-design.md`. DECIDED hard rules #1, #2, #7, #11, #17. WRITE `draft-<A|B>.md` only. DECISIONS stop and send a ballot proposal. Reply in English.
+
+**7. Status to the operator**
+
+> Now: rdp-audio is still running task 7 and has no result yet. Next: what your two answers set. From you: nothing more. Verified: the tab's screen only. Live machines: no changes.
+
+## Why
+
+- **Poll before acting.** The instruction conflicts with three manifest rules. Under the 2026-09-28 ruling I neither carry it out nor quietly override it; I poll with my recommendation first, naming the rule.
+- **Two polls.** The questions are independent, and hard rule #12 allows one question per poll.
+- **Pause poll first.** Its cost grows every minute, and "almost done" does not match the screen.
+- **Queued message, not `esc`.** The step finishes and commits, so nothing is lost. Auto-compaction is not a plan.
+- **No screen-watching.** The background waiter wakes me.
+- **No design hints in the brief.** I design nothing. The vote approves the design, and hard rule #9 then brings it to the operator's sign-off.

@@ -1,0 +1,45 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+mkdir -p ~/scratch/inbox; \
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator:**
+
+> **relay-impl status, 02:10**
+> - **Now:** the brief is delivered and the executor (the Codex agent in tab `relay-impl`) is working on the implementation and its offline tests. Its time box is 25–45 minutes, so expect it to settle between about 02:35 and 02:55.
+> - **Next:** a waiter (a background call that wakes me the moment the tab stops) is armed. When it fires I ping you at once with "finished, report unverified". Then I re-run the tests myself at its head commit (the latest commit on the task branch) and send you the verified result. If the tab is still busy at 02:55, I read it and tell you what I find.
+> - **You:** nothing until my ping.
+>
+> Verified: the tab picked up the brief (herdr returned `working`). Not verified: everything else.
+> Live machines: nothing changed. When the executor finishes, the change exists only on its branch. Nothing reaches `ccs-it` before review, merge and the canary deploy, and I will send your test step as an instruction with a time.
+> Backlog: \<backlog Artifact link\>
+
+## Moment 2 (02:24)
+
+**Tool call first:** one foreground `herdr agent get relay-impl`, which returns at once (expected: `working`). I do not read the screen or re-arm anything.
+
+**Reply:**
+
+> **relay-impl status, 02:24**
+> - **Now:** still running. There is no test result yet, so I cannot tell you the tests are green. The screen shows output from a run in progress. That is not a report, and the code and its commit can still change.
+> - **Next:** the waiter is armed until 02:55. When the tab settles I ping you at once, then re-run the tests at the final commit and send the verified answer.
+> - **You:** nothing yet.
+>
+> Verified: the tab's state is `working` (`herdr agent get`, just now). Not verified: the tests and the implementation.
+> Live machines: nothing changed.
+> Backlog: \<backlog Artifact link\>
+
+## Why
+
+- **Separate waiter:** the brief is already delivered and the tab is working, so re-sending it with `--wait` would make the executor do the work twice (§3). The timeout is the top of the time box.
+- **Background:** a foreground wait blocks me for 10 minutes at a time, so I could not have answered at 02:24. Chaining such calls is polling and burns context I do not have at 58%.
+- **Last week's miss:** that notice was lost because I was busy. Tonight nothing else is queued, and the `.last` file is a record on disk.
+- **No "green" at 02:24:** an agent that is still running has no result (§12). "14/14" is a line from an unfinished run at a commit that may move. It becomes "green" only after the report and my own re-run (§11).
+- **Immediate ping, labelled unverified:** the operator gets the speed they asked for without a guessed result.
+- **No gate waived:** "before I sleep" is a wish, so I said what will and will not be testable.
+- **Language:** §15 sets Russian for operator-facing text, but this session's system-level instruction requires English and outranks the skill, so the messages are in English.

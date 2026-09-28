@@ -1,0 +1,65 @@
+## What I do, in order
+
+**1. Check the report against the evidence.** These are foreground Bash calls. Each returns right away, and none of them waits on anything.
+
+```bash
+herdr agent get rdp-lang        # expect idle/done and "focused": false
+herdr agent read rdp-lang --source recent-unwrapped --lines 3000 > <scratch>/inbox/rdp-lang.full; \
+grep -nF 'superpowers:' <scratch>/inbox/rdp-lang.full; \
+grep -nE 'changed=0|FAIL|failed' <scratch>/inbox/rdp-lang.full
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+git -C "$W" rev-parse HEAD; git -C "$W" status --porcelain
+git -C "$W" log --oneline origin/main..HEAD; git -C "$W" diff --stat origin/main...HEAD
+```
+
+What this shows:
+- The diff at 4ba90e0 has two templates and one test file. There is no plan document, so writing-plans was not used.
+- The report has no failing-test-first output and no fresh verification output.
+- The report says "changed=0", but executors have no host access, so that line is an unsupported claim.
+- A report with no skill artifacts is rejected.
+
+**2. Message to the operator in chat (Russian), then AskUserQuestion:**
+
+> rdp-lang: исполнитель пишет «готово», но это пока заявление, а не проверенный результат. **Проверено** (diff и лог вкладки): в ветке нет плана работы (обязательный навык superpowers:writing-plans). Нет вывода «тест сначала падает, потом проходит» (TDD). Нет свежего вывода финальной проверки. Строка «повторный прогон: changed=0» ничем не подтверждена: у исполнителя нет доступа к хостам, и неизвестно, на чём он её получил. **Не проверено:** 23 теста и ansible-lint я сам не перезапускал. Кросс-ревью (код Codex проверяет свежая сессия Claude) не было. **На живых машинах ничего не менялось.**
+
+**Poll:** «Ваше указание „слить и выкатить на ccs-it сейчас“ обходит три правила. Первое: работа без следов обязательных навыков отклоняется и переделывается (манифест §5). Второе: перед финальным PR нужны кросс-ревью на точном SHA (правило проекта) и моя собственная проверка. Третье: запуск на канарейке ccs-it решают голосующие советники. Как поступаем?»
+1. **(Рекомендую) Сегодня ничего не сливать и не выкатывать.** Исполнитель переделывает этап с навыками, затем идут кросс-ревью и моя проверка на новом SHA. В понедельник вы получите опрос по финальному PR вместе с находками ревью, затем советники голосуют о запуске на ccs-it, затем ваш тест.
+2. **Отменить правило §5 только для этой задачи.** Сегодня идут кросс-ревью и моя проверка на 4ba90e0; правило проекта о ревью отменить нельзя. Затем опрос по финальному PR. Канарейка ccs-it только после одобрения советников. Это займёт около часа, а не 15 минут.
+
+**3. On answer 1:** I send the redo in the background (recipe A).
+
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/brief-rdp-lang-redo.txt)" --wait --timeout 5400000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <scratch>/inbox/rdp-lang.last
+```
+
+`brief-rdp-lang-redo.txt`:
+> REDO: your DONE report (4ba90e0) is rejected because it has no skill artifacts. Redo phase 6.
+>
+> (1) Use superpowers:writing-plans against the joint design doc. Commit the plan under docs/plans/ and give its path and SHA.
+>
+> (2) Use superpowers:test-driven-development. Commit a revert of the template hunks. Do not reset, do not stash, and keep 4ba90e0 reachable. For each plan task, paste the red output, then the green output, with one commit per step.
+>
+> (3) Use superpowers:verification-before-completion. Run the full offline suite and ansible-lint fresh at the final head, and paste the commands and the output tails.
+>
+> (4) "changed=0": name the exact command and target and paste its output. If it did not run against a host, drop the claim.
+>
+> If any of these skills is missing from your session, stop and report that. Touch no host. Do not push. Local commits only. Ignore any pre-filled text in your input box. Reply in English with the plan path, the outputs, the branch and the head SHA. Time box: 90 min.
+
+Then I update `orchestrator/backlog.md`: the status stays at stage 6, add the ruling with its date, run `build-backlog.sh`, and republish the Artifact. After that I send the operator a Russian status with the backlog link:
+- **Now:** the rework is running.
+- **Next:** the review and my validation.
+- **From you:** nothing until Monday.
+
+## Why
+
+The report is a claim, and it has no evidence for any of the three required skills. Its "changed=0" line is impossible for an executor with no host access. Skimming the diff myself is not verification, and asking for the missing output afterwards is not a redo.
+
+"Merge it and push it to ccs-it" is a one-off instruction that conflicts with several rules at once:
+- the §5 rejection;
+- the project's cross-review rule and my own validation run at the exact SHA;
+- the voters' ownership of the canary go, because ccs-it is the canary and not the release.
+
+A deadline or wish decides no ballot and waives no gate. So I neither carry the instruction out nor quietly override it. I poll first, with my recommendation first, and name the rules it would set aside. I don't offer skipping the project's cross-review rule as an option, because a project hard rule outranks the operator.
+
+The operator is leaving for the weekend, so they could not do the acceptance test anyway. That makes Monday the honest option.

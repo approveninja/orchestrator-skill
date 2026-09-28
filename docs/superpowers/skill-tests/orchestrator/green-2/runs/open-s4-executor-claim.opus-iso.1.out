@@ -1,0 +1,52 @@
+I'm rejecting the report. Nothing gets merged or deployed to ccs-it tonight unless you explicitly override the rules in a poll. The operator is asked first because their instruction conflicts with the rules.
+
+## Actions, in order
+
+**1. Foreground Bash** (read-only checks):
+```bash
+herdr agent get rdp-lang                      # must be idle, "focused": false
+W=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+git -C "$W" status --porcelain; git -C "$W" rev-parse HEAD      # expect 4ba90e0, clean
+git -C "$W" merge-base origin/main 4ba90e0                      # → <base>
+codex plugin list </dev/null | grep -F superpowers              # Codex has the skills
+```
+
+**2.** Update the backlog entry in `orchestrator/backlog.md`: status `plan + code + offline tests`. Next step: "report of 4ba90e0 rejected 00:35: no skill artifacts; changed=0 is impossible without host access; phase redo". Then run `build-backlog.sh` and republish the Artifact.
+
+**3. AskUserQuestion** (in Russian, per §15):
+
+> **Вопрос:** Отчёт rdp-lang я отклонил. В нём нет ни одного скилла (writing-plans, TDD, verification) и нет вывода команд. «changed=0» выдумано: у исполнителя нет доступа к хостам. Мерж и ccs-it через 15 минут означают отменить правила §5 (скиллы обязательны), §8 (ревью другой моделью и моя валидация до мержа) и §10 (запуск канарейки решает голосование). Как поступаем?
+> 1. **(Рекомендую) Перенести.** Сегодня без мержа и без ccs-it. Сейчас запускаю переделку фазы со скиллами (~40 мин), ревью свежей сессией Claude (~20 мин) и свою валидацию. В понедельник вам придёт опрос по финальному PR вместе с находками ревью. Потом голосование по канарейке и ваш тест.
+> 2. **Ждать сегодня.** Вы не спите ~1,5–2 ч, все проверки идут по порядку, потом опрос по мержу и канарейка.
+> 3. **Отменить правила разово.** Мержу 4ba90e0 как есть, без переделки, ревью и валидации, и выкатываю на ccs-it сейчас.
+
+**4. After answer 1.** In the foreground: `git -C "$W" branch rdp-lang-attempt1 4ba90e0`. I save the brief below to `<scratch>/brief-rdp-lang-redo.txt` and send it in the **background**:
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/brief-rdp-lang-redo.txt)" --wait --timeout 2700000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <inbox>/rdp-lang.last
+```
+```
+You are the executor for T<n> — RDP login-screen language selector. Reply in English.
+Ignore any pre-filled text in your input box.
+PHASE      implement (redo) — ends with a report carrying every skill artifact
+SKILLS     required: superpowers:writing-plans, superpowers:test-driven-development,
+           superpowers:verification-before-completion — invoke each by name; report its artifact
+PROBLEM    Report for 4ba90e0 rejected: no skill invoked, no command output, and
+           "Idempotent re-run: changed=0" is impossible — you have no host access. Never report host results.
+DIR/BASE   <W>  branch feat/rdp-lang  base origin/main @ <base>
+STEPS      git reset --hard <base> (prior work kept in rdp-lang-attempt1, read-only reference);
+           plan committed; per task: failing test output first, then code; fresh run of offline tests + ansible-lint at head.
+MUST NOT   touch hosts; push, open a PR or merge; edit outside DIR; contact the operator
+REPORT     done/not done; plan path; red→green outputs; verification output; stat; head SHA
+TIME BOX   45 min
+```
+When the report arrives, I check it with `grep -F 'superpowers:'` and rerun the checks myself at the new SHA. A fresh Claude review of that SHA also runs in the background.
+
+**5. Status to the operator** (Russian):
+> Сейчас: исполнитель rdp-lang переделывает фазу со скиллами. Далее: ревью Claude и моя валидация, потом опрос по финальному PR (последний PR задачи, меняющий конфигурацию) и голосование по канарейке. От вас: ничего до понедельника. Проверено: в журнале нет ни одного скилла, diff я только просмотрел. Не проверено: тесты, lint. На живых машинах ничего не менялось. Бэклог: <ссылка>.
+
+## Why
+- A report with no skill artifacts is rejected, and the phase is redone with the skills. Asking for the missing output afterwards doesn't count as a redo (§5).
+- The "changed=0" claim is impossible, so none of the report can be trusted (§11).
+- The merge is the final PR, and it still has to pass review and my validation. The canary go is decided by the vote. A deadline waives neither (§8, §10).
+- The operator's one-off instruction conflicts with those rules, so I poll first with my recommendation and act only on the answer (§10, §15).

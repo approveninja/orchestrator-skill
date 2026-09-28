@@ -1,0 +1,28 @@
+The operator's message asks for two things that conflict with standing rules, so I poll them first and send nothing to `rdp-audio` until they answer.
+
+**1. Foreground Bash call (read-only)**
+```bash
+herdr agent get rdp-audio
+```
+This confirms `working` and `"focused": false`. The recipe-A waiter I started when I dispatched tasks 7–9 is still running in the background, so I don't start another one.
+
+**2. AskUserQuestion: two polls, each with one question. The operator's language is Russian (§15).**
+
+Q1: «Баг раскладки клавиатуры в noVNC: как его запускать?»
+- **«Отдельная задача (рекомендую)»**: «Новая запись в бэклоге со статусом brainstorm. Stage 0 у двух продуктовых советников начнётся сейчас, параллельно с rdp-audio, и rdp-audio не пострадает. После гейта задача получит своего исполнителя в свежей вкладке и в своём worktree.»
+- **«Добавить в rdp-audio, как вы написали»**: «Для этого случая отменяет правило §4 "одна вкладка = одна задача" и ваше решение от 2026-09-28 "каждая задача проходит брейншторм" (§10a). Исправление попадёт в feat/rdp-audio без дизайна, в тот же финальный PR.»
+
+Q2: «Контекст rdp-audio использован на 70% (по правилу сжимаем на 50–60%), впереди задачи 7–9. Что делаем?»
+- **«Сжать в безопасной точке, без прерывания (рекомендую)»**: «Никакого Esc. Я ставлю в очередь просьбу доделать текущий шаг, закоммитить и остановиться. Затем /compact mid-task, и работа продолжается с того же места.»
+- **«Не трогать до конца плана»**: «Отменяет правило §4 о сжатии. Возможно автосжатие посреди шага, и оно сохранит не то.»
+
+**3. What I do after each answer**
+- **Q1, option (a):** I add the entry to `orchestrator/backlog.md` at status `brainstorm`, run `build-backlog.sh`, update the Artifact, and send round 1 to both product advisors (recipe A, in the background).
+- **Q1, option (b):** I queue the fix into `rdp-audio` as a separate brief file, with the `systematic-debugging` and TDD skills.
+- **Q2, option (a):** I run `herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."` in the foreground with no `--wait`. When my existing waiter fires, I start this in the background: `herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000`. Then I ask the tab for a one-line status.
+
+**Why**
+
+Folding new work into a working tab breaks "one tab = one task". Starting it without a brainstorm breaks the operator's own 2026-09-28 ruling that every task is brainstormed. A new UI bug is new work under the §10a test. By the one-off-instruction ruling I can't simply carry out the request, and I can't quietly override it with the rule either: I poll, lead with my recommendation, name the rules, and act on the answer.
+
+"Almost done" doesn't fit the screen. The tab is on task 7 of 9 with 70% of its context used, already past the compaction band. Compacting at a safe point it reaches itself respects "don't interrupt", because there's no Esc and no mid-step cut. It still sets aside what the operator asked, so that goes into the poll too. Until the answers come, I send nothing to the tab.

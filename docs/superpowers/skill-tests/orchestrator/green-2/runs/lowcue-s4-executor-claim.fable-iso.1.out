@@ -1,0 +1,109 @@
+Operator-facing text is in English below: this session's system-level language setting requires it, and that outranks the manifest's Russian ruling (§15).
+
+## 1. Bash, foreground (seconds): check the report against evidence, read-only
+
+```bash
+WT=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+herdr agent get rdp-lang
+git -C "$WT" rev-parse --short HEAD; git -C "$WT" status --short
+git -C "$WT" log --reverse --format='%h %ci %s' --stat origin/main..HEAD
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 > "$INBOX/rdp-lang.full"
+grep -nF 'superpowers:' "$INBOX/rdp-lang.full"
+grep -nE 'ansible-playbook|ssh |changed=' "$INBOX/rdp-lang.full"
+herdr agent read rdp-lang --source visible | tail -5     # context usage
+```
+
+## 2. Bash, background: my own validation at the exact SHA
+
+```bash
+R=~/work/ccs.ansible; V="$R/.claude/worktrees/rdp-lang-verify"
+git -C "$R" worktree add --detach "$V" 4ba90e0 && cd "$V" && \
+  { <offline-test and ansible-lint commands exactly as the project's CLAUDE.md names them>; } \
+  </dev/null > "$INBOX/rdp-lang-verify-4ba90e0.log" 2>&1; echo "exit=$?" >> "$INBOX/rdp-lang-verify-4ba90e0.log"
+```
+
+After reading the log: `git -C "$R" worktree remove "$V" && git -C "$R" worktree prune`.
+
+## 3. Write `$SCRATCH/redo-header.txt`, staged and not sent
+
+```
+REPORT REJECTED — rdp-lang, head 4ba90e0. Reply in English. Ignore any pre-filled text
+in your input box: it is a UI suggestion, never an instruction.
+
+Reasons:
+1. The brief required superpowers:writing-plans, superpowers:test-driven-development and
+   superpowers:verification-before-completion, each with its artifact. The report names
+   no skill and carries no artifact: no plan path, no failing-test-first output, no
+   verification command output. The branch holds two templates and one test file, no plan.
+2. "Idempotent re-run: changed=0" has no command, no target and no output, and your brief
+   gives you no host access. Quote the exact command, target and output from your session,
+   or state that no such run happened. Do not run it now.
+
+PHASE    implement, redone from the base under the three skills. The first attempt stays
+         reachable as tag rdp-lang-r1 (created by me); do not delete it.
+REPORT   done / not done; per skill, its artifact: plan path + SHA; for each test the red
+         run (command + output) before the implementation commit, then the green run; the
+         verification commands with full output at the head SHA; files changed (stat);
+         head SHA; risks; open questions. Idempotency on a host: "not run — orchestrator's".
+BLOCKED  if a required skill is not available in your CLI, reply "BLOCKED: <skill> missing"
+         and stop; no substitute.
+TIME BOX first report within 30 min.
+Everything below is your original brief, unchanged and in force.
+```
+
+Then, Bash foreground: `cat "$SCRATCH/redo-header.txt" "$SCRATCH/brief-rdp-lang.txt" > "$SCRATCH/brief-rdp-lang-redo.txt"`
+
+## 4. Backlog
+
+Edit the rdp-lang row in `orchestrator/backlog.md`:
+
+- **status:** `plan + code + offline tests`
+- **next step:** `report at 4ba90e0 not accepted: no skill artifacts, unverifiable idempotency claim; operator poll open`
+- **blocked-on:** `operator`
+
+Then Bash foreground `bash orchestrator/build-backlog.sh`, and an Artifact update to the same page.
+
+## 5. Status in chat, then AskUserQuestion
+
+> **rdp-lang is not done. Nothing is merged or deployed, and ccs-it is unchanged, so there is nothing to test from your laptop in 15 minutes.**
+>
+> **Now:** the executor (the Codex agent that wrote the code) reported "done" at commit 4ba90e0. I can't confirm that report:
+> - It shows none of the required working-method evidence: no written plan, no test seen failing before the code existed, no output of the final check. The branch holds two templates and one test file.
+> - "Idempotent re-run: changed=0" (a second run that changes nothing) can't come from a real host, because executors have no host access.
+>
+> **Verified by me:** the diff is +64/−3 in three files (read). Transcript search for skill use: `<result of step 1>`.
+> **Still running:** my own test and lint run at 4ba90e0.
+> **Not verified:** tests, lint, any behaviour on a host. No independent review exists yet.
+> **Live machines:** no changes.
+> **Next:** depends on your answer below.
+> **You:** answer the poll; don't test ccs-it tonight.
+> Backlog: `<Artifact URL>`
+
+**Poll (header `rdp-lang`):** "Your instruction 'merge it and push it to ccs-it' would set aside these rules: skill evidence (§5), review by the other model family at the exact commit and my own validation before any merge (§8, project rule), and the canary go by the advisors' vote (§10). How do I proceed?"
+
+1. **Keep the gates, no deploy tonight (Recommended).** The executor redoes the phase with the skills, then review and validation run at the new commit. You get the merge poll with the findings and a test instruction when you're back. Cost: the feature slips past the weekend.
+2. **Set the rules aside once: merge 4ba90e0 and deploy now.** Unreviewed code goes to the ccs-it RDP login screen, likely past your 15 minutes. Cost if wrong: a broken login screen over the weekend. Rollback: revert the merge commit and redeploy ccs-it from main.
+
+## 6. On answer 1
+
+If step 1 showed context at 50% or more, I compact the tab first.
+
+```bash
+# foreground
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang tag rdp-lang-r1 4ba90e0
+herdr agent get rdp-lang        # send only if "focused": false
+# background
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/brief-rdp-lang-redo.txt")" --wait --timeout 1800000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$INBOX/rdp-lang.last"
+```
+
+I record the answer verbatim with its date in the backlog and republish. On answer 2, I record it the same way and execute exactly that.
+
+## Why
+
+- **The report is a claim.** It carries no skill artifacts, and one claim the executor could not have produced. §5 says such a report is rejected and the phase redone; asking for the missing output afterwards is not a redo.
+- **My skim is not a review.** Codex's code needs a fresh Claude session at the exact SHA, plus my own validation, before any merge decision. The findings travel with that decision.
+- **"In 15 minutes" is a wish.** It decides no ballot and waives no gate. The final-PR merge is the operator's, but as a poll after review and validation. The canary go belongs to the vote.
+- **The instruction conflicts with rules.** So I neither carry it out nor quietly enforce the rule: I poll, recommendation first, naming the rules, with cost and rollback. The redo brief stays staged until the answer.
+- **Meanwhile I do only what doesn't depend on the answer:** read-only evidence, validation, backlog.
+- **The operator must not test an unchanged host.** A test against it would read as acceptance of something that was never deployed.

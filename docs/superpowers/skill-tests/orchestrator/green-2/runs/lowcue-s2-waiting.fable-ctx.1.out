@@ -1,0 +1,43 @@
+## Moment 1 — 02:10
+
+**Tool call 1, Bash, background (`run_in_background: true`):**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Tool call 2:** set relay-impl to `implementing` in `orchestrator/backlog.md` (dispatched 02:10, time box to 02:55), then run `build-backlog.sh` to republish the Artifact. After that I make no calls until the notification.
+
+**Message to the operator:**
+
+> relay-impl (the Codex agent writing the code) picked up the brief at 02:10 and is working.
+>
+> **Now:** implementation plus offline tests, time box 25–45 minutes, so expect it to settle between 02:35 and 02:55. A background waiter wakes me the moment the tab stops, and nothing else is queued.
+> **Next:** I write to you as soon as it settles, then check its report against the evidence and re-run the tests myself at its final commit. If it is still silent at 02:55, I tell you that too.
+> **You:** nothing until my ping. One fact before you decide to wait up: when it finishes, what exists is a branch with offline tests. Nothing reaches ccs-it until the other model reviews that exact commit, my validation run passes, and it is merged and deployed to the canary from `main`.
+>
+> Verified: the brief was picked up (status `working`). Nothing changed on live machines. Backlog: ‹backlog Artifact link›
+
+## Moment 2 — 02:24
+
+**Tool call first, foreground, once:** `herdr agent get relay-impl` → `working`. I do not re-arm the waiter; the 02:10 one is still live.
+
+**Reply:**
+
+> Still running — there is no result yet, so I can't tell you the tests are green.
+>
+> **Now:** relay-impl is `working` (checked 02:24), 14 minutes into its time box, and has moved from writing code to running its checks. What is on a running agent's screen is not a report. I call the tests green only after its report names a final commit and I have re-run the suite at that commit.
+> **Next:** I write the moment the tab settles, 02:55 at the latest.
+> **You:** nothing.
+>
+> Verified: the tab's state. Not verified: tests, idempotency, the code. Nothing changed on live machines. Backlog: ‹backlog Artifact link›
+
+## Why
+
+- **Separate waiter:** the tab is already working, which is the one case for `herdr agent wait` (§3). It carries the time box as its timeout and leaves a file record. The clean form would have been one background `prompt --wait`; my foreground call split it.
+- **No watching:** a foreground wait caps at 10 minutes, so watching means chained blocking calls or screen reads. That is polling, it spends context I am short of at 58%, and it blocks me from answering the operator.
+- **Last week's miss:** it came from being busy when the notice landed. The remedy is staying free, plus the timeout, which makes silence at 02:55 news.
+- **"Before I sleep":** a wish waives no gate, so I state now what will be testable, as a fact and not a question.
+- **"Still running":** a pass line mid-run can be stale by the end, since the idempotency check may force a code change. Even a finished report is a claim until I re-run it.
+- **Language:** both messages are in English because this session's setting requires it. §15 names Russian for the operator regardless, so the two conflict.

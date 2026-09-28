@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Join the scorers' verdicts (the BEGIN-TSV blocks of score/scores-*.md) with score/map.tsv,
-# and count verdicts per criterion, batch (red/green) and format (open/lowcue/product).
+# and count verdicts per criterion, batch (red, green, v1, v2 …) and format (open/lowcue/product).
 #
-# Usage: bash tally.sh [scores-glob]      default: score/scores-s*.md
+# Usage: [MAP=<map.tsv>] bash tally.sh [scores-glob]   defaults: score/map.tsv, score/scores-s*.md
 #   prints a table: criterion  format  batch  PASS FAIL PARTIAL HEDGED N/A  (other: lang codes)
 set -euo pipefail
 
@@ -11,7 +11,7 @@ files=( ${1:-$here/scores-s*.md} )
 
 for f in "${files[@]}"; do
   awk '/^BEGIN-TSV/{on=1; next} /^END-TSV/{on=0} on && NF' "$f"
-done | awk -F'\t' -v map="$here/map.tsv" '
+done | awk -F'\t' -v map="${MAP:-$here/map.tsv}" '
   BEGIN {
     while ((getline line < map) > 0) {
       split(line, m, "\t"); if (m[1] == "item") continue

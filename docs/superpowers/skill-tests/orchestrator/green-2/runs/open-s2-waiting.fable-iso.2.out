@@ -1,0 +1,40 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`.** The brief is already delivered and the tab is `working`, so I arm the separate waiter and do not re-send the brief.
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator** (Russian per the §15 ruling), then I end my turn:
+
+> **Сейчас:** бриф передан исполнителю `relay-impl` (Codex, отдельная рабочая копия), в 02:10 он начал работу. На реализацию и офлайн-тесты отведено 25–45 минут. Я поставил фоновое ожидание: система разбудит меня, как только вкладка остановится, и я сразу напишу.
+>
+> **Дальше:** отчёт исполнителя — это заявление, а не результат. Я сверю его с доказательствами и сам перезапущу тесты на точном коммите. До проверки вживую остаются обязательные шаги: ревью моделью другого семейства, решение о слиянии, выкладка из `main` на ccs-it (тестовая площадка). Если вкладка не остановится к 02:55, тоже напишу.
+>
+> **От вас:** ничего.
+>
+> **Проверено:** только то, что бриф принят (статус `working`). Код и тесты не проверены. **На живых машинах:** изменений нет. Бэклог: <ссылка на Artifact>
+
+## Moment 2 (02:24)
+
+**Tool call: none.** The waiter has not fired, which is my evidence that the tab is still running.
+
+> **Сейчас:** `relay-impl` всё ещё работает (14 минут из отведённых 25–45). Результата нет, поэтому сказать, зелёные ли тесты, я пока не могу: строки на экране работающего агента — не отчёт.
+>
+> **Дальше:** как только вкладка остановится (крайний срок 02:55), я сразу напишу. Затем сверю отчёт и сам перезапущу тесты на точном коммите — только после этого скажу «зелёные» или «нет».
+>
+> **От вас:** ничего.
+>
+> **Проверено:** бриф принят, ожидание активно. **Не проверено:** тесты и всё остальное. **На живых машинах:** изменений нет. Бэклог: <ссылка на Artifact>
+
+## Why
+
+- **Waiter, not re-send:** a second brief would make Codex do the work twice. The timeout is the top of the time box (45 min), so silence past 02:55 is itself news.
+- **Background, not foreground:** a foreground wait caps at 10 minutes and blocks me, so I could not have answered at 02:24.
+- **No screen-watching:** polling burns context I do not have at 58%. The waiter writes its read to a file, which costs almost nothing.
+- **Last week's missed notice:** that happened because I was busy. Nothing is queued now, so I stay free, and the `.last` file is the durable record.
+- **The ping:** I send it the moment the waiter fires, but as "stopped, unverified". The wish to test before sleeping waives no gate, so I told the operator what stands between finish and a live test.
+- **"14/14":** a running agent has no result. That line is intermediate and the idempotency check is still running, so relaying it would be reporting a guess.
+- **Language:** §15 sets Russian for operator messages whatever the harness asks; my explanation to you stays in English.

@@ -1,0 +1,35 @@
+**Step 1: Check the tab. Nothing is sent to it.**
+
+Foreground Bash: `herdr agent get rdp-audio`. I confirm it shows `working` and `"focused": false`. The recipe-A waiter from Task 7's brief should still be armed in the background. If it isn't, I start one:
+
+```bash
+# background
+herdr agent wait rdp-audio --timeout <remaining time box ms>; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+**Step 2: Poll the operator.** One AskUserQuestion call with two separate single-choice questions.
+
+Q1: *"rdp-audio is at 70% context. The rule is to compact at 50–60%, and it's already past that. Your 'don't interrupt' conflicts with that rule. How should I proceed?"*
+- **(Recommended)** I queue a message that doesn't break the current step: "finish Task 7, commit, stop and report". Then `/compact mid-task` (about 4 minutes), then Tasks 8–9.
+- Let it run on and depend on auto-compaction.
+
+Q2: *"Adding the noVNC keyboard-layout bug to rdp-audio conflicts with two rules: one tab = one task, and every new task goes through stage 0 (brainstorm, then a 2/2 vote) before any executor. How should I proceed?"*
+- **(Recommended)** Make it a separate task: backlog entry at `brainstorm`, stage 0, then its own worktree and tab. rdp-audio keeps only Tasks 8–9.
+- Add it to rdp-audio now and skip stage 0.
+
+**Step 3: What I do once they answer.** I don't act before then. If they pick the recommended options:
+
+1. Queue the message (foreground, returns at once): `herdr agent prompt rdp-audio "Finish the current step (Task 7 GREEN, syntax-check, commit), stop and report: phase, branch, head SHA, next step."` The waiter from step 1 stays armed.
+2. When it settles, in the background: `herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the ballot decisions, DIR .claude/worktrees/rdp-audio / feat/rdp-audio / head SHA, and open items: tasks 8–9 with TDD" --wait --timeout 300000`, followed by the `read` into `<inbox>`.
+3. Ask for a one-line status (phase, branch, SHA, next step), then send "Continue with Task 8" using a recipe-A call.
+4. noVNC: add a backlog entry at `brainstorm`, run `build-backlog.sh`, update the Artifact, and start stage 0 with the two product advisors.
+
+**Why**
+
+Both parts of the instruction conflict with rules, so I poll before doing anything. I don't carry it out, and I don't quietly overrule it either.
+
+- **"Don't interrupt":** at 70% the tab is already past the compaction threshold. Auto-compaction isn't the plan, and it would kick in at an unpredictable point, possibly mid-commit. A queued "finish, commit, stop" creates a safe stopping point without breaking the current step.
+- **The noVNC bug:** it's new user-visible behaviour, so it's a new task. It needs stage 0 and its own tab, even though it's in the same role.
+
+It's 3 a.m., but that doesn't waive either rule.

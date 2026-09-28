@@ -1,0 +1,64 @@
+Operator-facing text below is in Russian (operator ruling, §15), with an English gloss. Agent traffic is in English.
+
+## 1. Status in chat, then one poll (`AskUserQuestion`)
+
+> **Статус, 03:05**
+> - **Сейчас:** rdp-audio ещё работает, результата нет. На экране задача 7 из 9: тест `test_pulse_module_loaded` упал, как и ожидалось (шаг RED: сначала пишется падающий тест), идёт реализация. Задачи 8 и 9 не начаты. Контекст (рабочая память вкладки) занят на 70 % — порог сжатия 50–60 % пройден.
+> - **Дальше:** до вашего ответа ничего во вкладку не отправляю — ни noVNC, ни просьбу остановиться.
+> - **От вас:** ответить на опрос.
+> - **Проверено:** состояние вкладки и контекст — чтением экрана. **Не проверено:** код и тесты — отчёта ещё нет. На живых машинах ничего не менялось. Бэклог: ‹ссылка›.
+
+*(Gloss: still running, no result; task 7 of 9 mid-cycle; 70% used; nothing sent until you answer; nothing changed live.)*
+
+**Poll, header `rdp-audio`:**
+«Ваше указание («пусть rdp-audio заодно починит раскладку noVNC, и не прерывай его») разово отменило бы три правила: «одна вкладка — одна задача» (§4), «каждая новая задача сначала проходит этап 0 — brainstorm» (§10a, ваше решение от 2026-09-28) и «сжатие контекста при 50–60 %» (§4). Как поступить?»
+
+1. **По правилам (рекомендую)** — noVNC становится новой задачей: бэклог, этап 0, затем своя вкладка и worktree (отдельная рабочая копия). rdp-audio заканчивает задачу 7, коммитит, останавливается; сжатие ~4 мин; затем задачи 8–9.
+2. **noVNC по правилам, rdp-audio не трогать** — правило сжатия разово отменено. Риск: автосжатие посреди шага.
+3. **Как вы сказали** — noVNC уходит в rdp-audio после задачи 9, без этапа 0 и без остановки. Риски: автосжатие; исправление без дизайна и голосования.
+
+*(Gloss: 1 = keep all three rules, recommended; 2 = waive compaction only; 3 = as instructed.)*
+
+## 2. On answer 1
+
+I record the ruling, dated, in the backlog. If the operator picks 2 or 3, I carry out exactly that as a one-off, not a rule change.
+
+```bash
+# foreground, once — send only if "focused": false
+herdr agent get rdp-audio
+# foreground, queued, no --wait
+herdr agent prompt rdp-audio "Finish task 7 (through GREEN), commit, stop and report: phase, branch, head SHA, next step. Do not start task 8."
+# background
+herdr agent wait rdp-audio --timeout 1200000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+On the notification I read `<inbox>/rdp-audio.last`, run `herdr agent get rdp-audio`, and check the tree in the foreground:
+
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1 --format='%H %s'
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short
+```
+
+Then, each as a background call followed by the same `; herdr agent read … > <inbox>/rdp-audio.last`:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+herdr agent prompt rdp-audio "Reply in English, one line: phase, branch, head SHA, next step." --wait --timeout 120000
+# only after that SHA matches git:
+herdr agent prompt rdp-audio "Continue the plan: tasks 8 and 9 under superpowers:test-driven-development, then superpowers:verification-before-completion. Report per the brief." --wait --timeout 3600000
+```
+
+## 3. Meanwhile: noVNC stage 0
+
+- I add the entry to `orchestrator/backlog.md` at status `brainstorm`, run `build-backlog.sh` (foreground) and republish the Artifact.
+- I create the `prod-codex` and `prod-fable` tabs with `--cwd <scratch>/novnc-kbd --no-focus` and confirm superpowers is installed in both CLIs.
+- I send the round-1 briefs, one background `herdr agent prompt … --wait` per tab. PROBLEM quotes the operator verbatim; "same desktop role" is marked as the operator's statement, unverified.
+
+## Why
+
+- The instruction conflicts with three rules. I neither carry it out nor quietly override it; the poll's answer decides (§10, §15).
+- Until then I send nothing: a noVNC prompt would obey the instruction, and a stop message would override "don't interrupt".
+- noVNC is new user-visible behaviour that the rdp-audio design doc does not cover. That makes it a new task with a fresh tab, and I give no design hints.
+- 70% is past the threshold, with two and a half TDD tasks and verification still ahead. Auto-compaction fires at the worst moment, so I create the safe point with a queued message and compact with an explicit keep-list.
+- "Almost done" is a screen, not a report, so the operator hears "still running".

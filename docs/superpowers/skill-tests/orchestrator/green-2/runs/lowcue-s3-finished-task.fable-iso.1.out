@@ -1,0 +1,113 @@
+Operator-facing texts below are in English because this session's language instruction requires it. §15 names Russian as the operator's language, so that is a known deviation.
+
+## 1. Backlog first (foreground)
+
+Edit `orchestrator/backlog.md`:
+
+- **WG keepalive row:** status `docs closed`; decisions add `operator 2026-09-28 23:10: "accepted"`; docs closed `no: snapshot, living docs, design/plan status, memory`.
+- **New row:** `T<next> | RDP audio | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts | — | operator 2026-09-28 23:10 (deadline is a wish) | no`
+
+Then run `bash orchestrator/build-backlog.sh` and republish the same page with the Artifact tool.
+
+## 2. Stage 0: two new product-advisor tabs (foreground)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+mkdir -p "$S/brainstorm/rdp-audio"
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm/rdp-audio" --label prod-codex --no-focus
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$S/brainstorm/rdp-audio" --label prod-fable --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+Skill check, one background call per tab:
+
+```bash
+herdr agent prompt prod-codex "Reply in English. List the superpowers:* skills available to you, one per line. Do nothing else." --wait --timeout 120000; herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$ORCH_INBOX/prod-codex.last"
+```
+
+Once `superpowers:brainstorming` is confirmed in both, send round 1, one background call per tab with `--wait --timeout 2700000`, using `brief-rdp-audio-r1-<codex|fable>.txt`:
+
+```
+You are product advisor <A|B> in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box.
+TASK       T<next> — RDP audio
+ROUND      1 draft — independent; open no other advisor's file; ends when your draft exists
+SKILL      superpowers:brainstorming; I am your human partner: send questions to me (batched)
+PROBLEM    "Excellent. Now the RDP audio thing — I want a design by morning. Go." (operator,
+           2026-09-28 23:10) <plus the operator's earlier words on RDP audio, quoted with time>
+FACTS      Repo ~/work/ccs.ansible: Ansible for two KVM sites; ccs-it canary, ccs-ops the other.
+           Live state: projects/ccs/soul/<host>.md. No verified fact about RDP audio exists yet;
+           name what you need measured and I collect it read-only.
+DECIDED    Deploy only from merged main, canary ccs-it first; one worktree per task;
+           <ban sentences from CLAUDE.md, byte for byte>; the deadline shortens no round.
+MAY        read the repository, upstream sources, the web
+WRITE      <S>/brainstorm/rdp-audio/draft-<codex|fable>.md — the only file
+MUST NOT   write elsewhere; touch hosts or herdr; change any working tree; contact the other
+           advisor or the operator
+DECISIONS  stop and send me a ballot proposal; draft nothing that depends on it
+REPORT     file path; open questions, each marked blocking or not. Compact.
+TIME BOX   45 min to first report
+BLOCKED    reply "BLOCKED: <what> <why>" and stop
+```
+
+## 3. WG docs closure (runs in parallel)
+
+```bash
+git -C ~/work/ccs.ansible fetch origin
+git -C ~/work/ccs.ansible worktree add ~/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs -b chore/wg-keepalive-docs-close origin/main
+```
+
+Agent tool, model Sonnet, background:
+
+> "Reply in English. Work only in /Users/…/ccs.ansible/.claude/worktrees/wg-keepalive-docs. Write only what the evidence in `<S>/evidence/wg-keepalive/` shows; predict nothing. (1) Update the ccs-it snapshots in `projects/ccs/soul/`. (2) Mark the task's design and plan docs implemented, PR #165, with the merge SHA. (3) Update living docs describing the keepalive behaviour. Do not touch ccs-ops snapshots. No session links. Do not commit. Report each claim with its evidence line."
+
+## 4. Status to the operator
+
+> **Now.** WG keepalive: your acceptance is recorded. The task is not `done`: docs closure is running, cleanup follows. RDP audio is T<next>, status `brainstorm`; two product advisors are starting independent drafts — still running, no result yet.
+> **Next.** Cross-critique, a joint design doc, then the design-approval vote. The full brainstorm runs unshortened. If it cannot finish by morning, you get a poll: slip the deadline or waive the brainstorm.
+> **You.** One poll follows. Otherwise nothing.
+> **Verified by me:** PR #165 on main; ccs-it deployed from merged main; re-run `changed=0`. **Yours:** the ping summary. **Not verified:** anything about RDP audio.
+> **Live changes:** ccs-it only. ccs-ops untouched.
+> **Vote decisions:** none. **Backlog:** <Artifact URL>
+
+## 5. Poll (AskUserQuestion)
+
+I first run `pmset -g assertions` in the foreground, read-only. The poll goes out unless something already keeps the Mac awake.
+
+> **Keep this Mac awake overnight for the brainstorm?**
+> 1. **Yes, run `caffeinate -i` (recommended)** — I start it and kill it at cleanup.
+> 2. **No** — if the Mac sleeps, turns are cut off and the design may not be ready.
+
+## 6. When the subagent returns
+
+1. Check every claim against the evidence.
+2. Run `git grep -nE "code/session_[0-9A-Za-z]"` and the project's docs-only check.
+3. Commit, push, open the PR, then `gh pr merge <n> --merge --delete-branch`.
+4. Write the memory note and set `docs closed: yes`.
+5. Clean up:
+
+```bash
+herdr agent get wgka                       # idle, focused:false
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive status --porcelain   # must be empty
+herdr tab close <wgka tab_id>
+git -C ~/work/ccs.ansible worktree remove .claude/worktrees/wg-keepalive
+git -C ~/work/ccs.ansible worktree remove .claude/worktrees/wg-keepalive-docs
+git -C ~/work/ccs.ansible worktree prune
+git -C ~/work/ccs.ansible branch -d feat/wg-keepalive-relay chore/wg-keepalive-docs-close
+ps -p 48211 -o pid,command && kill 48211   # only if it is my codex app-server
+git -C ~/work/ccs.ansible pull && git -C ~/work/ccs.ansible worktree list
+```
+
+6. Set the backlog row to `done` and republish.
+
+## Why
+
+- **"Accepted" does not finish the WG task.** It is `done` only after the docs checklist and cleanup (§8, §4).
+- **`wgka` is closed, not reused.** One tab is one task, and no executor may exist for RDP audio before it is `brainstormed` (§4, §10a). Its knowledge is already in merged code.
+- **I hand over no design hints.** "It touches the desktop and gateway roles" is a sketch without evidence, so it stays out of the brief (§1).
+- **The voting tabs do not draft.** `adv-codex` and `adv-fable` vote, so two separate product advisors are created (§10a).
+- **"By morning" waives nothing.** Every round runs in full; a deadline the brainstorm cannot meet becomes a poll (§10a).
+- **The broker is killed by pid.** A pattern kill would take the Codex advisor tabs with it.
+- **Keeping the Mac awake is the operator's call.** It changes their workstation, so it is a poll, asked while they are still here (§15).
+- **Everything lives in files.** After nine hours, my own compaction must lose nothing.

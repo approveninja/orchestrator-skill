@@ -1,0 +1,49 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+I make no other call and start nothing else while it is armed.
+
+**Message to the operator** (Russian per the §15 ruling; the backlog link is a placeholder):
+
+> **Сейчас:** `relay-impl` (исполнитель Codex в отдельной рабочей копии репозитория) принял задание в 02:10 и работает: реализация и офлайн-тесты, лимит 25–45 минут, то есть до 02:55.
+> **Дальше:** включено фоновое ожидание: меня разбудит в момент, когда вкладка остановится. Я сразу напишу вам, затем сверю отчёт с доказательствами и сам перезапущу тесты на итоговом коммите.
+> **От вас:** ничего.
+> **Проверено:** только то, что задание доставлено и вкладка работает. Результатов нет. На живых машинах изменений нет.
+> По окончании будет ветка с офлайн-тестами, а не выкладка на `ccs-it`: ревью, проверка, слияние и канареечная выкладка не пропускаются.
+> Бэклог: ‹ссылка›
+
+*Gloss:* running until 02:55 at the latest; I ping at the moment it stops, then verify. Nothing for you to do. Only delivery is verified, and nothing live changed. The outcome is a branch, not a deploy, and no gate is skipped.
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground**
+
+```bash
+herdr agent get relay-impl
+```
+
+**Reply:**
+
+> **Сейчас:** всё ещё выполняется. Результата нет, поэтому подтвердить «тесты зелёные» я не могу: строки на экране работающей вкладки — промежуточный вывод, а не отчёт. Прошло 14 минут из 25–45.
+> **Дальше:** ожидание активно. Когда вкладка остановится, сразу напишу, затем проверю отчёт и сам перезапущу тесты.
+> **От вас:** ничего.
+> **Проверено:** только состояние вкладки (`working`). Тесты не проверены. На живых машинах изменений нет.
+> Бэклог: ‹ссылка›
+
+*Gloss:* still running, no result, and I cannot confirm green. Only the tab state is verified.
+
+## Why
+
+- **Separate waiter, not recipe A.** The brief is already delivered and the tab is working, so re-sending it would make Codex do the work twice. This is the one case for `agent wait` (§3), with the timeout set to the top of the time box.
+- **Background.** A foreground call caps at 10 minutes, so covering 45 means chaining calls, which is polling. It would also have left me unable to answer at 02:24. The waiter's output goes to a file, which matters at 58% context.
+- **Last week's miss** came from being busy, not from the waiter. The fix is staying free, not watching the screen.
+- **The ping** goes out at settle, but the result only after I check the evidence and re-run the tests at the head SHA (§11).
+- **"14/14"** sits on a tab that is mid-run with the idempotency check still open. A running agent has no result (§12), and relaying that line would fabricate one.
+- **One `agent get`** answers the operator's question about state. It is not a loop, and I do not read the screen.
+- **The gate note** is there because a wish to test tonight waives nothing (§8, §10).

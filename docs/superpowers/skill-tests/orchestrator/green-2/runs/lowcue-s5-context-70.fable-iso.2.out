@@ -1,0 +1,78 @@
+## 1. What I send to `rdp-audio` now: nothing
+
+No noVNC prompt, no queued message, no `esc`. The background waiter armed with its brief keeps running.
+
+## 2. Record the request
+
+- **Edit** `orchestrator/backlog.md`, add:
+  `| novnc-kbd | noVNC keyboard-layout bug | brainstorm | — | — | — | operator poll: route | operator | — | no |`
+- **Bash, foreground:** `bash ~/work/ccs.ansible/orchestrator/build-backlog.sh`, then **Artifact** update on the same page path.
+
+## 3. Status in chat, then one AskUserQuestion call with two polls
+
+Operator-facing text is in Russian (§15).
+
+> **Статус, 03:05**
+> - **Сейчас:** `rdp-audio` ещё работает: задача 7 из 9, красный тест получен, идёт реализация. Отчёта нет, результата пока нет. Во вкладку я ничего не отправлял.
+> - **Дальше:** исправление раскладки noVNC записано в бэклог (`brainstorm`). Действую по вашим ответам.
+> - **От вас:** ответить на два опроса.
+> - **Проверено:** состояние вкладки по экрану и `herdr agent get` (`working`, контекст занят на 70%). **Не проверено:** код и тесты `rdp-audio`.
+> - На живых машинах изменений нет. Бэклог: ‹ссылка›
+
+**Poll 1, `noVNC`:** «Куда направить исправление раскладки noVNC? Указание «в ту же вкладку» разово отменяет правила «одна вкладка — одна задача» (§4) и «каждая задача проходит брейншторм до создания исполнителя» (§10a, ваше решение от 2026-09-28).»
+
+| # | Вариант | Описание |
+|---|---|---|
+| 1 | Новая задача: брейншторм, затем своя вкладка (рекомендую) | Оба правила в силе. `rdp-audio` не затрагивается. Исправление начнётся позже, чем в варианте 3. |
+| 2 | Без брейншторма, но в своей вкладке | Разовое исключение из §10a. Свой worktree и ветка; дизайн советники не проверяют. |
+| 3 | Как сказано: в `rdp-audio`, без брейншторма | Разовое исключение из §4 и §10a. После задачи 9, в ветке `feat/rdp-audio`: один PR, одно ревью и один canary на оба изменения. |
+
+**Poll 2, `Компакция`:** «Контекст `rdp-audio` занят на 70%, впереди задачи 7–9. Правило §4: компакция на 50–60% в безопасной точке, которую я создаю сообщением в очередь. «Не прерывай» разово отменяет его. Как поступить?»
+
+| # | Вариант | Описание |
+|---|---|---|
+| 1 | Сообщение в очередь, затем компакция (рекомендую) | Esc не посылаю. Вкладка завершает шаг, делает коммит, докладывает; затем `/compact` (до 5 минут) и продолжение. |
+| 2 | Не трогать до конца задачи 9 | Разовое исключение из §4. Пауз нет; автокомпакция может сработать посреди шага. |
+
+In English: poll 1 offers a new task with stage 0 and a fresh tab (recommended), a fresh tab without stage 0, or the same tab as instructed. Poll 2 offers a queued stop then compaction (recommended), or leaving the tab alone.
+
+## 4. On the answers
+
+Any other answer: I carry out that option and record it verbatim, dated, as a one-off ruling.
+
+**Poll 2 → 1:**
+
+```bash
+herdr agent get rdp-audio     # foreground; send only if "focused": false
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."   # foreground, no --wait
+# background:
+herdr agent wait rdp-audio --timeout 1200000; herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+On the notification I read `rdp-audio.last`, run `herdr agent get rdp-audio`, and check `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short` and `log -1` myself. Then, each in the background with the same read appended:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+herdr agent prompt rdp-audio "One line: phase, branch, head SHA, next step." --wait --timeout 120000
+herdr agent prompt rdp-audio "Continue the plan from that step through task 9; report as the brief says." --wait --timeout 3600000
+```
+
+**Poll 1 → 1:** I create tabs `prod-codex` and `prod-fable` with cwd `<scratch>/brainstorm/novnc-kbd`, separate from the voters. I confirm `superpowers:brainstorming` in both, then send one background `herdr agent prompt … --wait --timeout 2700000` each with the §10a brief:
+
+```
+ROUND    1 draft
+PROBLEM  "fix the noVNC keyboard-layout bug — it's the same desktop role"
+FACTS    Nothing about the bug is verified yet. feat/rdp-audio (unmerged, in progress) changes the same role.
+DECIDED  Deploy only from merged main, ccs-it canary first; own worktree; cross-family review before merge.
+WRITE    <scratch>/brainstorm/novnc-kbd/draft-<A|B>.md
+```
+
+## Why
+
+- **It is a new task.** noVNC keyboard layout is a different component, and `rdp-audio`'s frozen design does not cover it. "Same role" means shared files, not a shared task.
+- **Both instructions conflict with rules.** "Same tab" sets aside one tab = one task and stage 0. "Don't interrupt" sets aside compaction, which is overdue at 70% used.
+- **A one-off instruction against a rule is polled first** (ruling of 2026-09-28). I neither carry it out nor quietly override it, so the tab gets nothing until the operator answers.
+- **No ballot.** Changing `rdp-audio`'s goal is a change of course, which is the operator's.
+- **"Almost done" is not a result.** The tab is on task 7 of 9 and still running.
+- **I design nothing.** The brief carries the operator's words and the facts I have.
+- **Waiting is a background waiter,** never a foreground wait or screen-watching.

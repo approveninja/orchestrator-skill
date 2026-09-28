@@ -1,0 +1,100 @@
+Two placeholders: `$ORCH` is my scratch directory (`backlog.md`, `build-backlog.sh`, `inbox/`, `brainstorm/`), and `T12` stands for the next free backlog id. Operator-facing text is in English here because this session is set to English; §15 names Russian for the operator.
+
+## 1. Preflight — Bash, foreground
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get prod-codex; herdr agent get prod-fable      # need: idle, "focused": false
+herdr agent read prod-codex --source visible --lines 30     # context left
+herdr agent read prod-fable --source visible --lines 30
+codex plugin list | grep -F superpowers; claude plugin list | grep -F superpowers   # subcommand names assumed
+mkdir -p "$ORCH/brainstorm/T12" "$ORCH/inbox"
+```
+
+## 2. Backlog — Edit `$ORCH/backlog.md`, then republish
+
+```
+| T12 | CCS bar shows the site name next to the user name | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts | — | — | no |
+```
+
+```bash
+bash "$ORCH/build-backlog.sh"     # foreground; then Artifact tool: republish to the same page path
+```
+
+## 3. Round 1 — write two brief files, dispatch both in the background
+
+`$ORCH/brainstorm/T12/brief-r1-prod-codex.txt` (the `prod-fable` file differs only in "advisor B" and `draft-prod-fable.md`):
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T12 — CCS bar shows the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      - base: origin/main @ 194768e
+           - the CCS bar is rendered by the njs front door (auth.js, role
+             projects/ccs/roles/host_proxy) on each site's gateway VM (CLAUDE.md, "Public ingress")
+           - ccs-it gateway runs front-door image tag 16 (projects/ccs/soul/ccs-it.md @ d12f76b)
+           - an auth.js change ships as a new image tag and recreates the front-door
+             container, one site per run (rollouts of PRs #163, #170)
+DECIDED    - CLAUDE.md hard rules bind; most relevant: #6, #7, #9, #11, #14, #17
+           - canary site = ccs-it; ccs-ops only after operator acceptance
+           - operator ruling 2026-09-28: every task is brainstormed by both product advisors
+MAY        read the repository, upstream sources, the web
+WRITE      <ORCH>/brainstorm/T12/draft-prod-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   20 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+```bash
+# Bash, run_in_background: true — call 1
+herdr agent prompt prod-codex "$(cat "$ORCH/brainstorm/T12/brief-r1-prod-codex.txt")" --wait --timeout 1200000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$ORCH/inbox/prod-codex.last"
+# Bash, run_in_background: true — call 2
+herdr agent prompt prod-fable "$(cat "$ORCH/brainstorm/T12/brief-r1-prod-fable.txt")" --wait --timeout 1200000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$ORCH/inbox/prod-fable.last"
+```
+
+If `prod-fable` goes `blocked` on a permission prompt, I approve only a write inside `$ORCH/brainstorm/T12/` and deny anything else.
+
+## 4. Status in chat, then the poll (same turn)
+
+> **T12 — site name in the CCS bar**
+> **Now:** in the backlog at `brainstorm`. Both product advisors (the two design tabs, Codex and Fable) have round 1, independent drafts. Still running, no result yet.
+> **Next:** cross-critique, one joint design doc, and a vote by the two voting advisors on every open question and on the doc. The design then comes to you as an Artifact for sign-off (project hard rule #9), and only after that does an executor start.
+> **You:** answer the poll below.
+> **Verified:** nothing yet. **Live machines:** nothing changed. Backlog page: same URL.
+
+AskUserQuestion:
+
+> **T12: the full brainstorm you ruled today cannot finish before your 11:00 call. Which do you choose?**
+> 1. **Keep the full brainstorm; I show it after the call (recommended).** Three design rounds, votes, code, cross-review, your merge poll, then the deploy to ccs-it (the canary site). Canary today stays the target, not a promise.
+> 2. **Waive the brainstorm for this task only.** A one-off exception to today's ruling "any task must first be brainstormed". An executor starts at once and every other gate still runs. Before 11:00 is still not promised.
+
+## 5. On the answer
+
+I record the ruling verbatim and dated in the backlog and republish.
+
+- **Answer 1:** on each waiter notification I read `inbox/<name>.last`, then `herdr agent get <name>`, then send round 2.
+- **Answer 2:** I interrupt both tabs (`ctrl+c` for Codex, `esc` for Fable), tell them T12's brainstorm is void, and only then create the executor.
+
+## Why
+
+- Today's ruling and §10a have no size exemption. No executor exists until both product advisors confirm the joint doc and both voting advisors approve it 2/2, so I start no executor tab.
+- "Today" and "before 11:00" are wishes, and a wish waives no gate. A deadline the full brainstorm cannot meet is a change of course, which is the operator's to decide by poll. Shortening or skipping the brainstorm myself would set aside today's ruling on my own authority.
+- Round 1 goes out before the poll because the ruling prescribes it at backlog entry and it does not depend on the answer. A waiver costs one interrupt.
+- I know a five-line way to do this and keep it out of the briefs. A hint from me would turn two independent drafts into two edits of my framing.
+- One background `prompt --wait` per tab delivers the brief and waits, so I stay free for the operator.
+- Hard rule #9 outranks the vote, so design sign-off stays with the operator.
+- The poll says that even a waiver does not promise 11:00. Cross-review, my validation, the final-PR poll and a deploy with dry run and idempotent re-run all remain.

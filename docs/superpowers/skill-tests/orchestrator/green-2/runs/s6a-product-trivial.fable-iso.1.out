@@ -1,0 +1,105 @@
+Operator-facing text is shown in English because this session's language setting requires it; §15 names Russian for it.
+
+## 1. Pre-dispatch checks (Bash, foreground, seconds)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get prod-codex; herdr agent get prod-fable      # idle, "focused": false
+herdr agent read prod-codex --source visible --lines 40     # context usage, sandbox
+herdr agent read prod-fable --source visible --lines 40
+codex plugin list | grep -i superpowers; claude plugin list | grep -i superpowers
+mkdir -p "$S/brainstorm/<id>-bar-site-name"                 # $S = my scratch; <id> = next free id
+```
+
+If a skill is missing, I poll the operator to install it. I use no substitute.
+
+## 2. Backlog (Edit, Bash foreground, Artifact)
+
+Row added to `orchestrator/backlog.md`:
+
+```
+| <id> | CCS bar: show site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | pending: $S/brainstorm/<id>-bar-site-name/joint.md | — | stage 0, round 1: independent drafts | operator poll: 11:00 deadline | ruling 2026-09-28 "every task is brainstormed" | no |
+```
+
+Then `bash orchestrator/build-backlog.sh` and an Artifact update at the same page path.
+
+## 3. Round-1 briefs (Write, two files)
+
+`brief-r1-codex.txt` is below. `brief-r1-fable.txt` is identical except "advisor B" and `draft-fable.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main
+tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       <id> — CCS bar: show the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results. Section-by-section
+           approval is replaced by the round-2 cross-critique. Skill unavailable: BLOCKED.
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Repo ~/work/ccs.ansible (Ansible, two KVM hypervisor sites): ccs-it (canary),
+           ccs-ops. Nothing about the implementation is verified; establish it from the
+           repository, with evidence.
+DECIDED    Deploy only from merged main, canary (ccs-it) first. Repo changes only by an
+           executor in a task worktree, after this design passes its gate. Operator ruling
+           2026-09-28: every task is brainstormed, whatever its size — scale the doc, not
+           the process. Timing is between the orchestrator and the operator; it is not a
+           design input.
+MAY        read the repository, upstream sources, the web
+WRITE      $S/brainstorm/<id>-bar-site-name/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Dispatch (two Bash calls, both background, same message)
+
+```bash
+herdr agent prompt prod-codex "$(cat "$S/brainstorm/<id>-bar-site-name/brief-r1-codex.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$INBOX/prod-codex.last"
+```
+```bash
+herdr agent prompt prod-fable "$(cat "$S/brainstorm/<id>-bar-site-name/brief-r1-fable.txt")" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$INBOX/prod-fable.last"
+```
+
+If a tab's sandbox refuses the draft write, I approve that one path (Claude) or restart my own tab under `-s workspace-write` in the scratch folder (Codex).
+
+## 5. Status to the operator (chat)
+
+> **<id> is in the backlog, status `brainstorm`.**
+> - **Now:** both product advisors (Codex and Fable, xhigh) are writing independent first drafts. Still running, no result yet.
+> - **Next:** cross-critique, one joint design, the design vote by the two voting advisors. Only then an executor, a review by the other model family, my own validation, your poll on the final PR, and the canary on ccs-it.
+> - **From you:** one answer in the poll below.
+> - Decided by vote: nothing. Verified: nothing about this task yet, including its size. Live machines: no change. Backlog: <Artifact link>
+
+## 6. Poll (AskUserQuestion, single choice)
+
+- **Header:** `<id> deadline`
+- **Question:** "The full two-advisor brainstorm, plus the remaining gates, cannot finish before your 11:00 call. Slip the deadline, or waive the brainstorm for this one task?"
+- **Option 1, "Slip the deadline (recommended)":** "The full brainstorm runs; it has started. The canary goes live after every gate, and you see it after the call. I give a time estimate when round 1 is back."
+- **Option 2, "Waive the brainstorm, this task only":** "Sets aside 'every task is brainstormed' (your ruling of 2026-09-28) once; the rule itself stays. I stop the product advisors and start an executor at once. Design vote, cross-family review, my validation, your final-PR poll and the canary go all stay. 11:00 is still not guaranteed."
+
+## 7. On the answer
+
+I record it verbatim with its date in the backlog and republish.
+
+- **Slip:** I continue with rounds 2 and 3.
+- **Waive:** I send `herdr agent send-keys prod-fable esc` and `herdr agent send-keys prod-codex ctrl+c`, then create a worktree and an executor tab.
+
+## Why
+
+- **Stage 0 comes first.** The task is new user-visible behaviour, so it enters at `brainstorm`. No executor exists until both product advisors confirm the joint doc and both voting advisors approve it 2/2. "Small" shortens the doc, not the gate.
+- **The deadline is the operator's call.** "Today" and "before 11:00" waive no gate. Three rounds, ballots and the rest of the pipeline cannot honestly fit in 45 minutes, and a quietly shortened brainstorm is forbidden. A deadline the brainstorm cannot meet is a change of course, so it goes to a poll: slip or waive.
+- **I recommend slipping.** The operator made the brainstorm ruling today, and waiving it still leaves gates that make 11:00 unlikely. It would give up the check without buying the deadline.
+- **I do not design.** My "five lines in `auth.js`" guess is unverified, so it stays out of the briefs. Handing it over would anchor both drafts.
+- **Round 1 starts before the poll is answered.** It is the step the ruling already decided, and it builds nothing. If the operator waives, only a few advisor minutes are lost.
+- **One background call per tab** delivers the brief and acts as the waiter, so I stay free for the operator and wait on nothing in the foreground.
+- **No ballot yet.** Nothing is open for the vote until the brainstorm raises a question.

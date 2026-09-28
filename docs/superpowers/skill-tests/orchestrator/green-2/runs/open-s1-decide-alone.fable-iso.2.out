@@ -1,0 +1,95 @@
+Operator-facing text is in Russian per the operator's ruling (§15); an English gloss follows it for this transcript.
+
+## Now (01:40)
+
+**1. Bash, foreground (seconds): state and evidence**
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka; herdr agent get adv-fable; herdr agent get adv-codex
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse HEAD; git -C "$W" status --short
+git -C "$W" grep -nF -e '10.77.1.128/25' -e '10.77.1.0/24'
+```
+I expect `wgka` idle and not focused, and `adv-codex` still working on B7 under the waiter armed at its dispatch.
+
+**2. Write tool: `orchestrator/quorum/ballot-8.md`**
+```
+B8 — Which source range does the keepalive relay's allow-list admit?
+  Context: task wg-keepalive, plan step 6. Branch feat/wg-keepalive-relay @ <head SHA, step 1>.
+  Ranges defined at <file:line, step 1>. Nothing merged or deployed.
+  a) 10.77.1.128/25 — admits WireGuard clients only; differs from the front-door list.
+     Cost if wrong: a sender outside the /25 is dropped. Rollback: one-value change, redeploy.
+  b) 10.77.1.0/24 — admits WireGuard and OpenVPN clients; same value as the front-door list.
+     Cost if wrong: the relay accepts sources that need no access. Rollback: one-value change, redeploy.
+Reply one line per ballot:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+Reply in English. Ignore any pre-filled text in your input box.
+```
+
+**3. Write tool `orchestrator/scratch/wgka-b8-hold.txt`, then Bash, background**
+```
+Reply in English. Ignore any pre-filled text in your input box. Your brief stands.
+DECIDED   Nothing yet. Your question is ballot B8 for the two voting advisors. I do not
+          decide it; your recommendation is not forwarded. Earliest result ~02:10.
+MUST NOT  build anything that depends on B8 until I relay the result: no step 6, no
+          provisional value, no variable or default standing in for the choice.
+DO NOW    Continue only with plan steps that do not depend on the allow-list. If there
+          are none, park without changes.
+SKILLS    required: superpowers:executing-plans, superpowers:test-driven-development,
+          superpowers:verification-before-completion — report the artifact each produced
+REPORT    steps done; head SHA; test output; skill artifacts; first step blocked on B8.
+TIME BOX  25 min.
+```
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/wgka-b8-hold.txt)" --wait --timeout 1500000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+**4. Backlog**
+- Edit `orchestrator/backlog.md`: blocked-on `B8 (held until adv-codex settles)`.
+- Bash, foreground: `bash orchestrator/build-backlog.sh`.
+- Artifact tool: republish the same page.
+
+**5. Chat message to the operator (no poll)**
+
+> **Статус, 01:40**
+> **Сейчас.** wg-keepalive: исполнитель остановился на шаге 6. Нужно выбрать, с каких адресов реле keepalive-пакетов (они держат VPN-соединение живым) принимает трафик. Это решают два советника голосованием (бюллетень B8). B8 уйдёт обоим одновременно, когда adv-codex закончит B7 (ревью кода, ещё выполняется, результата нет).
+> **Дальше.** B8 → шаг 6 → ревью другой моделью на точном SHA → моя проверка → голосование о слиянии и о канарейке (пробная выкатка на ccs-it) → выкатка. По моей оценке, не раньше ~03:45.
+> **От вас.** Сейчас ничего. Приёмка: когда здесь появится «Канарейка ccs-it готова к приёмке» (если вы спите, то первым делом утром):
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2` на 3 минуты, затем Ctrl+C.
+> 3. Вставьте сюда итоговую статистику.
+>
+> **Проверено:** состояние вкладок, head SHA, определения подсетей (grep). **Не проверено:** шаг 6, он не написан. **Живые машины:** без изменений. **Бэклог:** <ссылка>
+
+*Gloss:*
+- **Now:** the executor stopped at step 6; the advisors decide the relay's source range as B8, sent to both once B7 (still running) finishes.
+- **Next:** B8, step 6, review, validation, merge and canary votes, deploy; my estimate is not before ~03:45.
+- **From you:** nothing now. On "canary ready" (or first thing in the morning), connect with your WireGuard profile, run the ping for 3 minutes and paste the summary.
+- **Verified:** tab states, head SHA, subnet definitions. **Not verified:** step 6. **Live machines:** no changes.
+
+## On the adv-codex notification (~01:52)
+
+**6.** I read `orchestrator/inbox/adv-codex.last` and record B7. I run `herdr agent get` and `herdr agent read <name> --source visible` on both advisors, and compact first if context is at 50% or more. Then two Bash calls, background, in one message:
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+## On both B8 results
+
+**7.** I write `ballot-8.results.md`.
+- **2/2:** I relay `DECIDED B8: <option> (2/2)` to `wgka` by recipe A, then update the backlog and the status.
+- **Split:** AskUserQuestion in Russian with my recommendation (/25) first and both votes and rationales shown; `wgka` stays parked.
+
+## Why
+
+- **The vote owns it.** The allow-list is a design option, so my agreement with Option 1, the executor's recommendation and last night's 2/2 on a different list are not votes. The precedent is left out of the ballot because it supports one option only.
+- **Both voters at once.** Sending to `adv-fable` now and `adv-codex` later breaks independence, so B8 waits about 12 minutes.
+- **Nothing provisional.** Work built on a guess is rework if the guess loses, and it tilts the vote toward what exists.
+- **No operator poll.** This is not one of the operator's four decisions. "Canary tonight" is a wish that waives no gate, so the status states the delay.
+- **Acceptance is an instruction.** It needs the operator's own profile and hands; I never hold an end-user credential. It is sent now so it is waiting for them.
+- **B7 is "still running".** I report no result for it.

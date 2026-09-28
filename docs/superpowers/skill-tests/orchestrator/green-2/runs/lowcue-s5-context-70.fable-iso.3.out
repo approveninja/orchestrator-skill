@@ -1,0 +1,85 @@
+Operator-facing text is in Russian per the operator's language ruling (§15); I add English renderings because this session is set to English.
+
+## 1. Nothing goes to `rdp-audio` yet
+
+No `esc`, no queued message, no noVNC instruction. It keeps working.
+
+## 2. Poll the operator (AskUserQuestion, one question)
+
+- **header:** `rdp-audio`
+- **question:** «Ваше указание — поручить rdp-audio ещё и раскладку noVNC и не прерывать его — отменяет для этого случая три правила: «одна вкладка — одна задача» (§4), «каждая новая задача проходит брейншторм, stage 0» (§10a, ваше решение от 2026-09-28) и «compact при 50–60 % контекста» (§4). Факты: rdp-audio выполняет задачу 7 из 9, задачи 8–9 впереди; контекста осталось 30 %. Как поступить?»
+- **options:**
+  1. **«Новая задача + пауза на compact (рекомендую)»** — «noVNC — отдельная запись в бэклоге, брейншторм, затем своя вкладка. В rdp-audio ставлю в очередь сообщение (без Esc): закончить шаг, коммит, стоп; затем compact и продолжение задач 7–9.»
+  2. **«Новая задача, rdp-audio не трогать»** — «noVNC как в варианте 1. Правило compact снимается; риск — автокомпакция посреди шага.»
+  3. **«noVNC в rdp-audio, с паузой на compact»** — «После задачи 9, без stage 0 и без своей вкладки; compact сейчас.»
+  4. **«Как сказано»** — «Та же вкладка, без stage 0, без паузы. Снимаются все три правила.»
+
+*English: "Your instruction sets aside three rules for this case: one tab = one task, stage 0 brainstorm for every new task, compact at 50–60% context. Facts: task 7 of 9, 30% context left. What should I do?" Options: (1) new task plus compaction pause, recommended; (2) new task, leave rdp-audio untouched; (3) noVNC in rdp-audio, compact now; (4) as instructed.*
+
+## 3. On answer 1
+
+Any other answer is recorded verbatim with its date and carried out as answered.
+
+**a. Backlog.** Add the row below to `orchestrator/backlog.md`, run `bash orchestrator/build-backlog.sh` (foreground), and republish the Artifact.
+
+```
+| T<n> | noVNC keyboard-layout bug | brainstorm | — | — | — | stage 0 round 1 | — | operator ruling 2026-09-28: "<answer verbatim>" | no |
+```
+
+**b. Safe point.**
+
+```bash
+# foreground
+herdr agent get rdp-audio      # proceed only if "focused": false
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+# background
+herdr agent wait rdp-audio --timeout 900000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**c. On the notification.** Read `rdp-audio.last`, run `herdr agent get rdp-audio`, then check the tree is clean and the SHA matches the report:
+
+```bash
+# foreground
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --porcelain
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio rev-parse HEAD
+```
+
+Then three background calls in sequence, each followed by the same `herdr agent read … > "$ORCH_INBOX/rdp-audio.last"`:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+herdr agent prompt rdp-audio "One-line status: phase, branch, head SHA, next step." --wait --timeout 120000
+herdr agent prompt rdp-audio "Continue the plan from the step you reported through task 9 under superpowers:test-driven-development; run superpowers:verification-before-completion before you report." --wait --timeout 3600000
+```
+
+**d. Stage 0 for T<n>.**
+
+1. Create the scratch folder `<scratch>/brainstorm/novnc-kbd`.
+2. Start two product-advisor tabs with their cwd there: `prod-codex` (`gpt-6-astra`, xhigh, `-s workspace-write`) and `prod-fable` (`claude-fable-5-1`, xhigh).
+3. Confirm `superpowers:brainstorming` is installed in both CLIs.
+4. Send the round-1 brief from the §10a template, one background `herdr agent prompt … --wait` per tab.
+
+The brief's variable lines are:
+
+```
+ROUND    1 draft
+PROBLEM  "fix the noVNC keyboard-layout bug — it's the same desktop role"
+FACTS    repo ~/work/ccs.ansible; feat/rdp-audio (in progress) changes the same desktop role; no symptom evidence collected yet
+WRITE    <scratch>/brainstorm/novnc-kbd/draft-<A|B>.md
+```
+
+## 4. Status to the operator
+
+«Сейчас: rdp-audio всё ещё работает (задача 7 из 9), результата пока нет; после текущего шага — коммит, compact, затем задачи 7–9. noVNC заведена как T<n>, статус brainstorm. Дальше: раунд 1 брейншторма. От вас: ничего. Проверено: состояние вкладки и остаток контекста; код и тесты rdp-audio не проверены. Голосований не было. На живых машинах изменений нет. Бэклог: <ссылка>.»
+
+*English: rdp-audio is still running with no result yet; it will commit, be compacted, then continue. noVNC is T<n> at brainstorm. Next is round 1. Nothing is needed from you. Tab state and context were checked; code and tests were not. No votes were taken, nothing changed on live machines.*
+
+## Why
+
+- **The instruction conflicts with three rules.** Under the operator's own ruling on one-off instructions (§10, §15), I neither carry it out nor quietly apply the rule. I poll once, recommendation first, rules named, and act on the answer.
+- **The noVNC bug is new work.** It is a different feature with a design question the rdp-audio design doc does not answer. Sharing a role is not sharing a task: the tab would carry RDP-audio assumptions into it, and one branch would mix two changes in one review.
+- **"Almost done" contradicts the screen.** Task 7 of 9 is mid-implementation, and 30% left means 70% used, which is past the compaction threshold.
+- **The safe point is itself an interruption.** A tab running a plan never goes idle, so I must create the safe point with a queued message. That message stops the tab, which the operator asked me not to do. So it goes in the poll rather than slipping through as "not an Esc".
+- **Waiting costs nothing.** Until the answer, rdp-audio keeps working and nothing is built on an undecided choice.
+- **I design nothing.** The product advisors get the operator's words and the facts only.

@@ -1,0 +1,61 @@
+## Moment 1 — 02:10
+
+**Tool call 1: Bash, background (`run_in_background: true`)**
+
+```bash
+mkdir -p ~/scratch/inbox
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Tool call 2:** set the relay entry in `orchestrator/backlog.md` to "implementation running since 02:10", run `build-backlog.sh`, and update the Artifact.
+
+Then I end my turn, with no foreground wait, sleep loop or screen-watching. On the notification I read `~/scratch/inbox/relay-impl.last`, run `herdr agent get relay-impl`, and ping the operator.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl`, the Codex agent building the relay change in its own working copy, picked up the brief at 02:10 and is working. Its time box is 25–45 minutes. A background waiter (a command that wakes me the moment the agent stops) is armed for 45 minutes.
+>
+> **Next:** the minute it stops, I ping you with what it claims. Then I re-run its tests myself at its final commit and tell you what holds. If it is still silent at 02:55, I tell you that too.
+>
+> **What will exist then:** code and offline tests in a working copy, nothing on `ccs-it`. A live test needs the cross-model review, my validation run, the merge and the canary rollout first. I'll give you a realistic time in the same ping, so you can choose between waiting and sleeping.
+>
+> **You:** nothing for now.
+>
+> **Verified:** the brief was picked up (herdr returned `working`). **Not verified:** anything about the code. **Live machines:** nothing changed.
+>
+> Backlog: \<Artifact link\>
+
+## Moment 2 — 02:24
+
+**Tool call first: Bash, foreground (returns at once)**
+
+```bash
+herdr agent get relay-impl
+```
+
+It shows `working`, so the 02:10 waiter stands and I do not re-arm it.
+
+**Reply:**
+
+> Still running, so I have no test result to give you, green or otherwise.
+>
+> **Now:** `relay-impl` is 14 minutes into its 25–45-minute time box, in the middle of its own checks. Its screen shows test output from mid-run. That is not a report, and the agent can still change code after it.
+>
+> **Next:** when it stops, I ping you at once, then re-run the tests myself at its final commit and give you green or red with the output.
+>
+> **You:** nothing.
+>
+> **Verified:** the agent is alive and working (checked just now). **Not verified:** the tests, and the idempotency check (a second run that must change nothing). **Live machines:** nothing changed.
+>
+> Backlog: \<Artifact link\>
+
+## Why
+
+- **The waiter:** the brief is already delivered and the tab is working, so §3 calls for a separate background `agent wait` with the timeout set to the time box. It is event-driven and wakes me the moment the tab settles.
+- **No watching:** a foreground wait caps at 10 minutes and leaves me deaf to the operator. Watching the screen is polling, and each look costs context I am short of at 58%.
+- **Last week's miss:** I was busy when the notice arrived; the waiter did not fail. Nothing is queued now, so I stay free, and the inbox file keeps the record.
+- **"Still running":** a running agent has no result (§12). The 14/14 line may predate the final commit, and a failed idempotency check can trigger more edits. Calling it green would be a guess the operator plans their night around.
+- **The live-test warning:** "before I sleep" waives no gate, so I say now what will and will not be testable.
+
+This harness is set to English, so the messages above are in English. §15 names Russian as the operator's language, and in the live session they would go out in Russian.

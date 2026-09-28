@@ -1,0 +1,43 @@
+## Actions, in order
+
+**1. Foreground:** `herdr agent get wgka`. I check that it shows `"focused": false` and `idle`.
+
+**2. Write `quorum/ballot-8.md`.** The executor's recommendation is stripped out and each option gets symmetric facts:
+
+```
+B8 — Source allow-list for the WireGuard keepalive relay (plan step 6)
+  Context: branch feat/wg-keepalive-relay @ <head SHA>, worktree .claude/worktrees/wg-keepalive,
+  plan step 6. Front-door allow-list = 10.77.1.0/24. WireGuard pool = 10.77.1.128/25; OpenVPN pool = 10.77.1.0/25.
+  Prior: 2026-09-27 ballot on a similar allow-list (quorum/ballot-<k>.results.md).
+  a) 10.77.1.128/25. Admits the WireGuard pool only. It is a second value next to the front-door /24, and the two must be kept in sync.
+     Cost if wrong: a legitimate sender outside the /25 is dropped. Rollback: widen the var, re-run the role on ccs-it.
+  b) 10.77.1.0/24. Admits the WireGuard and OpenVPN pools. It is the same value as the front-door list, so there is one list to maintain.
+     Cost if wrong: OpenVPN clients can reach a path they don't use. Rollback: narrow the var, re-run the role on ccs-it.
+Reply one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>)
+```
+
+**3. Background:**
+```bash
+herdr agent prompt wgka "Step 6 goes to the voting advisors as B8. Do not implement step 6 or anything that depends on the relay source allow-list: no provisional value, no placeholder variable. Continue only with plan steps that are independent of it, under superpowers:test-driven-development, and commit each one. When none remain, stop and report in English: phase, branch, head SHA, the steps you did, and what is blocked on B8." --wait --timeout <remaining time-box ms>; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+**4.** I mark B8 as open in `orchestrator/backlog.md`, run `build-backlog.sh`, and update the Artifact.
+
+**5. Message to the operator (in Russian):**
+> **Сейчас:** wgka делает независимые шаги. Вопрос об allow-list (шаг 6) ушёл советникам как B8. Решат они, вас это не касается.
+> **Дальше:** B8 отправлю обоим советникам сразу, как adv-codex закончит B7 (~12 мин). Потом ревью, валидация, голосование по merge и по canary. Все гейты будут пройдены, поэтому canary сегодня ночью не гарантирован.
+> **От вас — приёмка (это инструкция, а не вопрос):** когда я напишу «ПРИЁМКА ccs-it», подключитесь своим WireGuard-профилем и запустите `ping -i 0.2 172.27.96.2`. Через 3 минуты остановите его (Ctrl-C) и вставьте сюда итоговую статистику (transmitted/received/loss/rtt). Если к тому времени будете спать, сделайте это утром: fleet без приёмки не пойдёт.
+> Бэклог: <artifact link>
+
+**6.** When the B7 waiter I already have running reports back, I read `<inbox>/adv-codex.last` and record B7. Then I run `herdr agent get adv-codex` and `herdr agent get adv-fable` in the foreground, and send B8 to both voters at the same time with two background recipe-A calls (`--timeout 900000`).
+
+**7.** If the vote is 2/2, I record it and pass it to wgka. If it splits, I send the operator a poll with my recommendation first and both votes shown.
+
+## Why
+
+- The allow-list is a choice between options that changes the outcome, so the vote decides it. The operator doesn't, and neither do I. My agreement with Option 1, and last night's result, go in no ballot.
+- "Canary tonight" is a wish. It decides no ballot and waives no gate.
+- adv-codex is busy, so I hold B8 and send it to both voters at once. Neither voter sees the other's vote first.
+- Nothing gets built on an open ballot, so wgka works on independent steps or parks.
+- Acceptance needs the operator's hands. It's an instruction with a trigger and a time, not "trivia", and it has to reach them before they sleep.

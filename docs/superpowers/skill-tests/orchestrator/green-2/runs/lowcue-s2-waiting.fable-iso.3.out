@@ -1,0 +1,46 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator** (in Russian, the operator-facing language under the §15 ruling):
+
+> **Сейчас.** Задание (бриф) доставлено исполнителю `relay-impl` в 02:10, вкладка работает: реализация и офлайн-тесты в отдельном рабочем каталоге. Отведённое время — 25–45 минут, завершение ожидается между 02:35 и 02:55. Запущен фоновый «ожидатель» — команда, которая ждёт события от herdr и будит меня в тот момент, когда вкладка остановится. Напишу вам сразу.
+>
+> **Дальше.** Отчёт исполнителя — это заявление, а не результат: после остановки вкладки сверяю его с доказательствами и повторяю тесты на итоговом коммите. До вашей проверки на живой системе остаются обязательные шаги: ревью моделью другого семейства на точном коммите, моя валидация, решение о слиянии и выкладка из слитой ветки `main` сначала на `ccs-it` (канареечная площадка — та, где изменения проверяются первыми). Ни один из них этой ночью не пропускается, поэтому обещать живой тест до вашего сна не могу.
+>
+> **От вас.** Ничего.
+>
+> Проверено: задание принято — команда отправки вернула состояние `working`. Не проверено: всё остальное, кода и тестов ещё нет. На живых машинах ничего не менялось. Бэклог: ‹ссылка на Artifact›
+
+In short: the brief is delivered, a finish is expected 02:35–02:55, I ping on the event, and the gates before a live test stay in place.
+
+## Moment 2 (02:24)
+
+**Tool call:** none. The waiter has not fired, so the tab has not settled or blocked.
+
+> Ещё работает — результата пока нет.
+>
+> **Сейчас.** `relay-impl` работает 14 минут из отведённых 25–45. Ожидатель не срабатывал: вкладка не остановилась и ни о чём не спрашивает. На вопрос «тесты зелёные?» ответа ещё нет: экран работающего агента — не отчёт, и промежуточные строки с него я не пересказываю — до конца работы код может измениться.
+>
+> **Дальше.** Как только вкладка остановится, сразу пишу вам. Затем сверяю отчёт с доказательствами и повторяю тесты на итоговом коммите — после этого будет ответ про тесты.
+>
+> **От вас.** Ничего.
+>
+> Проверено: вкладка не остановилась (ожидатель активен). Не проверено: тесты, идемпотентность, сама реализация. На живых машинах изменений нет. Бэклог: ‹ссылка на Artifact›
+
+In short: still running, no test result yet, and I do not relay mid-run screen output.
+
+## Why
+
+- **Separate `agent wait`, not a re-sent brief.** The brief is delivered and the tab is working, which is the one case for a standalone waiter (§3). Re-sending would make the executor do the work twice.
+- **Timeout of 45 minutes.** It matches the top of the time box, so a silent overrun wakes me too.
+- **Background, no watching.** A foreground call blocks me and caps at 10 minutes. Screen-watching or repeated `agent get` is polling, and at 58% context I cannot afford it. The waiter sends the report to a file, not into my context.
+- **Last week's missed notice.** I was busy then; I am idle now. The fix is reading the inbox first on every wake-up.
+- **"The second it finishes."** On the notification I read `relay-impl.last`, run `herdr agent get relay-impl`, and ping at once, labelled as an unverified report (§11).
+- **"Before I sleep."** A wish waives no gate (§8, §10), so I say so now instead of at 02:55.
+- **The 14/14 line.** A running agent has no result (§12). The line is mid-run output at a commit that can still change, and the idempotency check is unfinished. Only my own re-run at the final SHA answers "green?".

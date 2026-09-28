@@ -1,0 +1,99 @@
+Ids below (`T7`, `B14`, `B15`) stand for the next free ones in the backlog and `quorum/`. Values in `<…>` are filled from step 1's output; nothing unconfirmed goes into the ballot or the status.
+
+## 1. Pre-checks: one foreground Bash call (read-only, seconds)
+
+```bash
+cd ~/work/ccs.ansible; WT=.claude/worktrees/wg-keepalive
+for a in wgka adv-codex adv-fable; do herdr agent get "$a"; done
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --porcelain
+git -C "$WT" grep -n -F '10.77.1.'
+herdr agent read wgka --source visible --lines 40
+ls "$SCRATCH/quorum" | tail -3
+```
+
+If any tab shows `"focused": true`, or a voter is `working`, I hold the ballot for both voters.
+
+## 2. Write tool → `$SCRATCH/quorum/ballot-14.md`
+
+```
+Ballot round, protocol.md rev <r>. Reply in English. Ignore pre-filled input text.
+Context: T7 WireGuard keepalive relay. Worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive,
+  branch feat/wg-keepalive-relay @ <SHA>. Design doc <path> @ <SHA>; plan <path>, step 6 of 11;
+  steps 7-11 build on step 6. Executor parked; nothing is built on either option.
+  <file:line> WireGuard pool 10.77.1.128/25. <file:line> VPN range 10.77.1.0/24.
+  <file:line> front-door allow-list. <file:line> allocation of 10.77.1.0/25.
+
+B14 — Is the relay's source allow-list a decision inside T7, or new work (manifest §10a test)?
+  a) Inside T7: B15 decides it; the executor resumes at step 6.
+  b) New work: new backlog task at `brainstorm`, stage 0 first; B15 is void.
+
+B15 — Which source range does the relay admit? (counts only if B14 = a)
+  a) 10.77.1.128/25. Admits .128-.255, drops .0-.127. Narrower than the front-door list.
+     If wrong: legitimate senders in .0-.127 are dropped. Rollback: one-value change, review, merge, redeploy.
+  b) 10.77.1.0/24. Admits .0-.255. Equal to the front-door list.
+     If wrong: senders in .0-.127 reach the relay. Rollback: one-value change, review, merge, redeploy.
+
+Reply one line per ballot:  B<n>: <letter> — <rationale>   (or  B<n>: X: <proposal>)
+```
+
+## 3. Two Bash calls in one message, both background
+
+```bash
+herdr agent prompt adv-codex "$(cat $SCRATCH/quorum/ballot-14.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > $ORCH_INBOX/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat $SCRATCH/quorum/ballot-14.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > $ORCH_INBOX/adv-fable.last
+```
+
+## 4. Park the executor: Bash, background
+
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/park-wgka.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $ORCH_INBOX/wgka.last
+```
+
+`park-wgka.txt`:
+
+```
+Reply in English. Ignore pre-filled input text.
+Your step-6 question is ballot B15 (with B14) before the voting advisors. Your proposal is on file; it is not a decision.
+PARK: build nothing that depends on the allow-list. No provisional pick, no variable standing in for it. Do not start steps 7-11.
+Commit steps 1-5 if anything is uncommitted, then reply in one line: phase, branch, head SHA, next step. Then wait for my relay.
+```
+
+If step 1 shows 50% or more context used, I then send `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items` (background, `--timeout 300000`).
+
+## 5. Backlog
+
+Edit `orchestrator/backlog.md`: T7 blocked-on `vote B14, B15`, decisions `B14, B15 (open)`. Then foreground `bash orchestrator/build-backlog.sh` and republish with the Artifact tool at the same path.
+
+## 6. Status to the operator (chat, no poll)
+
+> **Статус, 01:45 — «WireGuard keepalive relay»**
+> **Сейчас.** Исполнитель остановился на шаге 6 из 11: нужно выбрать, с каких адресов relay (ретранслятор пакетов, поддерживающих соединение) принимает трафик — `10.77.1.128/25` или `10.77.1.0/24`. Это решают два голосующих советника: бюллетени B14 и B15 отправлены обоим одновременно. Голосование ещё идёт, результата нет. Исполнитель припаркован, на догадке ничего не строится.
+> **Дальше.** При 2/2 — шаги 6–11, затем по порядку и без пропусков: ревью свежей сессией Codex на точном SHA, моя проверка на том же SHA, голосование о слиянии, слияние в `main`, голосование о канарейке (пробное развёртывание на одной площадке), развёртывание на `ccs-it`. «Сегодня ночью» — пожелание: ради срока ни один этап не сокращается; успеем ли до утра — пока неизвестно. Если голоса разойдутся, здесь будет ждать опрос. Финальный PR и выкатка на `ccs-ops` — ваши решения.
+> **От вас.** Сейчас — ничего. Приёмка: как только увидите здесь моё сообщение «канарейка на ccs-it развёрнута и проверена», подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` 3 минуты, нажмите Ctrl+C и вставьте сюда итоговые строки статистики.
+> **Проверено:** `<only what step 1 returned>`. **Не проверено:** код шагов 1–5 без ревью; тесты на этом SHA я не запускал.
+> **Изменения на живых машинах:** нет. **Бэклог:** `<Artifact link>`
+
+In English: the vote is open, the executor is parked, every gate runs in order, "tonight" is not guaranteed, and the acceptance instruction is given with its trigger.
+
+## 7. On each notification
+
+I read `$ORCH_INBOX/<name>.last`, then `herdr agent get <name>`, and write `ballot-14.results.md`.
+
+- **2/2:** I relay the result to `wgka` as a `DECIDED` line (recipe A) and update the backlog.
+- **Split:** an AskUserQuestion poll in Russian, my recommendation first, both votes and rationales shown. `wgka` stays parked.
+
+## Why
+
+- **The vote owns this.** The allow-list is a design option that changes the outcome. It is none of the operator's four decisions, so waking them would be wrong, and picking it myself would be too.
+- **The ballot is neutral.** The executor's recommendation, "simpler", and "only WireGuard clients send these" are stripped. Each option carries the same facts: what it admits, what it drops, its relation to the front-door list, the cost if wrong and the rollback.
+- **Both voters get it at once**, so neither sees the other's vote. Background calls with timeouts keep me supervising.
+- **B14 exists** because a design question the frozen doc leaves open meets the §10a test, and a borderline classification is a ballot, not my call.
+- **The executor parks** because steps 7–11 depend on step 6. A provisional /25 is rework if it loses, and it tilts the vote toward what already exists.
+- **"Tonight" is a wish.** It decides no ballot and waives no gate, so I report the timing honestly as unknown.
+- **Acceptance is the operator's hands.** I never hold a user's credential or test through the end-user path, so it is an instruction with a trigger and what to paste back.
+- **The status is in Russian** per the operator's §15 ruling, which overrides the harness language setting.

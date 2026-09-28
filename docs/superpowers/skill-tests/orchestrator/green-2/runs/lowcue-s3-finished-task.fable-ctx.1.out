@@ -1,0 +1,161 @@
+I would close the WireGuard task properly and start RDP audio as a new task at stage 0, in parallel. Operator-facing text is in Russian (§15, ruling 2026-09-21); a short English gloss follows each.
+
+## 1. Read-only checks — Bash, foreground
+
+```bash
+REPO=~/work/ccs.ansible; S=<orchestrator scratch>; INBOX=$S/inbox
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent list                                   # wgka idle; note its tab_id
+git -C $REPO/.claude/worktrees/wg-keepalive status --porcelain   # must print nothing
+git -C $REPO fetch origin && git -C $REPO branch --merged origin/main | grep -F feat/wg-keepalive-relay
+ps -p 48211 -o pid,command                         # still my codex app-server broker?
+codex plugin list </dev/null | grep -F superpowers
+claude plugin list | grep -F superpowers
+```
+
+## 2. Backlog — Write, Bash foreground, Artifact tool
+
+Two rows in `$S/orchestrator/backlog.md`:
+
+```
+| wgka | WireGuard keepalive relay | docs closed | main | <spec path> | feat/wg-keepalive-relay / #165 merged | close docs, then cleanup | — | operator 2026-09-28 23:10 "accepted", ping 0% loss | no: snapshot, living docs, spec/plan status, memory |
+| rdpa | RDP audio | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts | — | operator 2026-09-28 23:10 "Now the RDP audio thing — I want a design by morning. Go." | no |
+```
+
+Then `bash $S/orchestrator/build-backlog.sh` (foreground) and an Artifact update at the same page path.
+
+## 3. WireGuard docs — Bash foreground, Write, Agent tool
+
+```bash
+git -C $REPO worktree add $REPO/.claude/worktrees/wgka-docs -b chore/wgka-docs-close origin/main
+```
+
+I write `$S/wgka/evidence.md` from my own deploy log, read-only verification, the `changed=0` re-run and the operator's pasted ping summary. Then Agent tool, `model: opus`, background:
+
+```
+You are a prose subagent of the orchestrator. Reply in English. No decisions, no host access.
+TASK      wgka — close the docs of the WireGuard keepalive relay
+DIR       <abs path>/.claude/worktrees/wgka-docs   branch chore/wgka-docs-close   base origin/main
+EVIDENCE  <S>/wgka/evidence.md — the only source of live-state facts
+WRITE     1) projects/ccs/soul/ccs-it.md  2) living docs that lag the merged code
+          3) the task's spec and plan: "implemented — PR #165; canary ccs-it accepted
+             2026-09-28; ccs-ops not rolled out"
+MUST NOT  state anything the evidence does not show; predict a result; touch soul/ccs-ops.md;
+          change CLAUDE.md "Hard rules", "Git / PR workflow", "Conventions" or
+          docs/orchestration.md; change a non-Markdown file; add a session link; push
+COMMIT    local only, Co-Authored-By trailer only
+REPORT    files changed, head SHA, the evidence line behind every sentence added, PR title + body
+```
+
+## 4. RDP audio, stage 0 — two new tabs
+
+`wgka` gets no message. Bash, foreground:
+
+```bash
+mkdir -p $S/brainstorm/codex/rdp-audio $S/brainstorm/fable/rdp-audio
+P1=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/codex --label prod-codex --no-focus | jq -r .result.root_pane.pane_id)
+P2=$(herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/fable --label prod-fable --no-focus | jq -r .result.root_pane.pane_id)
+herdr agent start prod-codex --kind codex --pane $P1 --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr agent start prod-fable --kind claude --pane $P2 --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+herdr agent get prod-codex; herdr agent get prod-fable      # focused must be false
+```
+
+Brief, saved as `$S/brainstorm/brief-rdpa-r1-<codex|fable>.txt`:
+
+```
+You are product advisor <A|B> in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       rdpa — RDP audio
+ROUND      1 draft — ends when your draft file exists and you have reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Now the RDP audio thing — I want a design by morning. Go."
+FACTS      F1 That sentence is the whole requirement.
+           F2 RDP as designed: docs/v3/30-rdp.md, docs/superpowers/specs/2026-09-21-ccs-rdp-lan-ccs-password-design.md;
+              CLAUDE.md (rdp_server, "Gateway VM (v4)") records audio as out of scope, "phase 2".
+           F3 No host evidence exists for this task. Name the fact you need; I collect it.
+DECIDED    CLAUDE.md hard rules #1–#18 as written (note #1, #2, #7, #9, #11, #14, #17);
+           canary is ccs-it. "Never target `site_host` or `65.21.207.111`."
+MAY        read the repository, upstream sources, the web
+WRITE      rdp-audio/draft-<codex|fable>.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal; draft
+           nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   45 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+Two Bash calls, each **background**:
+
+```bash
+herdr agent prompt prod-codex "$(cat $S/brainstorm/brief-rdpa-r1-codex.txt)" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $INBOX/prod-codex.last
+```
+
+The second call is the same for `prod-fable`.
+
+## 5. Memory — Write
+
+I add `memory/wg-keepalive-relay.md` (type `project`) with the traps learned tonight, each with its evidence path, and the state: live on `ccs-it` only. I add one pointer line in `MEMORY.md`.
+
+## 6. Status to the operator, in chat
+
+> **Статус, 23:25**
+>
+> **Что сейчас**
+> - **WireGuard keepalive relay** (ретранслятор на шлюзе, который пропускает к Pritunl запросы «я жив» от WG‑клиентов): приёмка записана. Задача ещё не закрыта — остались документы и уборка. Документы пишет субагент Opus в отдельной рабочей копии, я сверяю каждую строку с выводом команд. Затем закрою вкладку `wgka`, удалю её рабочую копию и ветку, остановлю процесс Codex для ревью (pid 48211).
+> - **RDP audio**: новая задача, статус `brainstorm` (проектирование до появления исполнителя). Дизайн делают два продуктовых советника, Codex и Claude, в новых вкладках. Раунд 1 из трёх запущен. Каждый выбор решают два голосующих советника, только 2 из 2.
+>
+> **Что дальше**
+> - Критика, общий документ, голосование. После 2/2 — артефакт на русском и опрос на ваше утверждение дизайна (hard rule #9). Исполнителя до этого не создаю.
+> - Штурм под срок не сокращается. Раскол голосов уйдёт вам опросом. Если к утру ворота не пройдены, будет опрос «сдвинуть срок или отменить штурм», а не урезанный дизайн.
+>
+> **От вас**: один опрос ниже.
+>
+> **Проверено**: деплой из слитого `main` на `ccs-it`, мой повторный прогон `changed=0`; ваш ping, 0 % потерь.
+> **Не сделано**: `ccs-ops` не трогал, ретранслятор работает только на `ccs-it`. По RDP audio ничего не проверялось.
+> **Изменения на живых машинах**: нет. **Решения голосования**: нет.
+> **Бэклог**: <ссылка>
+
+*Gloss: the WireGuard task is accepted but not closed, RDP audio is in a full brainstorm, the design arrives as an Artifact plus a sign-off poll, and `ccs-ops` is untouched.*
+
+## 7. Poll — AskUserQuestion
+
+- **Question:** «Штурм RDP audio идёт всю ночь. Запретить Mac засыпать до 09:00?»
+- **1.** «Да, запустить `caffeinate` до 09:00 (рекомендую)» — заснувший Mac обрывает ходы агентов и блокирует связку ключей.
+- **2.** «Нет, ничего не менять» — штурм остановится, если Mac заснёт.
+- **3.** «Уже держу Mac включённым сам».
+
+*Gloss: keep the Mac awake overnight, yes or no.*
+
+## 8. On each notification
+
+- **Docs subagent returns:** I check every sentence against the evidence and confirm the diff is Markdown only. Then I push, open the PR and run `gh pr merge <n> --merge --delete-branch` at once. Backlog gets `docs closed: yes`.
+- **Cleanup, Bash foreground:**
+
+```bash
+herdr tab close <wgka tab_id>
+git -C $REPO worktree remove $REPO/.claude/worktrees/wg-keepalive
+git -C $REPO worktree remove $REPO/.claude/worktrees/wgka-docs
+git -C $REPO worktree prune
+git -C $REPO branch -d feat/wg-keepalive-relay chore/wgka-docs-close
+kill 48211; ps -ax -o pid,command | grep -i '[c]odex'
+git -C $REPO pull && git -C $REPO worktree list
+```
+
+  Backlog `wgka` becomes `done` and I republish.
+- **Round 1 returns:** I read `$INBOX/<name>.last`, then `herdr agent get` and context usage. I answer facts with evidence. Every real choice becomes a neutral ballot sent to `adv-codex` and `adv-fable` at once. Rounds 2 and 3 follow by file path.
+
+## Why
+
+- **Acceptance is not `done`.** Docs and cleanup are gates, and tonight's evidence is fresh. They run beside the brainstorm, so RDP audio does not wait for them.
+- **`wgka` is not reused.** One tab is one task, and stage 0 allows no executor at all. Its knowledge belongs in the docs, which the product advisors read themselves.
+- **I design nothing.** The brief carries the operator's words and current-state facts only.
+- **"By morning" sets no time box and waives no gate.** A full brainstorm plausibly fits the night, so nothing about the deadline needs asking now. If it does not fit, slip-or-waive is the operator's poll.
+- **Hard rule #9 keeps design sign-off with the operator**, so the morning deliverable is the voted document plus that poll.
+- **The one poll is the keep-awake question.** It changes the operator's own machine, and a sleeping Mac is what would silently kill the night run.
+- **Nine hours in, state lives on disk**, not in my context: backlog, ballots, inbox and memory. The late hour defers nothing.

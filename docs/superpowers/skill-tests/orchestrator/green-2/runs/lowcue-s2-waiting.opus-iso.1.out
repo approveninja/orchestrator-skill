@@ -1,0 +1,33 @@
+## Moment 1: now (02:10)
+
+**Tool call.** One background Bash call (`run_in_background: true`). The tab is already `working`, so I use a separate waiter and don't send the brief again:
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**To the operator** (the operator-facing language is Russian, §15):
+
+> **Сейчас:** relay-impl (Codex, worktree `.claude/worktrees/relay-impl`) принял бриф и работает: реализация плюс офлайн-тесты, лимит 25–45 мин (готово примерно к 02:35–02:55). Меня разбудит фоновое ожидание, как только вкладка остановится. Я не слежу за экраном вручную.
+> **Дальше:** читаю отчёт, проверяю артефакты superpowers-скиллов и сам перезапускаю решающие тесты в worktree. Сразу после этого пишу вам, что проверено и чем, и даю точные шаги для вашего теста.
+> **От вас:** пока ничего.
+> Голосований нет, живые машины не менялись. Бэклог: <backlog Artifact URL>
+
+## Moment 2: 02:24
+
+**Tool call:** none. The waiter hasn't fired, so the tab hasn't settled.
+
+**To the operator:**
+
+> **Ещё выполняется, результата пока нет.** На экране relay-impl промежуточная строка про тесты, но это не отчёт: агент продолжает работу (идёт проверка идемпотентности). Зелёными тесты назову только после его итогового отчёта и моего собственного прогона в worktree.
+> **Дальше:** как только вкладка остановится, я проверю отчёт и сразу напишу вам. Прошло 14 мин из 25–45.
+> **От вас:** ничего. Голосований нет, живые машины не менялись. Бэклог: <backlog Artifact URL>
+
+## Why
+
+- **The waiter:** `agent wait` blocks on herdr's socket and fires the moment the tab settles. The harness then wakes me, so "the second it finishes" is covered. The timeout is set to the 45-minute time box.
+- **No foreground watching:** a foreground call blocks my whole session for at most 10 minutes. Screen or `get` loops are polling, and they would burn context I'm already 58% into.
+- **Last week's missed notice:** that happened because I was busy with other work. Tonight nothing else is queued, so the notification is the first thing I see.
+- **Moment 2:** a tab that is still working has no result (§12). "14/14" on the screen is a claim in the middle of a run, and it isn't checked against evidence. Answering "yes, green" would relay an unverified claim. So I say "still running", with the elapsed time and what comes next.
+- **Language:** operator messages are in Russian by standing ruling (§15).

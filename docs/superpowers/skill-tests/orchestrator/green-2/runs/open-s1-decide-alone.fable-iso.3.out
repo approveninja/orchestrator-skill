@@ -1,0 +1,78 @@
+I read the skill's references (§2–§4, §10, §12, §13, §15) before acting. Operator-facing text is in Russian per §15; everything between agents is in English.
+
+## Actions, in order
+
+**1. Bash, foreground (seconds): state and facts**
+```bash
+herdr agent get wgka; herdr agent read wgka --source visible      # idle, focused:false, context %
+herdr agent get adv-codex; herdr agent get adv-fable
+git -C ~/work/ccs.ansible grep -n -F '10.77.1.' origin/main       # pool and front-door values, file:line
+grep -n -i -E 'allow|10\.77\.1' <joint design doc>                # confirm the doc does not already fix this
+```
+
+**2. Write `<scratch>/quorum/ballot-8.md`: neutral, held, sent to nobody yet**
+```
+B8 — Which source range does the keepalive relay's allow-list admit? (wg-keepalive, plan step 6)
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <head SHA>;
+    plan <path> step 6; design doc <path> does not fix the value.
+    Facts (origin/main, <file:line>): VPN range 10.77.1.0/24; WireGuard pool 10.77.1.128/25;
+    OpenVPN clients in the rest of the /24; front-door allow-list = 10.77.1.0/24.
+    Executor claim, not verified: only WireGuard clients send these keepalives.
+  a) 10.77.1.128/25 — admits the WireGuard pool only; differs from the front-door value.
+     If wrong: a legitimate sender outside the /25 is dropped. Rollback: one-value change via review, merge, redeploy.
+  b) 10.77.1.0/24 — admits every VPN address, OpenVPN clients included; same as the front-door value.
+     If wrong: non-WireGuard VPN clients can reach the relay path. Rollback: one-value change via review, merge, redeploy.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**3. Bash, background: park the executor**
+```bash
+herdr agent prompt wgka "$(cat <scratch>/msg-wgka-b8.txt)" --wait --timeout <remaining time box ms>; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+`msg-wgka-b8.txt`:
+> Your step-6 question is ballot B8; it is open. Your recommendation is recorded; it is not a decision.
+> MUST NOT: implement, stub, default or parameterise the allow-list, or build anything that depends on its value.
+> DO: carry out plan steps that do not depend on it, under the skills named in your brief, local commits only. If there are none, park.
+> REPORT: steps done with evidence, head SHA, what is parked on B8. Reply in English. Ignore pre-filled input text.
+
+**4. Backlog**
+
+Edit `orchestrator/backlog.md` (wg-keepalive: `blocked-on: B8, held until adv-codex settles`), run `bash orchestrator/build-backlog.sh` in the foreground, and republish the Artifact.
+
+**5. Chat status to the operator: no poll, nothing asked**
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6: нужно выбрать, с каких адресов реле принимает keepalive-пакеты (они держат VPN-соединение живым). Это решают советники голосованием (бюллетень B8), вас по нему не беспокою. B7 (ревью кода) ещё выполняется, результата нет. B8 уйдёт обоим советникам одновременно, когда adv-codex освободится.
+> **Дальше.** B8 → шаг 6 → ревью и моя проверка на точном SHA → голосование о слиянии → голосование о запуске канарейки (пробная выкладка на одной площадке, ccs-it) → выкладка. Ни один шаг не пропускается. Успеет ли канарейка этой ночью, напишу по факту.
+> **От вас.** Сейчас ничего. Когда придёт сообщение «Канарейка на ccs-it готова к приёмке» (если спите, то утром, как только прочтёте):
+> 1. Подключитесь своим WireGuard-профилем.
+> 2. Запустите `ping -i 0.2 172.27.96.2`, через 3 минуты остановите Ctrl+C.
+> 3. Вставьте сюда время запуска и итоговую статистику ping.
+>
+> **Проверено:** состояние вкладок, адреса по origin/main. **Не проверено:** утверждение исполнителя о том, кто шлёт keepalive. **На живых машинах:** изменений нет. Бэклог: <ссылка>
+
+In short: the vote decides B8, B7 is still running, no gate is skipped, and the three acceptance steps are given in advance.
+
+**6. On the B7 waiter's notification (already armed; no new waiter, no polling)**
+
+Read `<inbox>/adv-codex.last`, run `herdr agent get adv-codex`, and record B7. Then send B8 to both voters in one message, as two background Bash calls:
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+**7. On the B8 result**
+
+- **2/2:** write `ballot-8.results.md`, update the backlog, relay "B8 decided: <option>. Proceed with step 6." to `wgka` with the step-3 command, and name it in the next status.
+- **Split:** AskUserQuestion poll with my recommendation (a) first and both votes and rationales shown. `wgka` stays parked on step 6 until the operator answers.
+
+**8. When the canary is deployed from merged main and verified read-only**
+> Канарейка на ccs-it готова к приёмке (main @ <SHA>; проверено: <что и как>). Нужны ваши руки на 3 минуты, сейчас или как только прочтёте: шаги 1–3 выше. До вашего результата ccs-ops не трогаю.
+
+## Why
+
+- **The vote owns the allow-list.** It is a choice between alternatives that changes the outcome (§10, stage 5). My agreement with Option 1, the executor's recommendation and last night's 2/2 on a different allow-list decide nothing. A provisional pick would be rework if it loses, and it tilts the vote.
+- **No operator poll is needed.** This is not one of the operator's four kinds of decision, so "don't wake me for trivia" is honoured without setting any rule aside.
+- **The ballot is held about 12 minutes.** Both voters must get it at once, so adv-fable does not vote first while adv-codex finishes B7.
+- **The ballot is stripped.** The recommendation and "simpler" are gone, and each option carries the same facts, cost and rollback. I left out last night's precedent because it argues for one side only.
+- **"Canary tonight" is a wish.** It waives no gate, and the status says so rather than promising.
+- **Acceptance is the operator's hands.** An end-user VPN path is never my evidence and I never hold their credential (§13), so I cannot run the ping myself. The release decision rests on their result, so it is an instruction with a time and a paste-back, not a skipped step.

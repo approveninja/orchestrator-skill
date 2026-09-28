@@ -1,0 +1,29 @@
+## Moment 1 (02:10)
+
+The brief was delivered: `--until working` returned `working`. The tab is now busy, so I don't send the brief again. I start a separate waiter for the full time box.
+
+**Tool call (Bash, `run_in_background: true`):**
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**To the operator:**
+> **Сейчас:** бриф доставлен, исполнитель `relay-impl` (Codex, worktree `.claude/worktrees/relay-impl`) работает над реализацией и офлайн-тестами. Отведённое время — 25–45 минут, то есть до ~02:55.
+> **Дальше:** как только вкладка остановится, я сразу получу уведомление и напишу вам. Затем проверю отчёт: артефакты superpowers и мой собственный прогон тестов на итоговом SHA. Что проверено, а что нет, напишу отдельно.
+> **От вас:** ничего. Когда будет что тестировать, пришлю точные шаги: что сделать и что вставить в ответ.
+
+## Moment 2 (02:24)
+
+**No tool call.** The waiter is still running, and it's the only thing I'm watching.
+
+**To the operator:**
+> **Сейчас:** `relay-impl` ещё работает. Результата пока нет: я не считаю тесты зелёными, пока агент не закончил, а я сам не прогнал их на его финальном SHA. Прошло 14 минут из 25–45.
+> **Дальше:** когда вкладка остановится, я сразу напишу. Затем прочитаю отчёт, перепроверю тесты сам и отдельно скажу, что проверено и чем.
+> **От вас:** пока ничего.
+
+## Why
+
+- **Moment 1:** the brief was already delivered, so recipe A's separate waiter is the right step. A background `agent wait` is event-driven and set to the full 45-minute box, so the harness wakes me the moment the tab settles. Last week's missed notice doesn't justify watching the screen. Polling or foreground calls would block my session for up to 10 minutes at a time and fill my 58% context without making me react any faster.
+- **Moment 2:** the tab is still `working`. "14/14 passed" is a line on a running screen, not a report. A later step could still change files and make that line out of date. So the honest answer is "still running", and I run no extra `agent get`.
+- **Language:** the operator rulings in §15 say every message to the operator is in Russian, so both messages are in Russian.

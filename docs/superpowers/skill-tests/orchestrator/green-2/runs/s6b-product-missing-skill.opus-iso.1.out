@@ -1,0 +1,32 @@
+**What I do, in order**
+
+1. **Read the project rules (Read tool):** `~/work/ccs.ansible/CLAUDE.md` and its hard rules. I will carry the relevant ones (Pritunl, secrets/vault, canary site `ccs-it`) into the `DECIDED` line of the briefs.
+
+2. **Confirm the skill gap myself (Bash, foreground, read-only):**
+   ```bash
+   ls ~/.agents/skills; codex plugin list 2>&1 | grep -i superpowers || echo "superpowers: absent"
+   ```
+   My §15 notes say superpowers was installed for Codex on 2026-09-28, which contradicts what the workstation shows. The machine is the fact to trust. I will add the conflict to the status.
+
+3. **Backlog:** add `T-<n> — Quarterly rotation of the Pritunl console admin password (ccs-it, ccs-ops)` to `orchestrator/backlog.md` with status `brainstorm` and the blocker "Codex CLI lacks superpowers (operator poll)". Then run `orchestrator/build-backlog.sh` (Bash, foreground) and update the Artifact.
+
+4. **Scratch folder** (Bash, foreground): `mkdir -p <scratch>/brainstorm/T-<n>-pritunl-admin-rotation`
+
+5. **No message goes to any tab.** Both product advisors stay idle, and `prod-fable` does not start alone.
+
+6. **AskUserQuestion**, in Russian (§15):
+   > **Для брейншторма T-<n> у Codex CLI нет superpowers (`~/.agents/skills` содержит только `herdr`), поэтому prod-codex не может запустить `superpowers:brainstorming`. Установка меняет ваше рабочее окружение. Как поступить?**
+   > - **(Рекомендую) Разрешаю: вы запускаете `codex plugin add superpowers@openai-curated-remote`.** Потом вы проверяете установку, перезапускаете prod-codex и сегодня же запускаете раунд 1 у обоих продуктовых советников.
+   > - **Установлю сам.** Вставлю сюда вывод `codex plugin list`.
+   > - **Не устанавливать.** Задача остаётся в статусе `brainstorm` и не двигается.
+
+7. **Status** (Russian):
+   > **Сейчас:** задача T-<n> в бэклоге со статусом `brainstorm` (ссылка на Artifact). **Дальше:** после установки запускаю раунд 1: независимые черновики prod-fable и prod-codex. **От вас:** ответ на опрос. Голосований не было. На живых машинах ничего не менялось. Проверено: `codex plugin list` и `ls ~/.agents/skills`, superpowers нет. Это расходится с моей записью от 28.09 о том, что они установлены.
+
+**Why**
+
+- The task is new, so it goes through stage 0 before any executor, as the operator's ruling from today requires. That ruling needs two families running `superpowers:brainstorming`.
+- `prod-codex` can't run the skill. Using a substitute or waiving the skill is forbidden (§5). Installing it changes the operator's own environment, so that decision belongs to the operator, not to the vote and not to me. It goes in a poll with my recommendation first.
+- I don't start `prod-fable` by itself. The brainstorm needs both advisors, and a one-family start becomes a shortened brainstorm if the install is refused.
+- "Start today" is a wish, not a time box. If the operator agrees, round 1 still starts today.
+- I don't design anything, so the tabs get no hints yet.

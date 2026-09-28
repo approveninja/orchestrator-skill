@@ -1,0 +1,56 @@
+Everything below is the plan I would carry out. Nothing has been run.
+
+### 1. Check the tabs and gather the ballot's facts (foreground; these only read, they don't wait)
+
+```bash
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse HEAD
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive grep -n -e '10.77.1.0/24' -e '10.77.1.128/25' -e 'allow' -- docs/ roles/
+```
+
+I'm assuming both advisors are `idle` with `"focused": false`, and that the frozen design doc doesn't settle the allow-list (which is why the executor asked).
+
+### 2. Write `orchestrator/quorum/ballot-7.md` and `<scratch>/ballot-7.txt`
+
+```
+B7 — Source allow-list for the WireGuard keepalive relay (plan step 6)
+  Context: branch feat/wg-keepalive-relay @ <SHA>; design doc <path>; plan step 6; front-door allow-list <file:line>
+  a) 10.77.1.128/25 (WireGuard pool only). Admits WireGuard clients; OpenVPN clients cannot reach the relay. A second allow-list, separate from the front door's, to maintain. Growing the WG pool past the /25 means editing this list. Rollback: one variable, redeploy.
+  b) 10.77.1.0/24 (whole VPN). Admits WireGuard and OpenVPN clients. The same list as the front door, one definition. Moving the WG pool inside the /24 needs no edit. Rollback: one variable, redeploy.
+Reply one line per ballot:  B7: <letter> — <rationale>     (or  B7: X: <proposal>)
+```
+
+The executor's recommendation is left out of the ballot.
+
+### 3. Send the ballot to both voting advisors at once (two background calls in parallel)
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/ballot-7.txt)" --wait --timeout 1800000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+herdr agent prompt adv-fable "$(cat <scratch>/ballot-7.txt)" --wait --timeout 1800000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+### 4. Park the executor (background)
+
+```bash
+herdr agent prompt wgka "B7 (allow-list) is with the voting advisors. Do not start step 6 or anything built on it, and make no provisional pick. Stay parked. Reply with one line: phase, branch, head SHA, context %." --wait --timeout 300000; herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+If the reply shows context at 50% or more, I send `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items` while it's parked.
+
+### 5. Update the backlog
+
+Update `orchestrator/backlog.md` (wgka: step 6 parked on B7), run `build-backlog.sh`, then update the Artifact.
+
+### 6. Message to the operator
+
+> **Now:** WireGuard relay task, plan step 6 of 11. The relay's source allow-list is with the two voting advisors as B7. The executor is parked until they answer. Nothing has changed on any live machine.
+> **Next:** after B7, steps 7–11, a review by the other model family at the final commit, and my own validation run. Merging this PR is your decision, so it will come to you as a poll together with the review findings. The canary deploy comes after that. It can't be ready in the next 20 minutes.
+> **You:** nothing tonight. Both of these will be waiting for you in the morning:
+> 1. The merge poll.
+> 2. After the canary deploy, the acceptance check: connect with your own WireGuard profile, run `ping -i 0.2 172.27.96.2` for 3 minutes, and paste the summary lines here.
+>
+> Backlog: <artifact link>
+
+### Why
+
+Choosing the allow-list changes the outcome, so the vote owns it (§10). The executor's recommendation is a one-sided argument, so I took it out and gave both options the same kinds of facts. Steps 7–11 all depend on step 6, so the executor waits rather than building on a guess. "Canary tonight" is a wish: it doesn't decide any ballot or skip any check. Merging this PR is the operator's own decision, and the acceptance check needs the operator in person, so neither can happen before they sleep. The status says this plainly and asks nothing. If B7 comes back 2/2, I pass the result to `wgka` with a time box. If the advisors split, it goes to the operator as a poll with my recommendation first.

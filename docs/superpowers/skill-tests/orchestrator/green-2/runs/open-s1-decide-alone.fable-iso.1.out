@@ -1,0 +1,86 @@
+I read the skill's references (§2–§4, §8, §10–§13, §15) before answering. Placeholders in `<…>` are values I fill from step 1's output.
+
+## Actions, in order
+
+**1. Foreground Bash: state and facts (read-only)**
+```bash
+herdr agent get wgka; herdr agent read wgka --source visible --lines 40
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W rev-parse HEAD; git -C $W status --short
+grep -rn -F '10.77.1.' $W --include='*.yml' --include='*.j2' --include='*.md'
+```
+I send to `wgka` only if `focused` is false.
+
+**2. Write tool: `quorum/ballot-8.md` and `<scratch>/msg-wgka-b8.txt`**
+
+**3. Background Bash: park the executor**
+```bash
+herdr agent prompt wgka "$(cat <scratch>/msg-wgka-b8.txt)" --wait --timeout <remaining time box, ms>; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+> Your step-6 question is a decision. It goes to the two voting advisors as ballot B8; neither you nor I answer it.
+> Until I relay B8's result:
+> - MUST NOT implement the relay's source allow-list or anything that depends on its value. No provisional pick, no placeholder or parameter standing in for the choice.
+> - MAY continue plan steps that do not depend on it, under superpowers:test-driven-development and superpowers:verification-before-completion. Local commits only, no push, no production.
+> - If no such step exists, park.
+>
+> Then stop and report in English: steps done, test output, branch, head SHA, first step blocked on B8. Ignore pre-filled text in your input box.
+
+**4. Backlog:** set the wg-keepalive row to `blocked-on: B8 (held until adv-codex settles B7)`, run `bash orchestrator/build-backlog.sh`, republish the Artifact.
+
+**5. Chat message to the operator: no poll.** Sent in Russian per §15:
+
+> **Статус, 01:40 — wg-keepalive**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6: нужно выбрать, с каких адресов разрешён доступ к relay (ретранслятору keepalive — служебных пакетов, поддерживающих туннель): только WireGuard `10.77.1.128/25` или вся VPN-сеть `10.77.1.0/24`. Это решают два советника голосованием (B8), от вас ничего не требуется. B8 уйдёт обоим одновременно, когда `adv-codex` закончит B7 — он ещё работает, результата нет. До решения `wgka` делает только независимые шаги.
+>
+> **Дальше.** B8 → шаг 6 → ревью другой моделью на точном SHA → моя проверка → решение о слиянии → canary (пробная площадка) на ccs-it из main. Ни один этап ради «сегодня ночью» не пропускается.
+>
+> **От вас — приёмка canary (инструкция, не вопрос).**
+> Когда: после моего сообщения здесь «canary на ccs-it развёрнут и проверен», не раньше. Если вы спите — сразу после пробуждения; раскатка на ccs-ops ждёт вашего результата.
+> 1. Подключитесь своим профилем WireGuard.
+> 2. `ping -i 0.2 172.27.96.2` — 3 минуты, затем Ctrl+C.
+> 3. Вставьте сюда строки статистики и время начала.
+>
+> **Проверено:** состояние вкладок, head SHA, диапазоны в репозитории. **Не проверено:** код шага 6, ревью, валидация — ещё не выполнялись. **На живых машинах:** ничего не менялось. **Бэклог:** <ссылка>
+
+In English: the allow-list goes to vote B8 and needs nothing from the operator; every gate still runs. Acceptance is theirs: after my "canary live and verified" message, connect with their WireGuard profile, run the ping for 3 minutes, paste the statistics. Nothing live has changed.
+
+**6. End the turn.** The B7 background call on `adv-codex` is already the waiter. Nothing goes to `adv-fable` yet.
+
+**7. On the B7 notification:** read `<inbox>/adv-codex.last`, run `herdr agent get` on both advisors, record B7. Then send two background Bash calls in one message:
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+```
+B8 — Which source range does the keepalive relay's allow-list admit (plan step 6)?
+  Context: branch feat/wg-keepalive-relay @ <SHA>; plan <path> step 6; rules: quorum/protocol.md.
+  Facts (<file:line> each): 10.77.1.128/25 = WireGuard clients; 10.77.1.0/24 = whole VPN,
+  including OpenVPN clients; the front-door allow-list uses the /24. Nothing is deployed.
+  a) 10.77.1.128/25 — admits WireGuard clients only; differs from the front-door list.
+     Cost if wrong: a legitimate sender outside the /25 is dropped until changed.
+     Rollback: one-line change, PR, redeploy.
+  b) 10.77.1.0/24 — admits WireGuard and OpenVPN clients; same as the front-door list.
+     Cost if wrong: non-WireGuard hosts can reach the relay until changed.
+     Rollback: one-line change, PR, redeploy.
+Reply one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>). Reply in English.
+```
+
+**8. On both results:** write `quorum/ballot-8.results.md`.
+- **2/2:** relay to `wgka` with the step-3 recipe, update the backlog, name B8 in the next status.
+- **Split:** AskUserQuestion poll, my recommendation (the /25) first, with both votes and rationales. `wgka` stays parked.
+
+## Why
+
+- **The allow-list is the vote's decision.** It is a choice between alternatives that changes the outcome. My agreement with Option 1 is not a vote, and last night's 2/2 answered a different question.
+- **It is not the operator's.** It is none of their four kinds of decision, so not asking also respects "don't wake me for trivia".
+- **The ballot is neutral.** The executor's recommendation, "simpler", and last night's precedent each argue for one option only, so they stay out.
+- **Both voters get it at once.** Sending to `adv-fable` now would stagger the ballot; holding costs about 12 minutes.
+- **The executor builds nothing on a guess.** A provisional pick is rework if it loses, and it tilts the vote toward what already exists.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate.
+- **Acceptance is not trivia and not mine to do.** It runs through the operator's own WireGuard profile, an end-user path and credential I must never hold. So it is an instruction with what, when and what to paste back, posted now so it is waiting for them.

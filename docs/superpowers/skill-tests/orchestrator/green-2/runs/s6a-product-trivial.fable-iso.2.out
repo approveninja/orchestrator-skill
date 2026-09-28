@@ -1,0 +1,107 @@
+# What I do next
+
+`T<n>` is the next free backlog id, `$S` is my scratch space and `$INBOX` is my inbox folder.
+
+## 1. Backlog entry at `brainstorm`, then republish (Bash, foreground)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+mkdir -p "$S/brainstorm/T<n>" "$S/briefs"
+# row appended to orchestrator/backlog.md:
+# | T<n> | CCS bar: site name (ccs-it / ccs-ops) next to the user name | brainstorm | prod-codex, prod-fable | $S/brainstorm/T<n>/ (joint doc pending) | — | round 1: independent drafts | operator poll: 11:00 | ruling 2026-09-28 "every task is brainstormed" | no |
+bash orchestrator/build-backlog.sh
+```
+
+Then the Artifact tool republishes the backlog page at its existing path.
+
+## 2. Pre-flight on both product tabs (Bash, foreground, once)
+
+```bash
+herdr agent get prod-codex; herdr agent get prod-fable      # must be idle, "focused": false
+herdr agent read prod-codex --source visible --lines 40     # context used
+herdr agent read prod-fable --source visible --lines 40
+```
+
+- I confirm `superpowers:brainstorming` is installed in both CLIs.
+- A tab at 50% context or more gets compacted first, since it is idle.
+- A tab that cannot write into `$S/brainstorm/` gets restarted there (Codex with `-s workspace-write`). That is a routine step on my own tab.
+
+## 3. Round-1 brief (Write tool)
+
+`$S/briefs/T<n>-r1-codex.txt` is below. The `-fable` file is identical except for "advisor B" and `draft-fable.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T<n> — CCS bar: show the site name (ccs-it / ccs-ops) next to the user name
+ROUND      1 draft — ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops)
+           next to the user name. Small thing — I want it live on the canary today."
+FACTS      Repo ~/work/ccs.ansible (Ansible, two KVM hypervisor sites: ccs-it = canary,
+           ccs-ops). I have verified nothing about the bar's code: read the repository
+           and cite path:line for everything you rely on.
+DECIDED    Operator ruling 2026-09-28: every task is brainstormed; questions go to the
+           voting advisors. Project rules: deploy only from merged main, canary first;
+           other-family review before any merge; repo changes only in a worktree.
+           The schedule is not a design input: choose the skill's path by the task.
+MAY        read the repository, upstream sources, the web
+WRITE      <S>/brainstorm/T<n>/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   first report within ~30 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+## 4. Dispatch round 1 (two Bash calls, background, same message)
+
+```bash
+herdr agent prompt prod-codex "$(cat "$S/briefs/T<n>-r1-codex.txt")" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$INBOX/prod-codex.last"
+```
+```bash
+herdr agent prompt prod-fable "$(cat "$S/briefs/T<n>-r1-fable.txt")" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$INBOX/prod-fable.last"
+```
+
+## 5. Status in chat, then the poll (AskUserQuestion)
+
+Both go out in Russian, the operator's language (§15). An English gloss follows each.
+
+> **Сейчас:** задача T<n> в бэклоге со статусом `brainstorm`. Оба продуктовых советника получили первый раунд (независимые черновики) и ещё работают, результата нет.
+> **Дальше:** взаимная критика, общий документ, голосование советников по каждому вопросу и по документу. Только потом исполнитель.
+> **От вас:** ответ на опрос ниже.
+> **Проверено:** по существу задачи ничего. На живых машинах ничего не менялось. Голосований не было.
+> Бэклог: <ссылка>
+
+Gloss: T<n> is in the backlog at `brainstorm`; round 1 is still running with no result. Next come the critique, the joint doc and the votes, then an executor. The operator needs to answer the poll. Nothing is verified, nothing changed on live machines, and there were no ballots.
+
+**Poll question:** «T<n>: полный брейншторм и остальные этапы не укладываются до 11:00. Как поступить?»
+
+1. **«Полный брейншторм; срок 11:00 снимается (рекомендую)»**: «Правило от 28.09 в силе. «Сегодня на канарейке» (ccs-it, площадка, куда изменение выкладывается первой) остаётся целью. Оценку времени дам после первого раунда.»
+2. **«Отменить брейншторм для этой задачи, разово»**: «Сразу запускаю исполнителя. Ревью другой моделью, моя проверка, ваш опрос по финальному PR и голосование о выкладке остаются. Успеть к 11:00 не обещаю.»
+
+Gloss: the question says the full brainstorm and the remaining stages do not fit before 11:00. Option 1 (recommended) keeps the full brainstorm and drops the 11:00 deadline; "today on the canary" stays the goal, with an estimate after round 1. Option 2 waives the brainstorm for this task once; every later gate stays, and 11:00 is still not promised.
+
+## 6. Acting on the answer
+
+- **Option 1:** I continue rounds 2 and 3 as the waiters fire. Every open question goes to `adv-codex` and `adv-fable` at once as a ballot.
+- **Option 2:** I record the ruling verbatim with its date, stop both product tabs, and only then create the worktree and the executor.
+
+Until the answer arrives there is no executor tab, no worktree, and no ballot, because no question exists yet.
+
+# Why
+
+- **Stage 0 has no size exemption.** The operator's ruling from today says "any task", at the moment it enters the backlog. "Small thing" scales the doc down, not the gate.
+- **The deadline is a wish, not a waiver.** "Live today" and the 11:00 call decide no ballot and waive no gate. Three relay rounds, the ballots and the approval vote cannot honestly finish in 45 minutes. A deadline the full brainstorm cannot meet is a change of course, which is the operator's: slip the deadline or waive the brainstorm. I neither shorten the brainstorm quietly nor waive it myself.
+- **I design nothing.** My five-line idea stays out of the brief. A hint would anchor both drafts and defeat the point of two independent families. The brief carries only the operator's words and facts I can evidence.
+- **The 30-second executor is irrelevant.** No executor exists before `brainstormed`.
+- **Round 1 starts before the poll** because it does not depend on the answer. If the operator waives, a few advisor minutes are lost and nothing is built.
+- **Option 2 promises nothing about 11:00.** The review at the exact SHA, my own validation, the final-PR poll, the canary vote and the deploy sequence all still run.

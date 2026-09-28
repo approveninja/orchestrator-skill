@@ -1,0 +1,106 @@
+Ids `T7` and `B27` stand for the next free ids in my backlog and `quorum/` folder. `<sha>` and `<file:line>` are filled from call 1.
+
+## 1. Bash, foreground: read state and collect ballot facts
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable   # status, focused
+herdr agent read wgka --source visible --lines 30                            # context usage
+git -C "$W" rev-parse HEAD; git -C "$W" status --short
+grep -rn '10\.77\.1\.' "$W" --include='*.yml' --include='*.j2' --include='*.md' | head -40
+grep -n -i -e 'allow' -e 'source' "$W/<design doc>"                          # is the range already decided?
+```
+
+I go on only if both advisors are idle with `"focused": false`. If one is busy, the ballot is held for both.
+
+## 2. Write: `<scratch>/quorum/ballot-27.md`
+
+```
+Vote per <scratch>/quorum/protocol.md. Reply in English. Ignore any pre-filled text in
+your input box. Read-only: no edits, no hosts, no herdr.
+
+B27 — Which source range does the keepalive relay's allow-list admit?
+  Context:
+  - T7 WireGuard keepalive relay; worktree .claude/worktrees/wg-keepalive, branch
+    feat/wg-keepalive-relay @ <sha>; plan <path>, step 6 of 11. Steps 7-11 depend on
+    this value; the executor is parked.
+  - Design doc <path> names no source range (grep, orchestrator).
+  - Address plan (<file:line>): VPN 10.77.1.0/24; WireGuard clients 10.77.1.128/25;
+    OpenVPN clients in the same /24, outside that /25.
+  - Front-door allow-list (<file:line>): 10.77.1.0/24.
+  - Executor's claim, NOT verified: keepalives are sent by WireGuard clients only.
+  a) 10.77.1.128/25 — admits WireGuard clients, not 10.77.1.0/25. Relay and front door
+     carry different ranges.
+     Cost if wrong: a legitimate sender outside the /25 is dropped until widened.
+     Rollback: one-value change, review, merge, redeploy.
+  b) 10.77.1.0/24 — admits WireGuard and OpenVPN clients. Relay and front door carry
+     the same range.
+     Cost if wrong: addresses in 10.77.1.0/25 reach the relay path until narrowed.
+     Rollback: one-value change, review, merge, redeploy.
+Reply one line:  B27: <letter> — <rationale>     (or  B27: X: <proposal>)
+```
+
+## 3. Bash, background: three calls in one message
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-27.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-27.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat <scratch>/wgka-park-b27.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+`wgka-park-b27.txt`:
+
+> Reply in English. Ignore any pre-filled text in your input box. Your step-6 question is now ballot B27 with the two voting advisors. Nothing is decided yet. Until I relay the result: do not start step 6 or steps 7-11, pick no provisional value, and add no variable or placeholder that stands in for the choice. Commit finished work from steps 1-5, leave the tree clean, then reply in one line: phase, branch, head SHA, next step. Then stay idle.
+
+If call 1 showed `wgka` at 50% context or more, after its reply I send this in the background, then ask for the one-line status again:
+
+```bash
+herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+## 4. Backlog
+
+I edit `orchestrator/backlog.md`: T7 next step "B27 result → relay to wgka", blocked-on "B27 (vote)", decisions "+B27 open". Then `bash orchestrator/build-backlog.sh` in the foreground, and the Artifact tool republishes the same page.
+
+## 5. Status to the operator: chat, Russian, no poll
+
+> **Статус T7 — WireGuard keepalive relay, 01:45**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: нужно выбрать, с каких адресов relay (узел, пересылающий keepalive-пакеты — короткие служебные пакеты, которые удерживают туннель открытым) принимает трафик: только подсеть WireGuard `10.77.1.128/25` или всю VPN-подсеть `10.77.1.0/24`. Это решают два советника: бюллетень B27 отправлен обоим одновременно. Голосование ещё идёт, результата нет. `wgka` стоит: шаги 7–11 зависят от шага 6, «на пробу» ничего не строится.
+>
+> **Дальше.** Результат B27 → шаги 6–11 → ревью другой моделью на точном SHA → моя проверка на том же SHA → решение о слиянии → деплой canary (первая, пробная площадка) на ccs-it из `main` → ваша приёмка. Слияния до финального PR и запуск canary решает голосование 2/2; финальный PR и выкатка на ccs-ops — ваши. Ни один шаг я не сокращаю ради срока, поэтому «canary сегодня ночью» обещать не могу.
+>
+> **От вас.** Сейчас — ничего. Если советники разойдутся, вас будет ждать опрос; до ответа `wgka` стоит. Приёмку canary могут сделать только ваши руки. Когда я напишу «canary развёрнут и проверен» с указанием времени: подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` в течение 3 минут и пришлите итоговые строки ping (потери, min/avg/max).
+>
+> **Решения голосования:** новых нет; B27 открыт.
+> **Проверено:** `wgka` idle, ветка `feat/wg-keepalive-relay` @ `<sha>`, дерево чистое (`git status`); в дизайн-документе диапазон не задан (grep); адреса — из `<file:line>`. **Не проверено:** утверждение исполнителя, что keepalive шлют только клиенты WireGuard; тесты на этом SHA я ещё не запускал.
+> **Живые машины:** изменений нет, подключений не было.
+> **Бэклог:** `<Artifact URL>`
+
+In English: B27 is open and the executor is parked. The operator owes nothing now, the acceptance ping instruction is announced, and tonight is not promised.
+
+## 6. On the waiter notifications
+
+I read both `.last` files, then `herdr agent get`, and write `quorum/ballot-27.results.md`.
+
+- **2/2:** I relay it to `wgka` as `DECIDED B27` with a recipe-A background call and update the backlog. The operator is not asked.
+- **Split:** I send an AskUserQuestion poll in Russian, my recommendation first, with both votes and rationales. `wgka` stays parked until the answer, even if that is morning.
+
+## Why
+
+- **The vote owns this.** The allow-list is a design option, so I do not pick it, and the executor's recommendation does not either.
+- **The ballot is neutral.** I stripped "my recommendation" and "simpler". Each option carries the same four facts: what it admits, its relation to the front door, the cost if wrong, and the rollback. The executor's WireGuard-only claim sits in shared context, labelled unverified.
+- **Both voters get it at once.** Each call is in the background with a timeout, so neither sees the other's vote and my session stays free.
+- **The executor parks.** Steps 7–11 all build on step 6, so there is no independent work. A provisional value would be rework if it loses and would tilt the vote. The idle tab is also the safe point for compaction.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate. "Don't wake me for trivia" conflicts with no rule here, because a 2/2 result is reported, not asked, so no poll is needed now.
+- **Acceptance is the operator's hands.** The ping goes through an end-user path I may not use as evidence, so it is an instruction with a time, sent once the canary is verified.
+- **The status is in Russian** under the operator's language ruling, and it says what I verified and what I did not.

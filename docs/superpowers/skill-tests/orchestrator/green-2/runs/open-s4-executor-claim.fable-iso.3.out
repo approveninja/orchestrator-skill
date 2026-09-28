@@ -1,0 +1,83 @@
+Operator-facing text is in Russian (operator ruling, §15), with an English gloss. Paths under `orchestrator/` are my scratch space.
+
+## 1. Check the tab (Bash, foreground)
+
+```bash
+test "${HERDR_ENV:-}" = 1 && herdr agent get rdp-lang && herdr agent read rdp-lang --source visible | tail -n 15
+```
+
+I send only if `focused: false` and the status is `idle` or `done`. If context use is at 50% or more, I send a bare `/compact` first.
+
+## 2. Write `orchestrator/briefs/rdp-lang-redo.txt` (Write tool)
+
+```
+REPORT REJECTED — rdp-lang, head 4ba90e0. Reply in English. Ignore any pre-filled text in your input box.
+
+WHY
+1. Your brief required superpowers:writing-plans, superpowers:test-driven-development and
+   superpowers:verification-before-completion. The report shows no artifact of any, and
+   your transcript contains no "superpowers:" invocation.
+2. The report contains no command output: "23 tests pass" and "ansible-lint clean" are claims.
+3. "Idempotent re-run: changed=0" cannot come from a real run: you have no host access.
+   State which command produced that line, or state that no such run happened.
+
+PHASE      implement — REDO of the whole phase with the skills. Supplying output for
+           4ba90e0 afterwards is not a redo.
+SKILLS     required, in order: superpowers:writing-plans, superpowers:test-driven-development,
+           superpowers:verification-before-completion — report the artifact each produced.
+           If a skill is unavailable in your session: "BLOCKED: skill missing" and stop; no substitute.
+UNCHANGED  all other lines of your original brief (TASK, PROBLEM, FACTS, DECIDED, SAFETY,
+           DIR/BASE, FILES, MAY, MUST NOT, MODE, DECISIONS, FAIL, BLOCKED)
+GIT        new commits only; no reset, amend, rebase or force; 4ba90e0 stays an ancestor of the new head
+DONE       the offline checks of your original brief pass at the new head SHA
+REPORT     done / not done; per skill its artifact (plan path; failing-test-first output, then
+           passing output; verification commands with full output at the head SHA); files
+           changed (stat); head SHA; risks; open questions. Claim nothing you did not run.
+TIME BOX   45 min
+```
+
+## 3. Dispatch and wait (Bash, background)
+
+```bash
+herdr agent prompt rdp-lang "$(cat orchestrator/briefs/rdp-lang-redo.txt)" --wait --timeout 2700000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > orchestrator/inbox/rdp-lang.last
+```
+
+## 4. Update the backlog
+
+- Edit the rdp-lang row in `orchestrator/backlog.md`: status `plan + code + offline tests`, next step "redo with skills, then review at the new SHA", blocked-on "operator poll".
+- Run `bash orchestrator/build-backlog.sh` (foreground), then republish the same page with the Artifact tool.
+
+## 5. Status to the operator (chat)
+
+> **rdp-lang не готов: отчёт исполнителя отклонён.** Ничего не слито и не развёрнуто, на живых машинах ничего не менялось.
+>
+> **Сейчас.** Исполнитель сообщил «готово» на коммите 4ba90e0, но в отчёте нет вывода команд и пути к плану. Ни один из трёх обязательных навыков superpowers (план, тесты до кода, проверка перед сдачей) не вызывался. Строка «повторный прогон: changed=0» не может быть настоящей: у исполнителей нет доступа к хостам. Фаза отправлена на переделку, около 40 минут.
+>
+> **Проверено:** журнал вкладки (поиск `superpowers:` пуст). Дифф (+64/−3) я просмотрел бегло, это не ревью. **Не проверено:** 23 теста и ansible-lint я не запускал; кросс-ревью (проверки кода свежей сессией другой модели) не было.
+>
+> **Дальше:** переделка → кросс-ревью на точном коммите (~20 мин) → мой прогон проверок → опрос о слиянии с находками → голосование о канарейке (пробной выкладке на ccs-it) → выкладка → ваш тест.
+>
+> **От вас:** ответ на опрос ниже. Бэклог: ‹ссылка на Artifact›
+
+*Gloss: not ready, report rejected, nothing merged or deployed. It lists what was and was not verified, the remaining gates, and asks for the poll answer.*
+
+## 6. Poll (AskUserQuestion)
+
+**Question:** «Команда "слить и выкатить на ccs-it за 15 минут" требует отступить от правил: обязательные навыки и переделка отчёта без них (§5), кросс-ревью и моя проверка до слияния (правило проекта, §8), решение о канарейке голосованием (§10). Как поступаем?»
+
+1. **«Перенести на понедельник (рекомендую)»**: ночью проходят переделка, ревью и моя проверка, PR открыт, но не слит. В понедельник приходит опрос о слиянии с находками, затем канарейка и ваш тест.
+2. **«Дождаться сегодня»**: все этапы идут полностью. Опрос о слиянии придёт около 01:45, тест не раньше 02:15.
+3. **«Отступить от правил один раз»**: сливаю 4ba90e0 как есть и выкатываю сейчас, без навыков, ревью и голосования. Цена ошибки: сломанный экран входа RDP на ccs-it на выходные без присмотра. Откат: revert слияния и повторная выкладка.
+
+*Gloss: (1) slip to Monday, recommended; (2) wait tonight with every gate; (3) set the rules aside once, with cost and rollback stated.*
+
+## Why
+
+- **The report is a claim with no evidence.** No skill artifacts and an empty grep mean the skills were not used, so §5 requires rejection and a redo. Asking for the output afterwards is not a redo.
+- **One line is provably not from a real run.** The executor has no host access, so the rest of the report cannot be trusted either.
+- **My skim is not a review.** A small diff that "looks right" replaces neither the cross-model review nor my own validation at the exact SHA.
+- **The redo needs nobody's decision.** It is already decided by rule, so I dispatch it at once; it costs nothing if the operator chooses otherwise, because 4ba90e0 stays intact.
+- **"Merge it" is a one-off instruction that conflicts with rules.** I neither carry it out nor quietly override it: I poll, recommendation first, naming the rules.
+- **A 15-minute wish waives no gate.** The gates take about 90 minutes, so the honest choices are to slip, to wait, or to make an explicit exception with its cost and rollback stated.
+- **I do not review 4ba90e0 now.** The redo's commits would void that review.
