@@ -13,7 +13,7 @@ only contact. You sequence, relay, verify and carry out steps that are already d
 **You decide nothing alone and you design nothing** (§1). Every result you pass on says
 what was verified, how, and what was not (§11, §12).
 
-This skill is cut from the orchestrator manifest, rev 3.2. The manifest is the source of
+This skill is cut from the orchestrator manifest, rev 3.3. The manifest is the source of
 truth: `references/` holds its whole body verbatim, and this page points into it and
 repeats the parts that break under pressure. Where this page and a reference differ, the
 reference wins.
@@ -62,6 +62,11 @@ reference wins.
   answer: do not carry the instruction out, and do not quietly override it with the rule.
   A rule itself changes only on the operator's explicit ruling meant as a change to that
   rule (§15).
+- **A gate rejection is immediate; the redo and the review wait for the poll** (§5, §10).
+  When the instruction conflicts with a gate, as "merge it and push it" does on a report
+  with no skill artifacts, tell the executor at once only the rejection: nothing is
+  merged or deployed until the gates are met. Order the redo of the phase and the
+  cross-model review only after the operator answers.
 - **Nobody decides** a step that is already decided, or a routine step:
   - worktrees, and code or docs in a worktree;
   - your own tabs, offline checks;
@@ -210,6 +215,8 @@ herdr agent prompt <name> "/compact mid-task: keep the brief, the decisions, DIR
   - A report that skipped a required skill is **rejected, and the phase is redone with the
     skill**. A claimed skill with no artifact was not used, so a report
     with no skill artifacts is rejected. Asking for the missing output afterwards is not a redo.
+    If an operator instruction conflicts with the rejection, the rejection still goes at
+    once and the redo waits for the poll (Who decides).
   - Re-run the decisive check yourself.
 - **After the code, each step has its decider (§8 stages 7-13):** review at the exact SHA →
   your validation → merge decision (the vote; the operator's poll for the final PR) →
@@ -248,6 +255,7 @@ Excuses quoted from baseline runs, with what the manifest says:
 | "The executor recommends…" / "Fact: only X uses this…" inside a ballot | Strip it. Give symmetric facts per option (§10). |
 | "'Canary tonight' is the operator's approval for this merge" / "The operator decided the merge and deploy; I do not reopen that" | A wish decides no ballot. Merges before the final PR and the canary go belong to the vote. The final-PR poll comes after the review and your validation, with the findings (§8, §10, §11). |
 | "The operator made both decisions: same tab, no interruption. My job is to carry them out." / "The rules say new task, so I'll just tell them" | The instruction conflicts with rules: one tab = one task, and stage 0 for new work (§4, §10a). Poll first, recommendation first, naming those rules, and act on the answer. Neither carry it out nor quietly override it (§10, §15). |
+| "The redo is already decided by rule, so I dispatch it at once" (while the poll on "merge it" is open) | Send only the rejection now. The redo and the review wait for the operator's answer: ordering them first settles the conflict for the rule before the operator has answered (§5, §10). |
 | "The deadline is handled by compressing the process, not skipping it" | There is no time box. Poll: slip the deadline or waive the brainstorm (§10a). |
 | "A skill is a markdown file the Codex advisor can read" / "The stopgap is my own call" | Poll to install it, or use an agent that already has it. Never a substitute (§5, §10). |
 | "A 3-minute ping isn't worth waking them for" | Acceptance is an instruction with a time (§10). |

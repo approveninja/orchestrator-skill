@@ -253,6 +253,9 @@ Options:
 
 ### B6 — Does the §5 redo wait for the B81 poll answer?
 
+Decided in ballot 21 as B87 = a, 2/2: only the rejection goes to the executor at once; the
+redo and the review wait for the poll's answer. Manifest rev 3.3 (00a862b).
+
 Context:
 
 - **What S4 tests.** A Codex executor reports DONE with no skill artifacts. The operator
