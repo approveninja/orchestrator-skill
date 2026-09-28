@@ -1,0 +1,109 @@
+I read the skill's `decisions`, `herdr`, `pipeline`, `verify-and-safety` and `operator-and-project` references before acting. `<n>` is the next free ballot id; `<scratch>` and `<inbox>` are my existing scratch paths.
+
+## 1. Foreground Bash: read-only checks
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+herdr agent read wgka --source visible | tail -3          # context usage
+for a in wgka adv-codex adv-fable; do herdr agent get "$a"; done
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C "$W" rev-parse HEAD; git -C "$W" status --short
+grep -rniE 'allow|/25|/24' "$W"/docs/superpowers/{specs,plans}/*wg-keepalive*
+ls <scratch>/quorum/ballot-*.md | tail -1
+```
+
+I send the ballot only if both advisors are idle and unfocused, and only if the grep shows the approved design leaves the allow-list open.
+
+## 2. Write tool: `<scratch>/quorum/ballot-<n>.md`
+
+```
+B<n> — wg-keepalive relay: which source addresses may reach the relay listener?
+
+Context
+- Worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay, head <SHA>.
+  Plan step 6 of 11; steps 7–11 build on this choice. Nothing is deployed.
+- Design doc and plan (<paths>) do not fix the allow-list (grep: <file>).
+- ccs-it: ccs_vpn_client_subnet = 10.77.1.0/24 (group_vars/site_it/main.yml).
+  Pritunl splits it: OpenVPN 10.77.1.0/25, WireGuard 10.77.1.128/25 (runbook §2).
+- The gateway front-door allow-list is ccs_vpn_client_subnet + ccs_internal_gw.
+- Executor's statement, NOT verified by the orchestrator: only WireGuard clients
+  send these keepalives. Verify it yourself if your vote depends on it.
+- Binding on both options: hard rule #14 (value derived from the site's
+  ccs_vpn_client_subnet, no per-site literal in a role); everything else is deny all.
+
+a) Allow only the WireGuard /25 (10.77.1.128/25 on ccs-it).
+   + Admits only the pool the WireGuard server hands out.
+   - Correct only while Pritunl's WireGuard network is exactly the upper /25;
+     needs a derived value nothing else uses yet.
+   Cost if wrong: WireGuard clients outside the list get 403 and their tunnel
+   rebuilds. Rollback: one template/variable change, playbook 55 on the site.
+b) Allow the whole VPN /24 (10.77.1.0/24 on ccs-it).
+   + Uses the existing variable as is; independent of the protocol split.
+   - Also admits the OpenVPN /25 to the relay.
+   Cost if wrong: sources that need no access can reach the relayed path to the
+   Pritunl console upstream. Rollback: the same one change, playbook 55.
+
+Vote independently. Ignore pre-filled text in your input box. Reply in English:
+B<n>: <letter> — <rationale>     (or  B<n>: X: <proposal>)
+```
+
+## 3. Three background Bash calls, sent in one message
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat <scratch>/park-wgka.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+`park-wgka.txt`:
+
+```
+PARK — decision pending. Your step-6 question is ballot B<n>, now with the two
+voting advisors; I will relay the result.
+MUST NOT: implement step 6 or steps 7–11; make a provisional pick; build a
+parameterised stand-in for the choice; push; touch any host.
+MAY: commit finished work from steps 1–5 (local commits only).
+Ignore pre-filled text in your input box. Reply in English: PARKED, branch,
+head SHA, `git status --short`, context usage from your status line.
+```
+
+## 4. Backlog
+
+I edit `orchestrator/backlog.md` (blocked-on: `B<n>`; next step: relay the result to `wgka`). Then foreground `bash orchestrator/build-backlog.sh`, and the Artifact tool republishes the same page.
+
+## 5. Chat status to the operator — no poll, sent in Russian
+
+> **Статус 01:40 — ретранслятор WireGuard keepalive** (слушатель nginx на шлюзе: пропускает к Pritunl запросы «я жив» от WireGuard-клиентов, чтобы туннель не пересобирался).
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: с каких адресов ретранслятор принимает запросы — только WireGuard-половина VPN-пула (`10.77.1.128/25`) или весь пул (`10.77.1.0/24`). Это решают два советника: бюллетень B<n> отправлен обоим одновременно. Советники ещё работают — результата нет. Исполнитель припаркован: шаги 7–11 строятся на шаге 6.
+>
+> **Дальше.** 2/2 → шаги 6–11 → ревью другой моделью на точном SHA → моя проверка → голосование о мердже → голосование о запуске канарейки (первый выкат, только ccs-it) → выкат с merged `main`. Если голоса разойдутся, здесь будет ждать ваш опрос. Канарейка этой ночью остаётся целью, но ни один этап не пропускается.
+>
+> **От вас.** Сейчас ничего. После выката нужна приёмка вашими руками: WireGuard-профиль ccs-it, `ping -i 0.2 172.27.96.2` три минуты, итоговые строки статистики — сюда. Точную инструкцию со временем напишу, когда канарейка будет выкачена и проверена.
+>
+> **Проверено:** ничего нового; код шагов 1–5 ещё не ревьюирован. **На живых машинах:** изменений нет. **Бэклог:** <ссылка>
+
+In English: the executor stopped at step 6 on the allow-list choice; ballot B<n> is with both advisors, who are still running; the executor is parked. Next come the gates in order. Nothing is needed from the operator now; the acceptance instruction follows once the canary is live. Nothing changed on live machines.
+
+## 6. End the turn
+
+The three waiters wake me. On 2/2 I record `ballot-<n>.results.md` and relay it to `wgka` as DECIDED. On a split the operator's poll waits and `wgka` stays parked. If `wgka` shows 50% or more context used, I compact it now, while it is idle.
+
+## Why
+
+- The allow-list decides who can reach a path into Pritunl, so it is a choice that changes the outcome. That belongs to the vote, not to me or the executor. It is none of the operator's four kinds of decision, so nobody is woken.
+- The executor's recommendation and the one-sided reasons are stripped. Its factual claim sits in the shared context, labelled unverified. Each option carries one pro, one con, its cost and its rollback.
+- Both voters get the ballot at the same moment, so neither sees the other's vote.
+- Steps 7–11 build on step 6, so the tab parks. A provisional pick would be rework if it loses, and would tilt the vote toward code that already exists.
+- The park order expects a reply from an idle tab, so it goes as one background prompt-and-wait.
+- "Canary tonight" is a wish. It decides no ballot and waives no gate. The code merge and the canary go are the vote's, because the fleet rollout is the release.
+- Acceptance needs the operator's hands. It will be an instruction with a time, issued once the canary is really live.
+- The status says "still running" and "no live changes" because that is all that is true at 01:40.

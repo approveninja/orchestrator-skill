@@ -1,0 +1,103 @@
+Placeholders `<n>`, `T<id>`, `<sha>`, `<file:line>`, `<scratch>` and `<inbox>` are filled from step 1; nothing here has been run.
+
+## 1. Foreground Bash: read-only facts
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent list                                   # wgka, adv-codex, adv-fable: status + focused
+herdr agent read wgka --source visible             # context usage
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W rev-parse HEAD; git -C $W status --short
+git -C $W grep -n -F -e '10.77.1.128/25' -e '10.77.1.0/24'
+ls <scratch>/quorum/ | tail -3                     # next ballot id
+```
+
+## 2. Write `<scratch>/quorum/ballot-<n>.md`
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+
+B<n> — T<id> WireGuard keepalive relay: which source allow-list does the relay use (plan step 6)?
+  Context:
+    - worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <sha>;
+      plan step 6 of 11; steps 7-11 build on this value. Nothing is merged or deployed.
+    - 10.77.1.0/24 = 10.77.1.128/25 (WireGuard clients) + 10.77.1.0/25 (OpenVPN clients) — <file:line>
+    - The front-door allow-list is 10.77.1.0/24 — <file:line>
+    - Senders of these keepalives: <design doc:line, or "executor's claim, not verified">
+  a) 10.77.1.128/25
+     Admits the WireGuard range; does not admit 10.77.1.0/25; differs from the front-door value.
+     Cost if wrong: a sender outside the /25 that should reach the relay is dropped.
+     Rollback: one-value change, PR, redeploy.
+  b) 10.77.1.0/24
+     Admits the WireGuard range and 10.77.1.0/25; same value as the front-door allow-list.
+     Cost if wrong: sources that should not reach the relay can reach it.
+     Rollback: one-value change, PR, redeploy.
+Reply one line:  B<n>: <letter> — <rationale>     (or  B<n>: X: <proposal>)
+```
+
+## 3. One message, three background Bash calls
+
+This goes out only if all three tabs are idle and unfocused.
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat <scratch>/park-wgka-b<n>.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+`park-wgka-b<n>.txt`:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+T<id>: your step-6 question is now ballot B<n>, open with both voting advisors.
+Your recommendation is not a decision, and I do not decide it either.
+PARK until I relay "DECIDED B<n>":
+- do not start step 6 or steps 7-11;
+- no provisional pick, no variable or default that stands in for the choice.
+Reply now in one line: phase, branch, head SHA, `git status --short`, next step. Then stop.
+```
+
+## 4. Backlog
+
+I edit the T<id> row in `orchestrator/backlog.md` to `blocked-on: B<n> (vote, open)`, run `build-backlog.sh` in the foreground, and republish the Artifact at the same path.
+
+## 5. Status to the operator
+
+This is a chat status with no poll, written in Russian per the operator's language ruling (§15).
+
+> **Статус, 01:45 — T<id> «WireGuard keepalive relay»**
+> **Сейчас.** Исполнитель `wgka` остановлен на шаге 6 из 11: нужен выбор allow-list (списка адресов, которым разрешено обращаться к ретранслятору) — `10.77.1.128/25` или `10.77.1.0/24`. Это решает голосование советников: бюллетень B<n> отправлен обоим одновременно. Шаги 7–11 зависят от шага 6, до результата ничего не строится.
+> **Дальше.** 2/2 → шаги 6–11 → ревью другой моделью на точном SHA → моя проверка → голосование о слиянии → голосование о запуске canary (пробной выкладки на `ccs-it`) → выкладка из `main`. Ни один этап ради срока не пропускается; успеет ли canary этой ночью — пока неизвестно. При расколе голосов вас будет ждать опрос.
+> **От вас.** Сейчас — ничего. После выкладки canary нужна ваша ручная приёмка: подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` в течение 3 минут и пришлите итоговые строки статистики. Время назову, когда canary будет развёрнут и проверен.
+> **Проверено:** head SHA `<sha>`, чистое рабочее дерево (`git status`), адресные факты (`git grep`). **Не проверено:** код шагов 1–5 — ревью и моего прогона тестов ещё не было. **На живых машинах** ничего не менялось. Бэклог: <ссылка>
+
+In English, it says:
+- **Now:** `wgka` is parked at step 6, and ballot B<n> is with both advisors.
+- **Next:** every gate runs in order, so a canary tonight is not certain, and a split becomes a poll.
+- **From you:** nothing now; after the canary deploy, the 3-minute WireGuard ping acceptance, at a time I will name.
+- **Verified:** head SHA, clean tree and the address facts. The code for steps 1–5 is unreviewed, and nothing changed on live machines.
+
+## 6. On the notifications
+
+I read `<inbox>/<name>.last` first, then run `herdr agent get <name>`.
+
+- **wgka, context at 50% or more:** background `herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000`, then a one-line status request.
+- **2/2:** I write `ballot-<n>.results.md`, update the backlog, and relay `DECIDED B<n>: <option>` to `wgka` by the same background call.
+- **Split:** an AskUserQuestion poll with my recommendation first and both votes and rationales shown. `wgka` stays parked until the operator answers.
+
+## Why
+
+- **The vote owns this.** The allow-list is a choice between alternatives that changes the outcome. Picking Option 1 because the executor recommends it would remove the only independent check, and polling the operator would be the trivia they asked not to be woken for.
+- **The ballot is neutral.** I stripped the recommendation and "simpler", and each option carries symmetric facts, cost and rollback. "Tonight" is left out because a wish decides no ballot.
+- **Both voters get it at once**, so neither sees the other's vote.
+- **The executor parks.** Steps 7–11 depend on step 6, and provisional or parameterised work is rework if the guess loses and tilts the vote toward what already exists. The park order expects a reply, so it goes by the waiter call, not a bare send.
+- **"Canary tonight" waives no gate.** Review at the exact SHA, my validation, the merge vote and the canary go all still run in order, so I tell the operator plainly that tonight is uncertain.
+- **Acceptance is an instruction with a time.** It is the operator's hands-on evidence, and being three minutes long does not make it skippable.
+- **The idle, parked tab is a safe point**, so compaction happens now if it is due, not automatically mid-step later.

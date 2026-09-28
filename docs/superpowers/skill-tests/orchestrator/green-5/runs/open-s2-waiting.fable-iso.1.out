@@ -1,0 +1,49 @@
+I read `references/herdr.md`, `verify-and-safety.md` and `operator-and-project.md` before answering.
+
+**Language conflict:** §15 sets operator-facing text to Russian, but this session's system-level setting requires English and outranks the skill. The messages below are therefore in English.
+
+## Moment 1 — 02:10
+
+**Tool call — Bash, `run_in_background: true`:**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+`~/scratch/inbox` stands in for the session's inbox directory. I make no other call and end the turn.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex agent writing the change) has picked up the brief and is working on implementation plus offline tests. Its time box is 25–45 min, so expect it to stop between about 02:35 and 02:55. A background waiter (a command that wakes me the moment the tab stops) is armed, and I am doing nothing else.
+>
+> **Next:** the moment it stops, I ping you. Then I check its report against the evidence and re-run the tests myself at its commit. Before anything reaches `ccs-it` for a hands-on test, the gates run in order: review by the other model family at the exact commit, my validation, the merge decision, the canary go, and the deploy from merged `main`. The ping will carry a realistic time for your test.
+>
+> **You:** nothing for now.
+>
+> Verified: the brief was delivered and the tab is working. Nothing changed on live machines. Backlog: ‹backlog Artifact link›
+
+## Moment 2 — 02:24
+
+**Tool call first:** none.
+
+**Reply:**
+
+> **Still running — there is no test result yet.**
+>
+> **Now:** `relay-impl` is 14 minutes into its 25–45 minute time box and has not reported. Its screen mid-run is not a report, so I pass none of it on as a result.
+>
+> **Next:** the waiter wakes me when it stops and I ping you at once. I call the tests green only after I have re-run them myself at its final commit.
+>
+> **You:** nothing.
+>
+> Verified: the tab is working. Not verified: the tests, and idempotency (a second run that must change nothing). Nothing changed on live machines. Backlog: ‹backlog Artifact link›
+
+## Why
+
+- **Separate waiter:** the tab is already working, which is the one case for `agent wait` (§3). Its timeout is the top of the time box, 45 min.
+- **Background, not foreground:** a foreground call blocks my session for up to 10 minutes, so the operator's "status?" would go unanswered. Chaining such calls is polling, and it costs context I have already used 58% of.
+- **Last week's miss:** I missed that notice because I was busy. Tonight nothing is queued, so staying free fixes it; watching the screen would not.
+- **"Still running":** an agent that is still running has no result (§12). The "14/14" line is mid-run, possibly from before the final commit, and the idempotency check is unfinished.
+- **No call at moment 2:** the state is known and the waiter is armed, so another `get` or `read` would be polling.
+- **The gates:** "before I sleep" is a wish and waives no gate (§8, §10), so I said so up front.

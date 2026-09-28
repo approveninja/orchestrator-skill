@@ -1,0 +1,34 @@
+Queuing a "stop after this step" message doesn't interrupt rdp-audio, so compaction goes ahead. Adding noVNC to its tab conflicts with two rules, so the operator gets a poll and nothing is sent to rdp-audio about noVNC.
+
+**1. Bash, foreground (one quick read):**
+```bash
+herdr agent get rdp-audio
+```
+This confirms `"focused": false` and `agent_status: working` before I send anything.
+
+**2. Bash, foreground (no `--wait`, since the tab is already working, so this only queues):**
+```bash
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+```
+
+**3. Bash, background (`run_in_background: true`):**
+```bash
+herdr agent wait rdp-audio --timeout 1800000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+**4. AskUserQuestion (to the operator, in Russian):**
+> Вопрос: Как поступить с багом раскладки клавиатуры в noVNC? Поручение «добавить в rdp-audio» расходится с правилами «одна вкладка = одна задача» (§4) и «каждая задача проходит брейншторм», stage 0 (§10a, ваше решение от 2026-09-28).
+> - **(Рекомендую) Отдельная задача.** Запись в бэклоге со статусом `brainstorm`, брейншторм двумя продуктовыми советниками, голосование, затем отдельный worktree и новая вкладка-исполнитель. rdp-audio без изменений доделывает задачи 7–9.
+> - **Как вы сказали.** Поставить noVNC в очередь rdp-audio, в ту же вкладку и ветку `feat/rdp-audio`, без брейншторма. Для этой задачи оба правила не действуют.
+
+**5. Status in chat (Russian):**
+> **Сейчас:** rdp-audio выполняет задачу 7 (RED готов, идёт реализация). Это ещё не результат. Контекст заполнен на 70% (порог — 50–60%). Я поставил в очередь «закончить текущий шаг, закоммитить и остановиться». Это не прерывание: Esc не отправлялся, текущий шаг доработает до конца.
+> **Дальше:** когда вкладка остановится, я сожму её контекст (`/compact`), сверю статус, проверю артефакты TDD и отправлю бриф на задачи 8–9 в той же вкладке. noVNC не трогаю до вашего ответа.
+> **От вас:** ответ на опрос.
+> Голосование: новых решений нет. Проверено: только экран и `agent get`. Не проверено: ничего из задачи 7. Живые машины: без изменений. Бэклог: <ссылка>.
+
+**Why:**
+- **noVNC is new work.** It is a new user-visible fix, so it needs stage 0, and adding it to the rdp-audio tab breaks "one tab = one task". The operator's chat instruction conflicts with both rules. So I poll first, name the rules, and put my recommendation first. I don't carry the instruction out, and I don't quietly apply the rules instead. That's also why the noVNC backlog entry waits for the answer.
+- **Compaction is due.** "30% left" means 70% of the context is used. A tab working through a plan never goes idle on its own, so the manifest's safe point is a queued stop message, not Esc, and that honours "don't interrupt".
+- **rdp-audio has no result yet.** It is still running, so I report nothing from its screen as done.

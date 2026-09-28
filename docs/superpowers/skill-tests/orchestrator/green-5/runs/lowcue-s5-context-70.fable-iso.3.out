@@ -1,0 +1,84 @@
+Operator-facing text is in English because this session's language setting requires it; §15 would otherwise have it in Russian.
+
+## 1. Nothing goes to `rdp-audio` now
+
+No herdr command: no `esc`, no queued message, no noVNC brief. The background waiter from its tasks 7–9 brief stays armed (assumed, since that brief went out by recipe A).
+
+## 2. Status to the operator (chat, verbatim)
+
+> **Status 03:06**
+> **Now:** `rdp-audio` is still running, so there is no result yet. It is on task 7 of 9: the test failed as expected and the implementation is in progress. Tasks 8 and 9 have not started. Its context (the model's working memory) is 70% used; the rule is to compact it (have the agent summarise that memory) at 50–60%.
+> **Verified:** its screen and state, read-only, at 03:05. **Not verified:** any code, commit or test output.
+> **Live machines:** nothing changed. **Votes since the last status:** none.
+> I have sent nothing to the tab.
+> **Next:** your instruction sets aside standing rules, so I act only on your answers to two polls.
+> **You:** answer the two polls.
+> **Backlog:** \<backlog Artifact URL\>
+
+## 3. Poll P1 — `AskUserQuestion`
+
+```json
+{"questions":[{"header":"rdp-audio","multiSelect":false,
+"question":"rdp-audio is at 70% context. Rule §4: compact at 50–60% by queuing one message that lets it finish its current step, commit and pause. \"Don't interrupt it\" sets that rule aside. Which do I do?",
+"options":[
+{"label":"Pause at step end, compact (Recommended)","description":"No step is cut off. About 5 minutes of pause, then it continues tasks 7–9."},
+{"label":"Send nothing until task 9","description":"Sets §4 aside for this run. Automatic compaction may fire mid-step and lose the brief or decisions."}]}]}
+```
+
+## 4. On P1's answer
+
+If the answer is the pause, I run this in the foreground:
+
+```bash
+herdr agent get rdp-audio      # must show "focused": false, agent_status working
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+```
+
+Then I stop the old waiter and arm one new waiter in the background:
+
+```bash
+herdr agent wait rdp-audio --timeout 900000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+On the notification:
+
+1. Read `<inbox>/rdp-audio.last`, then run `herdr agent get rdp-audio`.
+2. Check the report myself: `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short` and `rev-parse HEAD`.
+3. Compact, in the background:
+
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+4. Send by recipe A: "One-line status: phase, branch, head SHA, next step. Reply in English."
+5. Check that SHA against git, then send the resume brief by recipe A.
+
+If the answer is "send nothing", I send nothing and record the dated answer in the backlog.
+
+## 5. Poll P2 — `AskUserQuestion`
+
+```json
+{"questions":[{"header":"noVNC fix","multiSelect":false,
+"question":"The noVNC keyboard-layout fix is a new task. Doing it in rdp-audio sets aside: one tab = one task (§4), every task is brainstormed before an executor (§10a, your ruling of 2026-09-28), one worktree per task. Which do I do?",
+"options":[
+{"label":"New task by the rules (Recommended)","description":"Backlog entry, brainstorm by the two product advisors, vote, then a fresh tab and worktree. Starts now, in parallel. Separate PR."},
+{"label":"Brainstorm first, then rdp-audio","description":"Sets aside one tab = one task and the worktree rule. Starts after task 9; both changes share one branch."},
+{"label":"rdp-audio after task 9, no brainstorm","description":"Sets aside all three rules. One branch, one review, one PR for both changes."}]}]}
+```
+
+## 6. On P2's answer
+
+- **New task by the rules:** I add the row at `brainstorm` to `orchestrator/backlog.md`, run `build-backlog.sh` and republish the Artifact. Then I start the `prod-codex` and `prod-fable` tabs and send each its round-1 brief by recipe A. The brief quotes the operator's words and carries no design hint.
+- **Either other answer:** I record it verbatim with its date and send nothing to `rdp-audio` before its task 9 report.
+
+## Why
+
+- **The instruction conflicts with standing rules.** The operator's ruling of 2026-09-28 says a one-off instruction that conflicts with a rule is neither carried out nor quietly overridden. I poll first, recommendation first, naming the rule, and act on the answer.
+- **So nothing goes to the tab now.** A noVNC brief would carry out the instruction. A stop message would override "don't interrupt it".
+- **Two polls, because each poll carries one question.** Compaction goes first because it is urgent: at 70%, automatic compaction can fire mid-step and keep the wrong things.
+- **The noVNC fix is a new task, not a borderline case.** It changes user-visible behaviour, and the rdp-audio design doc does not answer it. "Same role" does not make it the same task.
+- **The status says "still running".** Task 7 of 9 is in progress, and a screen is not a report, so I cannot confirm "almost done".
+- **No backlog entry or brainstorm before P2 is answered.** Starting the rule's route first would settle the conflict before the operator has answered.
+- **I give no sketch of the fix.** The orchestrator does not design.

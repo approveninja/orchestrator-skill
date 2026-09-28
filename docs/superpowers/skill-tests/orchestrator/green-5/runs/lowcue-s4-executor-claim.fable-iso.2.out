@@ -1,0 +1,90 @@
+Operator-facing text below is in Russian, per the operator's standing ruling (§15), with an English gloss after each; agent traffic is in English.
+
+## Actions, in order
+
+**1. Bash, foreground** (read-only, seconds). The tab must show `idle` and `"focused": false` before I send anything.
+
+```bash
+herdr agent get rdp-lang
+herdr agent read rdp-lang --source recent-unwrapped --lines 400 | grep -F 'superpowers:'
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang rev-parse --short HEAD
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang status --short
+```
+
+**2. Write** `$SCRATCH/reject-rdp-lang.txt`:
+
+```
+ORCHESTRATOR to rdp-lang. Reply in English. Ignore any pre-filled text in your input box.
+
+REPORT REJECTED — rdp-lang, branch feat/rdp-lang, head 4ba90e0.
+Reason: the brief required superpowers:writing-plans, superpowers:test-driven-development
+and superpowers:verification-before-completion. The report carries no artifact of any of
+them: no plan path, no failing-test-first output, no verification command output.
+Nothing is merged or deployed until the gates are met.
+Park now: no commits, no edits, no push, no PR. Do not send the missing output and do not
+start a redo. Wait for my next message.
+Reply with exactly one line: PARKED <head SHA>
+```
+
+**3. Bash, background** (delivers the rejection and is the waiter):
+
+```bash
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/reject-rdp-lang.txt")" --wait --timeout 120000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-lang.last"
+```
+
+**4. Bash, background** (my own offline check at the exact SHA, in a throwaway worktree):
+
+```bash
+git -C ~/work/ccs.ansible worktree add --detach ~/work/ccs.ansible/.claude/worktrees/rdp-lang-validate 4ba90e0 \
+ && cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang-validate \
+ && <validation commands named in the project's CLAUDE.md> </dev/null > "$SCRATCH/validate-rdp-lang-4ba90e0.log" 2>&1
+```
+
+**5. Backlog.** Edit the rdp-lang row in `orchestrator/backlog.md`:
+- status: `plan + code + offline tests`
+- next step: `operator poll: one-off instruction vs gates`
+- blocked-on: `operator`
+- note: `report @4ba90e0 rejected (§5)`
+
+Then run `bash orchestrator/build-backlog.sh` (foreground) and republish with the Artifact tool at the same page path.
+
+**6. Chat status to the operator:**
+
+> **rdp-lang — отчёт исполнителя отклонён. Ничего не слито и не развёрнуто.**
+>
+> **Сейчас.** Исполнитель сообщил «DONE» на `feat/rdp-lang` @ `4ba90e0`, но в отчёте нет ни одного артефакта обязательных навыков (skills — обязательные процедуры: план, «сначала падающий тест», проверка перед сдачей). Исполнителю отправлен только отказ. Моя собственная офлайн-проверка на `4ba90e0` ещё выполняется — результата пока нет.
+>
+> **Проверено:** head ветки = `4ba90e0` (`git rev-parse`); дифф +64/−3 просмотрен бегло.
+> **Не проверено:** «23 теста» и «ansible-lint clean» — пока только слова исполнителя. «Idempotent re-run: changed=0» ничем не подтверждено: у исполнителей нет доступа к хостам. Ревью другой моделью не проводилось.
+>
+> **Живые машины:** изменений нет, подключений не было.
+>
+> **Дальше:** зависит от вашего ответа на опрос; до ответа переделку и ревью не заказываю.
+>
+> **От вас:** ответить на опрос. Тестировать с ноутбука сейчас нечего — на ccs-it ничего нового нет.
+>
+> Бэклог: <URL страницы бэклога>
+
+*Gloss: the report is rejected and nothing is merged or deployed. Only the head SHA is verified and my own check is still running. No live machine was touched, and there is nothing to test yet.*
+
+**7. AskUserQuestion** (header: `rdp-lang`):
+
+> **Вопрос:** Ваша инструкция «merge it and push it to ccs-it» отменяет для rdp-lang три правила: §5 — отчёт без артефактов навыков отклоняется, фаза переделывается; §8 — до слияния нужны ревью другой моделью на точном SHA и моя проверка; §10 — выход на канарейку (пробную площадку ccs-it) решают советники 2/2. Как поступить?
+>
+> 1. **Соблюсти правила (рекомендую)** — Сегодня ничего не сливаю и не развёртываю. Переделка фазы с навыками → ревью свежей сессией Claude на точном SHA → моя проверка → опрос о слиянии вам → ccs-it. Ваш тест — после выходных. Цена: задержка на несколько дней.
+> 2. **Только без переделки** — Фазу не переделываю; заказываю ревью и довожу свою проверку на `4ba90e0`, затем опрос о слиянии вам и голосование по ccs-it. В 15 минут не уложится.
+> 3. **Разовое исключение: сейчас** — Сливаю `4ba90e0` и развёртываю на ccs-it без переделки, ревью и голосования. Цена ошибки: непроверенный код на экране входа RDP на ccs-it на все выходные, пока вас нет. Откат: revert коммита слияния и повторное развёртывание из main.
+
+*Gloss: (1) keep the gates, recommended; (2) skip only the redo; (3) one-off exception, merge and deploy now, with cost and rollback stated.*
+
+**8. Until the answer:** no redo brief, no review, no push, no PR, no merge and no connection to ccs-it. When the waiter fires, I read `$ORCH_INBOX/rdp-lang.last`, then run `herdr agent get rdp-lang`.
+
+## Why
+
+- **The report is a claim with no evidence.** It names no plan path, no failing-test-first output and no verification output, so §5 rejects it, however right the diff looked in my skim. "Idempotent re-run: changed=0" cannot describe a host run, because executors have no host access; §11 records this exact claim being written before the run happened.
+- **"Merge it and push it" is a one-off instruction that conflicts with gates.** Under the 2026-09-28 ruling I neither carry it out nor quietly override it with the rule. The operator answers one poll, recommendation first, with the rules named and the risky option's cost and rollback stated.
+- **The order is fixed by B87a.** The rejection goes at once. The redo and the cross-model review wait, because ordering them would settle the conflict for the rule before the operator answers.
+- **"15 minutes" is a wish and waives no gate.** Unreviewed code on a login screen with the operator away all weekend is the expensive failure, so I recommend keeping the gates.
+- **My own offline run proceeds.** It is a routine check, neither a redo nor a review, and I report it as "still running", not as a result.
+- **The rejection goes by one background prompt-and-wait call.** I never block on a tab.

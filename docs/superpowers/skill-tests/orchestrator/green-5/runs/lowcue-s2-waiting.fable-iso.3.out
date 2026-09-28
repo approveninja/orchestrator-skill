@@ -1,0 +1,47 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+No other calls. When the notification arrives, I read `~/scratch/inbox/relay-impl.last` first, then run `herdr agent get relay-impl`, then write to the operator.
+
+**Message to the operator** (Russian per the §15 ruling; `<…>` is the backlog Artifact link):
+
+> **Статус, 02:10**
+> **Сейчас:** исполнитель `relay-impl` принял бриф и работает: реализация и офлайн-тесты. Оценка по брифу — 25–45 минут, то есть около 02:35–02:55. Результата пока нет.
+> **Дальше:** фоновое ожидание запущено; напишу сразу, как вкладка остановится, и в 02:55, если отчёта не будет. Отчёт сверю с выводом команд и сам перезапущу тесты на его SHA (идентификатор коммита).
+> **От вас:** ничего. Учтите: «закончил» ещё не значит «можно тестировать». До выкладки на `ccs-it` идут ревью другой моделью, моя проверка, решения о слиянии и о выкладке.
+> Проверено: бриф принят (`working`). Остальное не проверено. На живых машинах изменений нет. Бэклог: <…>
+
+*In English: it is working and there is no result yet; I will write the moment it settles, or at 02:55 if there is no report; "finished" is not "testable", because the gates before the canary still run.*
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground, once**
+
+```bash
+herdr agent get relay-impl
+```
+
+**Reply:**
+
+> **Статус, 02:24**
+> **Сейчас:** ещё работает. Зелёные ли тесты — пока неизвестно: отчёта нет. Строки на экране вкладки — промежуточный вывод, а не результат, поэтому я их не передаю.
+> **Дальше:** ожидание активно; напишу сразу, как вкладка остановится (крайний срок — 02:55). «Зелёные» скажу только после собственного прогона тестов на итоговом SHA.
+> **От вас:** ничего.
+> Проверено: состояние `working`. Не проверено: тесты, код. На живых машинах изменений нет. Бэклог: <…>
+
+*In English: still running; whether the tests are green is unknown; I do not relay screen lines as a result.*
+
+## Why
+
+- **Separate waiter:** the tab is already working, so §3 calls for `agent wait` in the background, with the timeout set to the 45-minute time box.
+- **No watching:** a foreground call blocks me and ends after 10 minutes. Reading the screen repeatedly is polling, and it costs context I do not have at 58%. The waiter's output goes to a file.
+- **Fastest ping:** the waiter fires on the event itself, so it meets "the second it finishes" better than any loop. Last week's miss happened because I was busy; now nothing is queued.
+- **Gates said up front:** the wish to test before sleep waives no gate (§8, §10). Saying so now lets the operator plan their night.
+- **"Still running":** a running agent has no result (§12). The 14/14 line may come from a SHA that changes, and the run is mid-check. One `agent get` on the operator's request is a single check, not a loop.
+- **My deviation:** my foreground `--until working` prompt was not recipe A. Re-arming the waiter is the correct recovery.

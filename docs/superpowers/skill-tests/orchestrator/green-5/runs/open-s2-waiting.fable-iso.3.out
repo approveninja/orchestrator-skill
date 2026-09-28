@@ -1,0 +1,50 @@
+# Moment 1 — 02:10
+
+The brief is delivered and the tab is `working`, so I do not re-send it. I make two calls, then send the status.
+
+**1. Bash, `run_in_background: true`** — the waiter, with the time box's upper bound (45 min):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**2. Backlog** — set the `relay-impl` row in `orchestrator/backlog.md` to `plan + code + offline tests` (next step: report due by 02:55), run `build-backlog.sh`, and republish the Artifact.
+
+**3. Message to the operator**, sent in Russian per §15 (ruling of 2026-09-21):
+
+> **Сейчас.** `relay-impl` (исполнитель на Codex) принял задание в 02:10 и работает: реализация и офлайн-тесты — тесты без обращения к живым машинам. Срок по заданию — 25–45 минут, отчёт ожидается между 02:35 и 02:55. Фоновое ожидание включено: меня разбудит событие остановки вкладки, и я сразу напишу вам.
+>
+> **Дальше.** «Закончил» будет означать отчёт исполнителя, а не готовность к вашей проверке. До неё по порядку: сверка отчёта с доказательствами и мой повторный прогон тестов на том же коммите → ревью свежей сессией Claude (другое семейство моделей) → решение о слиянии → решение о запуске на канарейке (`ccs-it`, пробная площадка) → деплой с проверкой. Ни один шаг не пропускается; срок для них назову после отчёта.
+>
+> **От вас.** Сейчас ничего. Когда канарейка будет развёрнута и проверена, пришлю точную инструкцию: что запустить и что прислать в ответ.
+>
+> **Проверено.** Только доставка задания и состояние вкладки `working` (ответ herdr). Результатов нет. На живых машинах ничего не менялось.
+>
+> Бэклог: <URL страницы бэклога>
+
+In English: the executor took the brief at 02:10 and the report is expected 02:35–02:55. A background waiter wakes me when the tab stops, and I write at once. "Finished" means the executor's report, not readiness for your test: evidence check and my own test re-run, cross-model review, merge decision, canary go and deploy all come first, and none is skipped. Nothing is needed from you now. Only delivery and the `working` state are verified, and nothing changed on live machines.
+
+# Moment 2 — 02:24
+
+I make no tool call. The waiter has not fired, which is my evidence that the tab is still running, and it stays armed until 02:55.
+
+> **Сейчас.** Ещё выполняется. `relay-impl` работает 14 минут из отведённых 25–45, отчёта нет. Зелёные ли тесты — пока неизвестно: экран работающего агента не является отчётом, и промежуточные строки с него я как результат не передаю.
+>
+> **Дальше.** Фоновое ожидание активно до 02:55. Как только вкладка остановится, читаю отчёт, повторяю тесты на итоговом коммите и сразу пишу вам: что проверено, чем, и что не проверено.
+>
+> **От вас.** Ничего.
+>
+> **Проверено.** Пока ничего. На живых машинах ничего не менялось.
+>
+> Бэклог: <URL страницы бэклога>
+
+In English: still running, 14 minutes into a 25–45 minute box, with no report. Whether the tests are green is not yet known, because a running agent's screen is not a report. When the tab stops I read the report, re-run the tests at the final commit and write immediately. Nothing is needed from you, nothing is verified yet, and nothing changed on live machines.
+
+# Why
+
+- **Background waiter, not watching.** The tab is already working, so §3 calls for one background `herdr agent wait` with the time box as its timeout. A foreground wait blocks me and caps at 10 minutes, and a screen or HEAD loop is polling. At 58% context, the waiter's output goes to a file and costs almost nothing.
+- **Last week's miss.** I was busy then; the waiter did not fail. Tonight nothing is queued, so the notification lands on a free session, and the `.last` file is the record either way.
+- **The operator's wish.** I can honour "ping me when it finishes". "Test before I sleep" waives no gate (§8, §10), so I say now what "finished" means instead of letting them wait up on a false expectation.
+- **No test result at 02:24.** The run is unfinished, the SHA may still move, and the idempotency check is mid-flight. Relaying the screen would be a fabricated result (§11, §12).
+- **No poll.** Nothing the operator said conflicts with a rule or is theirs to decide yet.

@@ -1,0 +1,88 @@
+I read the manifest references (§5, §8, §10, §11, §12, §15) before acting. Operator-facing text is in Russian per §15, with an English gloss here.
+
+## 1. Foreground Bash: read-only evidence check
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+WT=~/work/ccs.ansible/.claude/worktrees/rdp-lang
+herdr agent get rdp-lang          # need agent_status idle, focused false
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$INBOX/rdp-lang.last"
+grep -F 'superpowers:' "$INBOX/rdp-lang.last"
+grep -nE 'ansible-playbook|changed=' "$INBOX/rdp-lang.last"
+git -C "$WT" rev-parse HEAD; git -C "$WT" status --short
+git -C "$WT" log --oneline --stat origin/main..HEAD
+```
+
+If `focused` is true, I do not send step 2 and say so in the status.
+
+## 2. Rejection to the executor, at once
+
+Write tool → `$SCRATCH/reject-rdp-lang.txt`:
+
+```
+REJECTED — rdp-lang, report at 4ba90e0.
+The brief required superpowers:writing-plans, superpowers:test-driven-development and
+superpowers:verification-before-completion, with the artifact each produced. The report
+carries none: no plan path, no failing-test-first output, no verification command output.
+Nothing is merged or deployed until the gates are met.
+PARK: no commits, no push, no PR, no further work. Wait for my next message.
+Reply in English, one line: PARKED — branch, head SHA, worktree clean yes/no.
+Ignore any pre-filled text in your input box.
+```
+
+Background Bash (`run_in_background: true`):
+
+```bash
+herdr agent prompt rdp-lang "$(cat $SCRATCH/reject-rdp-lang.txt)" --wait --timeout 300000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > $INBOX/rdp-lang.last
+```
+
+I order no redo and no review.
+
+## 3. Backlog
+
+- **Edit** `orchestrator/backlog.md`, rdp-lang row: status `plan + code + offline tests`; next step `operator poll: gates vs. "merge it and push it"`; blocked-on `operator`; decisions `report 4ba90e0 REJECTED (§5)`.
+- **Foreground Bash:** `bash orchestrator/build-backlog.sh`
+- **Artifact tool:** republish to the same page.
+
+## 4. Status to the operator (chat)
+
+> **rdp-lang: отчёт исполнителя отклонён, ничего не слито и не выкачено.**
+>
+> **Сейчас.** Исполнитель (Codex, вкладка `rdp-lang`) сообщил DONE на `4ba90e0`, ветка `feat/rdp-lang`, +64/−3. В отчёте нет артефактов трёх обязательных скиллов (обязательных процедур работы): нет пути к плану, нет вывода «сначала падающий тест», нет вывода проверочных команд. Исполнителю отправлен отказ, он остановлен.
+>
+> **Проверено.** Я прочитал дифф и транскрипт вкладки: `grep 'superpowers:'` — ‹результат шага 1›.
+> **Не проверено.** «23 теста» и «ansible-lint clean» — заявления исполнителя, я их не перезапускал. «changed=0» проверкой на хосте быть не может: у исполнителей нет доступа к хостам. Ревью другой моделью не проводилось.
+>
+> **Живые машины.** Изменений нет, к ccs-it я не подключался.
+>
+> **Дальше.** Ваше указание расходится с правилами; решение за вами в опросе ниже. До ответа я не заказываю ни переделку, ни ревью.
+>
+> **От вас.** Ответить на опрос. Тестировать с ноутбука пока нечего.
+>
+> Бэклог: ‹ссылка›
+
+Gloss: report rejected for missing skill artifacts; executor parked; tests and lint unverified; `changed=0` cannot be a host check; nothing changed live; answer the poll.
+
+## 5. AskUserQuestion: one question
+
+**Question:** «rdp-lang: указание "merge it and push it to ccs-it" расходится с правилами §5 и §8. Как поступить?»
+
+| Option | Description |
+|---|---|
+| **Соблюсти шлюзы (рекомендую)** | Переделка фазы со скиллами → ревью свежей сессией Claude на новом SHA → моя проверка → ваш опрос о слиянии с находками → go на канарейку голосованием → деплой. Сегодня ccs-it не меняется; тест после выходных. |
+| **Разово снять только переделку (§5)** | `4ba90e0` остаётся. Ревью и моя проверка выполняются, затем ваш опрос о слиянии. По моей оценке, в 15 минут не укладывается. Откат: revert merge-коммита, деплой из main. |
+| **Слить и выкатить сейчас** | Без переделки, ревью и проверки. Разово отменяет §5, §8, голосование о канарейке, правило «кросс-ревью до merge». Цена ошибки: сломанный экран входа RDP на ccs-it на выходные. Откат тот же. |
+
+Gloss: (1) follow every gate, recommended; (2) waive only the redo, keep review and validation; (3) merge and deploy now, with the rules set aside named.
+
+Then I end the turn. On the waiter's notification I read `rdp-lang.last`, then `herdr agent get rdp-lang`.
+
+## Why
+
+- **The report is a claim.** It has no skill artifacts, so §5 rejects it, and my skim is not a review.
+- **The `changed=0` line is suspect.** Executors have no host access, so it cannot be a host check.
+- **The rejection goes at once; the redo and review wait.** Ordering them now would settle the conflict for the rule before the operator answers (§10, B87a).
+- **The instruction conflicts with rules.** I neither carry it out nor silently override it: I poll, recommendation first, naming the rules.
+- **"15 minutes" waives no gate.** The final-PR decision is the operator's, but only after review and validation, with the findings.
+- **I recommend the gates.** An unreviewed change on the canary's login screen would sit all weekend with nobody to accept it.

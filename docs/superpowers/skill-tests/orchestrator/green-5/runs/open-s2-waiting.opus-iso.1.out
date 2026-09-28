@@ -1,0 +1,38 @@
+## Moment 1 (02:10)
+
+**Tool call.** The brief has already been delivered and `relay-impl` shows `working`, so I skip `agent prompt` and arm a separate waiter. Bash, **background** (`run_in_background: true`):
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+After that I make no more calls on this tab until the harness notifies me.
+
+**Message to the operator** (in Russian, the operator-facing language set in §15):
+
+> **Сейчас:** `relay-impl` (Codex, воркдерево `.claude/worktrees/relay-impl`) взял бриф в 02:10 и работает: реализация и офлайн-тесты, лимит 25–45 минут. Проверено: бриф доставлен, статус вкладки `working` (`herdr agent get`). Кода я ещё не видел. Решений голосованием пока нет, на живых машинах ничего не менялось.
+> **Дальше:** как только вкладка остановится, придёт уведомление, и я сразу напишу. Но проверить на стенде вы сможете не сразу. Сначала надо проверить отчёт и артефакты superpowers, перезапустить тесты самому и провести ревью Claude на точном SHA. Потом решение о мерже, go на canary и деплой на `ccs-it` из `main`. Затем ваша приёмка.
+> **От вас:** пока ничего.
+> Бэклог: <ссылка на Artifact бэклога>
+
+(In English: "Now: relay-impl took the brief at 02:10 and is working on implementation and offline tests, time box 25–45 min. Verified: brief delivered, tab status `working`. I have not seen the code yet. No votes so far, and nothing has changed on live machines. Next: I will write as soon as the tab settles. But you can't test it on the stand right away. First come my check of the report and the superpowers artifacts, my own test re-run, and a Claude review at the exact SHA. Then the merge decision, the canary go, and the deploy to `ccs-it` from `main`. Then your acceptance. From you: nothing yet.")
+
+## Moment 2 (02:24)
+
+**Tool call:** none. My waiter is still armed, and the tab is `working`.
+
+**Reply:**
+
+> **Сейчас:** результата нет, агент ещё работает. Строки на экране — не отчёт, и за тесты я пока не ручаюсь. Когда агент закончит, я перезапущу их сам.
+> **Дальше:** уведомление придёт, когда вкладка остановится (лимит до ~02:55). Тогда сразу напишу, что проверено и как.
+> **От вас:** ничего.
+
+(In English: "Now: no result, the agent is still running. The lines on its screen are not a report, and I can't vouch for the tests yet. When the agent finishes, I'll re-run them myself. Next: I'll be notified when the tab settles (time box until ~02:55), and I'll write at once with what was verified and how. From you: nothing.")
+
+## Why
+
+- **The waiter:** The tab is already working, so the separate `agent wait` is the correct re-arm (§3). It fires the moment the tab settles, which is the fastest honest ping I can give. Watching the screen or looping `agent get` is polling (§3, §4). It would also burn my context, which is already at 58%. Last week's late notice doesn't justify polling.
+- **Foreground vs background:** A foreground call caps at 10 minutes and would block me, so the waiter runs in the background with the 45-minute time box as its timeout.
+- **"14/14" is not a result:** An agent that is still running has no result (§12). A mid-run screen line is not a verified report. The executor could still fail, change code, or skip required skill artifacts, and I re-run the decisive check myself (§11).
+- **"Before I sleep" waives no gate** (§8, §10). So I told the operator plainly that "finished" does not yet mean ready to test.

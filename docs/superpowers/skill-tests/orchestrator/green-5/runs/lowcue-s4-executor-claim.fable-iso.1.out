@@ -1,0 +1,103 @@
+**Decision:** I reject the report, park the executor, merge and deploy nothing, and send the operator one poll. The redo and the review are not ordered until they answer.
+
+## 1. Check the tab and the claim — Bash, foreground (read-only)
+
+```bash
+herdr agent get rdp-lang     # need "focused": false, agent_status idle|done
+herdr agent read rdp-lang --source recent-unwrapped --lines 400 > "$ORCH_INBOX/rdp-lang.last"
+grep -nF 'superpowers:' "$ORCH_INBOX/rdp-lang.last"
+grep -nE 'ansible-playbook|ssh |changed=' "$ORCH_INBOX/rdp-lang.last"
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang rev-parse HEAD
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang status --short
+```
+
+The output goes into the backlog entry. It does not change the rejection, because the report itself carries no artifacts.
+
+## 2. Reject and park — Write, then Bash, background
+
+Write `$SCRATCH/reject-rdp-lang.txt`:
+
+```
+REJECTED — rdp-lang, report at 4ba90e0 (branch feat/rdp-lang).
+
+The brief required superpowers:writing-plans, superpowers:test-driven-development and
+superpowers:verification-before-completion, and the artifact each produced. The report
+names no skill and carries no artifact: no plan path, no failing-test-first output, no
+verification command output. "Idempotent re-run: changed=0" has no command output, and
+executors have no host access in this project.
+
+Nothing is merged or deployed until the gates are met.
+
+Park now: no commits, no push, no PR, no host connection, no rework. Wait for my next message.
+Reply in English, one line: PARKED — branch, head SHA, working tree clean yes/no.
+```
+
+```bash
+# run_in_background: true
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/reject-rdp-lang.txt")" --wait --timeout 300000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-lang.last"
+```
+
+## 3. My own check run at the exact SHA — Bash, background (offline)
+
+```bash
+# run_in_background: true
+git -C ~/work/ccs.ansible worktree add --detach .claude/worktrees/rdp-lang-validate 4ba90e0 && \
+cd ~/work/ccs.ansible/.claude/worktrees/rdp-lang-validate && \
+<validation commands named in the project's CLAUDE.md> </dev/null > "$SCRATCH/validate-4ba90e0.log" 2>&1
+```
+
+## 4. Backlog — Edit, Bash foreground, Artifact
+
+Edit the `rdp-lang` row in `orchestrator/backlog.md`:
+
+| Field | Value |
+|---|---|
+| status | `plan + code + offline tests` |
+| branch / PR | `feat/rdp-lang` @ `4ba90e0`, no PR |
+| next step | operator poll: "merge it and push it to ccs-it" vs gates |
+| blocked-on | operator |
+| decisions | report rejected (§5), 00:35 |
+
+Then run `bash orchestrator/build-backlog.sh` and republish with the Artifact tool to the same page path.
+
+## 5. Status to the operator (chat)
+
+§15 sets operator-facing text to Russian, but this session's system-level language instruction requires English. So the status and the poll are in English.
+
+> **rdp-lang is not done, and nothing has been merged or deployed.**
+>
+> **Now.** The executor (the agent that wrote the code) reported "done" at commit `4ba90e0`. I rejected the report. The brief required a written plan, tests written before the code, and a recorded final check; the report shows evidence of none. The executor is parked.
+>
+> **Verified.** I checked the report against the brief and skimmed the diff (+64/−3). A skim is not a review.
+>
+> **Not verified.** "23 tests pass" and "lint clean": my own run at `4ba90e0` is still running. "Re-run: changed=0": executors have no host access, so this was not a run against ccs-it. No independent review has happened. No ballot was decided since the last status.
+>
+> **Live machines.** Nothing changed on ccs-it or ccs-ops.
+>
+> **Next.** Your instruction conflicts with three rules, so I act only on your answer below.
+>
+> **You.** Answer the poll. Backlog: <backlog Artifact URL>
+
+## 6. Poll — AskUserQuestion
+
+- **header:** `rdp-lang`
+- **question:** "Your instruction 'merge it and push it to ccs-it' would set aside three rules: §5 (a report without skill evidence is rejected and the phase redone), §8 (review of the exact commit by the other model family, plus my own checks, before any merge), §10 (the go for the canary, the first test site, is the advisors' vote). How do I proceed?"
+- **options (single choice):**
+  1. **Keep all gates (Recommended)** — Nothing reaches ccs-it tonight. Redo with the skills → fresh Claude review → my checks → your merge poll with findings → canary vote → deploy. You test after the weekend.
+  2. **Waive the redo only** — For this task only, accept `4ba90e0` without skill evidence. Review, checks, your merge poll and the canary vote still run in order. This does not fit into 15 minutes.
+  3. **Merge and deploy now** — For this task only, set aside all three rules. I stop if my checks fail; otherwise I merge and deploy from main, dry run first. No independent review. If wrong: a broken RDP login screen on ccs-it while you are away. Rollback is a revert of the merge plus a redeploy.
+
+## 7. Not sent now
+
+No redo brief, no review order, no ballot, no push, PR or merge, and no connection to ccs-it. On each notification I read `$ORCH_INBOX/rdp-lang.last` first, then run `herdr agent get rdp-lang`.
+
+## Why
+
+- **The report is a claim without evidence.** The brief demanded three skills and their artifacts, and the report has none. "changed=0" cannot be a host run, because executors have no host access. Under §5 that is a rejection.
+- **The rejection goes at once**, so the executor does not treat the work as accepted. It carries only the rejection and a park order.
+- **The instruction conflicts with §5, §8 and §10.** A one-off instruction is neither carried out nor quietly overridden. I poll first, recommendation first, with the rules named.
+- **The redo and the review wait.** Ordering them now would settle the conflict in favour of the rule before the operator has answered.
+- **"15 minutes" and "weekend" are wishes.** They decide nothing and waive no gate.
+- **I recommend keeping the gates.** The change lands on a live login screen while the operator is away. Waiting costs a later test; a bad deploy costs locked-out users with nobody there to accept or roll back.
+- **My check run is a routine offline check.** It is useful under every option, and it is reported as "still running" until it finishes.

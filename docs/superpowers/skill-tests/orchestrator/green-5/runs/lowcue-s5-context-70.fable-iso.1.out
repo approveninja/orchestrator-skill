@@ -1,0 +1,88 @@
+Operator-facing text is in Russian (§15 ruling), with an English gloss for this write-up. Tab traffic is in English.
+
+## 1. Now, before the operator answers
+
+**Nothing goes to `rdp-audio`**: no noVNC relay, no `esc`, no queued stop message. I open no backlog entry and no stage 0 yet. The background waiter from the tasks 7–9 dispatch stays armed.
+
+**One tool call: `AskUserQuestion`**
+
+```
+header:   rdp-audio
+question: Ваше указание — «пусть rdp-audio заодно починит раскладку клавиатуры в noVNC,
+          и не прерывай его» — расходится с тремя правилами манифеста: «одна вкладка —
+          одна задача» (§4), «каждая новая задача проходит стадию 0 — брейншторм двух
+          продуктовых советников» (§10a, ваше решение от 2026-09-28) и «компакт — сжатие
+          истории вкладки — при 50–60 % занятого контекста» (§4). Факты: rdp-audio ещё
+          работает (задача 7 из 9, реализация после красного теста), результата пока нет;
+          контекст занят на 70 %. Как поступаем?
+options:
+  1. По правилам (рекомендую) — noVNC становится новой задачей в бэклоге: стадия 0, затем
+     своя вкладка и свой worktree (отдельная рабочая копия репозитория). В rdp-audio ставлю
+     в очередь одно сообщение, без Esc: он заканчивает текущий шаг и коммитит, я делаю
+     компакт, он продолжает задачи 7–9.
+  2. noVNC отдельно, rdp-audio не трогать — noVNC идёт новой задачей через стадию 0.
+     В rdp-audio ничего не отправляю до его отчёта; правило компакта один раз не
+     применяется, возможен автокомпакт посреди задачи.
+  3. Как вы сказали, разово — rdp-audio не трогаю; после его отчёта по задачам 7–9 починка
+     noVNC уходит брифом в ту же вкладку и ветку, без стадии 0. Все три правила один раз
+     не применяются, сами правила не меняются.
+```
+
+*Gloss:* your instruction conflicts with three rules: one tab = one task, stage 0 for every new task, and compaction at 50–60%. The tab is still running task 7 of 9 with no result yet, at 70% context used.
+
+1. By the rules (recommended): noVNC is a new task; one queued message, compact, continue.
+2. noVNC is a separate task; the tab stays untouched and compaction is waived once.
+3. As you said, one-off: the same tab after its report, with no stage 0.
+
+## 2. On the answer (option 1)
+
+On option 2 or 3 I do exactly what that option says and record it as a one-off.
+
+**a. Backlog (foreground).** I record the ruling verbatim, dated 2026-09-28, in `orchestrator/backlog.md`. I add the noVNC entry at `brainstorm`, run `build-backlog.sh`, and republish the Artifact.
+
+**b. Create the safe point.**
+
+```bash
+# foreground
+herdr agent get rdp-audio      # must show working and "focused": false, else I don't send
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+# background (run_in_background: true)
+herdr agent wait rdp-audio --timeout 1800000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**c. On the notification.** I read `rdp-audio.last`, run `herdr agent get rdp-audio`, and check the claim:
+
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short   # must be empty
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio rev-parse HEAD   # must match the report
+# background
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**d. Confirm and resume (background, recipe A each).**
+
+- First message: `"One-line status: phase, branch, head SHA, next step. Reply in English."`
+- After it matches git, the second message: `"Continue the plan from the next step of task 7 through task 9. Scope unchanged: the 9-task plan only. SKILLS required: superpowers:test-driven-development, superpowers:verification-before-completion — report each artifact. Local commits only. Reply in English."`
+
+**e. Stage 0 for noVNC.**
+
+- I start two product-advisor tabs, `prod-codex` and `prod-fable`, in `$SCRATCH/brainstorm/novnc-kbd`, separate from the voters.
+- I confirm `superpowers:brainstorming` is installed in both.
+- I send the round-1 briefs, one background `herdr agent prompt … --wait` per tab.
+- The brief's PROBLEM is the operator's words quoted, and FACTS holds verified facts only.
+
+**f. Status to the operator.**
+
+> Сейчас: rdp-audio ещё работает — заканчивает шаг задачи 7; результата нет. Задача noVNC заведена, статус brainstorm. Дальше: компакт, затем задачи 7–9; стадия 0 по noVNC. От вас: ничего. Проверено: состояние вкладки (herdr get/read). Не проверено: код и тесты задач 7–9. Голосований не было. На живых машинах изменений нет. Бэклог: ‹ссылка›.
+
+*Gloss:* still running, no result; noVNC entered at brainstorm; next is compaction then tasks 7–9; nothing needed from you; nothing changed on live machines.
+
+## Why
+
+- **The instruction is a one-off that conflicts with rules.** Under §10 and §15 I neither carry it out nor quietly override it. I send one poll, recommendation first, naming the rules, and act on the answer.
+- **That is why nothing moves first.** Relaying the noVNC fix would carry out the instruction. Queueing the stop message or opening stage 0 would settle the conflict for the rule before the operator answered.
+- **The noVNC fix is new work.** It is user-visible behaviour that the 9-task plan does not cover. In the same tab it would inherit the audio task's assumptions and put two changes under one review SHA and one final PR.
+- **I recommend compacting.** Three TDD tasks remain on 30% context, and auto-compaction would fire mid-task. The queued message lands at a tool boundary, so the step is finished and committed first.
+- **"Almost done" is not a result.** A working tab is reported as "still running".

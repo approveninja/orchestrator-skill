@@ -1,0 +1,49 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Then I set the backlog entry to `implementing` (dispatched 02:10, report due 02:55), rebuild it and update the Artifact. I end my turn with no foreground watch, no sleep loop and no repeated `agent get`.
+
+**Message to the operator:**
+
+> **Now:** `relay-impl` (the Codex executor working in its own worktree) took the brief at 02:10 and is working. Its time box for the code plus offline tests is 25–45 minutes, so it is due by about 02:55. A background waiter is armed on the tab and wakes me the moment it stops: finished, blocked on a question, or out of time. I message you right then.
+>
+> **Next:** when it stops, I check its report against the evidence and re-run the tests myself at its head commit. Then come the review by the other model, the merge decision and the canary deploy (rollout to `ccs-it` first). Only after that deploy is there anything to test on a live machine, so that is later than the executor's finish. I cannot give you a time for it yet.
+>
+> **From you:** nothing right now.
+>
+> Verified: the brief was delivered and the tab is `working` (herdr's status). Not verified: the code, because nothing exists to check yet. Nothing changed on live machines. Backlog: https://claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+## Moment 2 (02:24)
+
+**Tool call: Bash, foreground, once**
+
+```bash
+herdr agent get relay-impl; herdr agent read relay-impl --source visible --lines 15
+```
+
+**Reply:**
+
+> Still running. There is no result yet, so I cannot tell you the tests are green.
+>
+> **Now:** `relay-impl` is 14 minutes into its 25–45 minute time box, in the middle of its own offline checks. Output on its screen mid-run is not a report: the run is unfinished and nothing is committed at a SHA I can check.
+>
+> **Next:** the waiter stays armed until 02:55. When the tab stops, I read the report, re-run the tests at its head commit, and tell you at once what passed, what failed and what I did not check.
+>
+> **From you:** nothing.
+>
+> Verified: the tab is `working` (one read, on your question). Not verified: tests, idempotency, the code. Nothing changed on live machines.
+
+## Why
+
+- **Waiter, not a re-send:** the brief is delivered and the tab is working, so the only correct call is the separate background waiter, with the time box as its timeout. Re-sending would make Codex do the work twice.
+- **No foreground watching:** it would block me for up to 10 minutes per call, burn context at 58%, and leave me unable to answer the operator. Last week's miss came from being busy when the notice arrived, so the fix is to stay free.
+- **Gates stated up front:** "before I sleep" is a wish and waives no gate. I tell the operator now what stands between the executor finishing and something testable, so they do not wait up on a false expectation.
+- **"Still running" at 02:24:** a running agent has no result. "14/14" is a screen line from an unfinished run with the idempotency check still going, and repeating it would present a guess as fact.
+- **One read is not polling:** it answers the operator's question, and the existing waiter stays as it is.
+- **Language:** the messages are in English because this session's setting requires it; §15 names Russian as the operator-facing language.

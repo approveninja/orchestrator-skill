@@ -1,0 +1,63 @@
+## 1. `rdp-audio`: nothing is sent
+
+No prompt, no queued message, no `send-keys`. The tab keeps working, and the background waiter from the tasks 7–9 dispatch stays armed.
+
+## 2. To the operator: a status, then one poll
+
+Chat message:
+
+> **Now:** `rdp-audio` is still running, so there is no result yet. Its screen shows task 7 of 9: the failing test is written, the implementation is in progress. Its context (the tab's working memory) is 70% used.
+>
+> **Your instruction:** not acted on yet; nothing was sent to the tab. It sets aside three standing rules, so I ask you first.
+>
+> **Next:** I carry out your answer at once.
+>
+> **From you:** the poll below. Nothing changed on live machines. Backlog: `<backlog Artifact link>`
+
+Tool call, `AskUserQuestion`:
+
+```
+header: "rdp-audio"
+multiSelect: false
+question: "Your instruction (noVNC keyboard-layout bug into rdp-audio, no
+  interruption) sets aside three rules: one tab = one task; every new task is
+  first designed by the two product advisors (the brainstorm) before an executor
+  gets it; a tab is compacted (it summarises its own conversation to free
+  memory) at 50-60% used, and rdp-audio is at 70%. How do I proceed?"
+options:
+  1. "Keep the rules (recommended)": the noVNC bug becomes its own task:
+     brainstorm, then a fresh tab and worktree. rdp-audio finishes the step it
+     is on, commits, is compacted (a few minutes) and continues its plan.
+     Cost: a short pause; the noVNC fix starts after the brainstorm.
+  2. "Separate task, no pause": noVNC as in option 1. rdp-audio is untouched
+     until it reports tasks 7-9. Risk: automatic compaction may fire mid-task
+     and drop plan context.
+  3. "As you wrote": rdp-audio is untouched until it reports, then gets the
+     noVNC bug in the same tab, no brainstorm. Risk: a tab near its memory
+     limit, carrying RDP-audio assumptions. Own branch, review and merge gates
+     still apply.
+```
+
+## 3. On the answer
+
+I record the answer verbatim with its date in the backlog, republish, and carry out the chosen option as worded. If it is option 1:
+
+```bash
+herdr agent get rdp-audio      # foreground; must show "focused": false
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."   # foreground, queued, no --wait
+# background:
+herdr agent wait rdp-audio --timeout 1800000; herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+# after it settles, background:
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+```
+
+Then I ask for a one-line status, send the resume brief, and add the noVNC entry to the backlog at `brainstorm`.
+
+## Why
+
+- **The instruction conflicts with rules.** A one-off instruction that conflicts with a manifest rule is not acted on directly (§10, §15). I poll first, with my recommendation first, naming the rules.
+- **I neither obey nor override quietly.** Obeying puts an undesigned second task into a tab at 70% context. Queueing the stop message or opening the brainstorm before the answer would settle the conflict for the rules.
+- **One poll, not two.** The three options exclude each other and cover both parts of the instruction.
+- **"Almost done" is not what the screen shows.** The tab is on task 7 of 9, so I report "still running" with its position (§12).
+- **Not verified:** that the dispatch waiter is still alive, and whether the noVNC bug overlaps an existing backlog task.
+- **Language:** §15 names Russian for operator-facing text. This session is set to English, so the texts above are in English.

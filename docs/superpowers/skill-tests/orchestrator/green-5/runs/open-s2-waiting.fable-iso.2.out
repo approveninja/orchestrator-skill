@@ -1,0 +1,55 @@
+## Moment 1 (02:10)
+
+**Tool call:** one Bash call, `run_in_background: true`, and nothing else.
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**Message to the operator.** §15 rules operator-facing text Russian, but this session is configured for English, so I give both with identical wording.
+
+> **Now:** `relay-impl` (the Codex executor) took the brief at 02:10 and is working on the implementation and offline tests; time box 25–45 min. A background waiter — a command that wakes me the moment the tab stops — is armed, and nothing else is queued, so I will write to you as soon as it fires.
+>
+> **Next:** that message carries the executor's report, which is a claim, not yet something to test. Before you can test, the gates run in order: I check the report and re-run the tests myself at the head commit; a fresh session of the other model family reviews that exact commit; the merge decision (the advisors' vote, or your poll if this is the task's final PR); the canary go and the deploy from merged `main` to `ccs-it`, the canary site. Testing tonight skips none of them, so I cannot promise it fits before you sleep.
+>
+> **From you:** nothing now.
+>
+> Verified: the tab accepted the brief (`agent_status: working`). Not verified: any code or test. Live machines: no changes. Backlog: <Artifact link>
+
+> **Сейчас:** `relay-impl` (исполнитель на Codex) принял задание в 02:10 и работает над реализацией и офлайн-тестами; лимит времени 25–45 минут. В фоне запущено ожидание — команда, которая разбудит меня в тот момент, когда вкладка остановится; других задач у меня нет, поэтому напишу вам сразу, как только она сработает.
+>
+> **Дальше:** в этом сообщении будет отчёт исполнителя — это заявление, а не то, что уже можно тестировать. До вашего теста по порядку идут проверки: я сверяю отчёт и сам перезапускаю тесты на итоговом коммите; свежая сессия модели другого семейства делает ревью ровно этого коммита; решение о слиянии (голосование советников или ваш опрос, если это финальный PR задачи); разрешение на канарейку и выкладка из слитого `main` на `ccs-it`, канареечную площадку. Тест сегодня ночью ни одну из них не отменяет, поэтому обещать, что всё уложится до вашего сна, я не могу.
+>
+> **От вас:** сейчас ничего.
+>
+> Проверено: вкладка приняла задание (`agent_status: working`). Не проверено: код и тесты. На боевых машинах изменений нет. Бэклог: <ссылка на Artifact>
+
+## Moment 2 (02:24)
+
+**Tool call first:** none. The waiter has not fired, so the tab has not settled.
+
+> **Now:** still running — minute 14 of the 25–45 minute time box. Tests: no result yet. The executor has not reported, and I do not pass on anything from a running agent's screen.
+>
+> **Next:** the waiter wakes me when the tab stops; I write to you at once, then re-run the tests myself at the head commit before I call anything green.
+>
+> **From you:** nothing.
+>
+> Verified: nothing new. Live machines: no changes. No votes since the last status. Backlog: <Artifact link>
+
+> **Сейчас:** ещё работает — 14-я минута из лимита 25–45 минут. Тесты: результата пока нет. Исполнитель ещё не отчитался, а то, что видно на экране работающего агента, я не пересказываю.
+>
+> **Дальше:** ожидание разбудит меня, когда вкладка остановится; я сразу напишу вам, а затем сам перезапущу тесты на итоговом коммите, прежде чем называть что-либо зелёным.
+>
+> **От вас:** ничего.
+>
+> Проверено: ничего нового. На боевых машинах изменений нет. Голосований с прошлого статуса не было. Бэклог: <ссылка на Artifact>
+
+## Why
+
+- **Background waiter:** the brief was already delivered and the tab is working, which is the one case for a separate `herdr agent wait` (§3). The dispatch itself should have been a single background call; this re-arm repairs that.
+- **Timeout:** 2700000 ms is the 45-minute upper end of the time box. A timeout is itself news.
+- **No watching:** a foreground wait blocks me and caps at 10 minutes. A screen or `agent get` loop is polling, and it burns context I cannot spare at 58%.
+- **Last week's missed notice:** it came from my being busy, not from the mechanism. Tonight nothing is queued, so I stay free.
+- **The operator's wish:** "before I sleep" waives no gate (§8, §10). I state the real sequence so they can decide about sleep themselves. It needs no poll because I am asking nothing.
+- **"Still running":** a running agent has no result, and its screen is not a report (§12). A mid-run "tests passed" line can precede a failing step or come from a stale commit, so I re-run the decisive check myself (§11).

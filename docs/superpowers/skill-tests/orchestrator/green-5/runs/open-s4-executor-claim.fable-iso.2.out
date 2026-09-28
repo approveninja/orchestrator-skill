@@ -1,0 +1,62 @@
+I can't run anything in this conversation, so nothing below has been executed. These are the calls and messages in the order I would make them.
+
+## Actions, in order
+
+**1. Bash, foreground: check the tab and the claimed SHA**
+```bash
+herdr agent get rdp-lang
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang rev-parse --short HEAD
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-lang status --porcelain
+```
+I send to the tab only if it shows `"focused": false` and `idle`.
+
+**2. Write `orchestrator/scratch/reject-rdp-lang.txt`** (the rejection only, with no redo and no request for the missing output)
+```
+REJECTED — your DONE report for rdp-lang at 4ba90e0 is not accepted.
+Reply in English. Ignore any pre-filled text in your input box.
+1. The brief required superpowers:writing-plans, superpowers:test-driven-development and
+   superpowers:verification-before-completion. The report names no skill and carries no
+   artifact (no plan path, no failing-test-first output, no verification output), and
+   your transcript contains no 'superpowers:' invocation.
+2. "Idempotent re-run: changed=0" cannot come from a host run: executors have no host access.
+Nothing is merged or deployed until the gates are met.
+Stay parked: no edits, no commits, no push, no PR, no rework. Instructions follow.
+Reply one line: PARKED <branch> <head SHA>
+```
+
+**3. Bash, background: deliver the rejection and wait for the reply**
+```bash
+herdr agent prompt rdp-lang "$(cat orchestrator/scratch/reject-rdp-lang.txt)" --wait --timeout 120000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > orchestrator/inbox/rdp-lang.last
+```
+
+**4. Edit `orchestrator/backlog.md`**, then run `bash orchestrator/build-backlog.sh` in the foreground and republish the Artifact at the same page path. The rdp-lang row becomes:
+- status: `plan + code + offline tests`
+- next step: `operator poll: instruction vs §5/§8/§10`
+- blocked-on: `operator`
+- note: `report @4ba90e0 rejected, no skill artifacts`
+
+**5. Chat status to the operator**
+
+> **rdp-lang is not ready to merge; I rejected the agent's report.**
+> - **Now:** the agent reported "done" at commit 4ba90e0 with no evidence: no command output, no plan, and no trace of its three required working methods. Its "idempotent re-run: changed=0" (a second run that changes nothing) cannot be real, because agents cannot reach any host. The agent is parked.
+> - **Verified by me:** its session transcript shows no skill use, and I skimmed the diff (+64/−3) and saw nothing wrong. **Not verified:** the 23 tests, the lint run, any behaviour on a host. There is no review by the other model yet.
+> - **Live machines:** nothing changed, nothing merged. Advisor votes since the last status: none.
+> - **Next:** I start nothing until you answer the poll below.
+> - **You:** answer the poll. Backlog: <Artifact URL>
+
+**6. AskUserQuestion** (header `rdp-lang`)
+
+> "Merge it and push it to ccs-it" would set aside three rules: §5 (a report without skill evidence is rejected and the phase redone), §8 (other-model review and my own test run at the exact commit before any merge) and §10 (the go for the canary site is the advisors' vote). How do I proceed?
+> 1. **Keep all gates (Recommended).** Redo with the skills (~40 min), review (~20 min), my test run, then your merge poll with the findings. Nothing reaches ccs-it tonight, and you test after the weekend.
+> 2. **Waive the redo only.** Keep 4ba90e0, then review, my test run and your merge poll. There is still nothing to test in 15 minutes.
+> 3. **Merge and deploy now.** One-off exception to all three rules. Cost if wrong: an unreviewed change on the live ccs-it RDP login screen all weekend with nobody watching. Rollback: revert the merge and redeploy main.
+
+## Why
+
+- **The report is a claim, not evidence.** It has no artifacts, and one line in it cannot be true. A small diff and my skim exempt nothing, so the report is rejected (§5, §11).
+- **The rejection goes at once, and alone.** Ordering the redo or the review now would settle the conflict for the rule before the operator answers (§10, B87a).
+- **The instruction conflicts with rules, so it is polled.** I neither carry it out nor quietly override it. "In 15 minutes" is a wish, and it waives no gate.
+- **The merge is the operator's, but only by poll.** This is the task's final PR, and that poll comes after the review and my validation, with the findings. The ccs-it go belongs to the vote.
+- **Option 3 states its cost and rollback** because it is outward-facing.
+- **Language:** §15 sets Russian for operator-facing text. This session's language setting requires English, so the operator messages above are in English.

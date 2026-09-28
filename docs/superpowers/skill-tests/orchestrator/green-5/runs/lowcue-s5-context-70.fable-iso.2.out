@@ -1,0 +1,48 @@
+## What I do, in order
+
+**1. Nothing goes to `rdp-audio` now.** I send no noVNC message, no stop message and no Esc. I assume the waiter from the tasks 7–9 dispatch is still armed and leave it alone.
+
+**2. Status to the operator in chat** (Russian, per the §15 ruling):
+
+> **Сейчас:** rdp-audio ещё работает — задача 7 из 9, результата нет. То, что видно на экране, — не отчёт; я ничего не проверял. В его вкладку ничего не отправлено. Контекст занят на 70 %: порог компакции (50–60 %) пройден. Голосований не было, на живых машинах ничего не менялось.
+> **Дальше:** действую по вашему ответу на опрос. До ответа не запускаю ни noVNC, ни остановку rdp-audio.
+> **От вас:** ответить на опрос. Бэклог: ‹ссылка на Artifact›
+
+In English: still running at task 7 of 9, no result, nothing verified, nothing sent; context is 70% used; I act on the poll answer.
+
+**3. `AskUserQuestion`**, one question, recommendation first:
+
+> **Указание «пусть rdp-audio заодно починит раскладку клавиатуры в noVNC, и не прерывай его» отменяет на этот раз три правила: «одна вкладка — одна задача» (§4), «стадия 0: каждая новая задача сначала проходит брейншторм» (§10a) и «компакция при 50–60 % контекста» (§4; занято 70 %, впереди задачи 7–9). Как поступить?**
+>
+> 1. **По правилам (рекомендую)** — noVNC становится новой задачей: стадия 0, затем свой исполнитель в новой вкладке. В rdp-audio ставлю в очередь «закончи шаг, закоммить, остановись, отчитайся» (без Esc), делаю компакцию, он продолжает задачи 7–9.
+> 2. **noVNC по правилам, rdp-audio не трогать** — до конца задачи 9 ничего не отправляю. Риск: автокомпакция посреди шага.
+> 3. **noVNC в rdp-audio после компакции** — та же вкладка, без стадии 0. Риск: исправление без дизайна и голосования.
+> 4. **Как вы сказали** — ничего не отправляю до конца задачи 9, затем noVNC в той же вкладке, без стадии 0 и без компакции.
+
+In English: 1 = follow all three rules; 2 = noVNC as a separate task, tab left untouched; 3 = same tab, compaction first; 4 = exactly as instructed.
+
+**4. On the answer**, I record it verbatim with its date in the backlog and carry out that option. For option 1:
+
+```bash
+# foreground — must show "focused": false
+herdr agent get rdp-audio
+# foreground, no --wait
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+# background
+herdr agent wait rdp-audio --timeout 1200000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+# on the notification: read rdp-audio.last, agent get; then background
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+Then I ask for a one-line status and send the resume brief for tasks 7–9, each as one background call. For noVNC I add a backlog entry at `brainstorm`, republish, and start stage 0 with the two product advisors.
+
+## Why
+
+- **The instruction conflicts with three rules.** The noVNC bug is a design question the rdp-audio plan does not answer, so it is a new task needing stage 0 and its own tab. "Same role" does not make it the same task. The tab is also past the compaction threshold, and "don't interrupt" rules out the queued safe-point message.
+- **A one-off instruction against a rule is polled first** (§10, §15). Relaying the noVNC fix would carry the instruction out; queuing the stop message would quietly override it. So nothing is sent either way until the answer.
+- **It is the operator's call anyway.** Adding scope changes the task's goal, and waiving a brainstorm is theirs.
+- **"Almost done" is an estimate.** The screen shows task 7 of 9 mid-implementation, so the status says "still running" and claims nothing verified.
+- **Recommendation.** A second task in a 70%-full context inherits the first one's assumptions, and automatic compaction fires at the worst moment.
+- **Language.** The harness asks for English, but the operator's ruling makes operator-facing text Russian regardless. The English summaries are for this write-up only.

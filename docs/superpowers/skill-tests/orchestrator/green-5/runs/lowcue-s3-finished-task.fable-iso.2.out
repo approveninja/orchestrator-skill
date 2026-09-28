@@ -1,0 +1,137 @@
+Using `orchestrating-herdr-agents` (manifest §4, §7, §8, §10, §10a, §15).
+
+Conventions: `R=~/work/ccs.ansible`, `S` = my scratch dir, `INBOX=$S/inbox`. WG task = T14, RDP audio = T15. `<…>` is a value read from the named command or file. Operator-facing text is in Russian (§15), with an English gloss.
+
+## 1. Foreground Bash: preflight, broker, folders
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka        # need idle, "focused": false
+git -C $R fetch origin && git -C $R rev-parse origin/main
+git -C $R/.claude/worktrees/wg-keepalive status --porcelain   # must be empty
+ps -p 48211 -o command= | grep -F 'codex app-server' && kill 48211
+mkdir -p $S/handover $S/brainstorm/prod-codex/T15-rdp-audio $S/brainstorm/prod-fable/T15-rdp-audio
+codex plugin list | grep -F superpowers; claude plugin list | grep -F superpowers
+```
+
+## 2. Backlog: Edit, rebuild, republish
+- T14 row: status `docs closed`, decisions += `operator 2026-09-28: "accepted"`, docs closed `no: snapshot, doc status, memory`.
+- New row: `| T15 | RDP audio | brainstorm | prod-codex, prod-fable | — | — | deadline poll, then round 1 | operator | — | no |`
+- `bash orchestrator/build-backlog.sh`, then the Artifact tool updates the same page path.
+
+## 3. Background Bash: `wgka` close-out handover
+```bash
+herdr agent prompt wgka "$(cat $S/brief-T14-handover.txt)" --wait --timeout 600000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $INBOX/wgka.last
+```
+`brief-T14-handover.txt`:
+```
+You are the executor of T14 in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box.
+TASK      T14 — WireGuard keepalive relay
+PHASE     close-out handover, read-only; ends when the file is written. This tab is then closed.
+SKILLS    required: superpowers:verification-before-completion
+FACTS     PR #165 merged; ccs-it deployed from merged main, re-run changed=0; operator accepted 2026-09-28
+DELIVER   <S>/handover/T14-roles.md — what you verified in the gateway and host_proxy roles
+          (and desktop, where you read it): entry points, variables and defaults, handlers,
+          templates, dependencies, host scoping, every trap you hit. Each item: the fact, then
+          its evidence (path:line at main, or command + output). Unverified = HYPOTHESIS.
+MUST NOT  propose designs or next steps; change the worktree; push; touch production;
+          create tabs; contact the operator
+REPORT    file path; `git status --porcelain` output; branch + head SHA. Compact.
+TIME BOX  10 min
+BLOCKED   reply "BLOCKED: <what> <why>" and stop
+```
+
+## 4. T14 docs: worktree plus background prose subagent
+```bash
+git -C $R worktree add $R/.claude/worktrees/wg-keepalive-docs -b chore/wg-keepalive-docs-close origin/main
+```
+Agent tool, model `sonnet`, background:
+> "Reply in English. Work only in `/Users/<me>/work/ccs.ansible/.claude/worktrees/wg-keepalive-docs`. Evidence: `<S>/evidence/T14/{deploy-ccs-it.log,rerun-ccs-it.log,acceptance.txt}`. Update `projects/ccs/soul/<host>.md` for each host in the PLAY RECAP. Mark the T14 design and plan docs `implemented — PR #165, merge <sha>`. Update the living-doc sections on the WireGuard relay. Write only what the evidence shows and list each claim with its evidence line. No session links. Commit locally, do not push, touch no host."
+
+## 5. Foreground Bash: product-advisor tabs
+The voters `adv-codex` and `adv-fable` stay voters.
+```bash
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/prod-codex --label prod-codex --env ORCH_INBOX=$INBOX --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- \
+  -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $S/brainstorm/prod-fable --label prod-fable --env ORCH_INBOX=$INBOX --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- \
+  --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+
+## 6. To the operator: status, then poll
+
+> **Статус, 23:10**
+> **Сейчас.** T14 (WireGuard keepalive relay) принята вами. Закрываю её: документация (снимки состояния хостов, статусы дизайна и плана) и уборка (вкладка `wgka`, её worktree — отдельная рабочая копия репозитория, ветка, вспомогательный процесс ревью). T15 (RDP audio) заведена в бэклог со статусом `brainstorm`: два продуктовых советника (Codex и Claude) независимо пишут черновики, критикуют друг друга и сводят их в один документ; его утверждают два голосующих советника, 2/2.
+> **Дальше.** После вашего ответа на опрос — раунд 1. Исполнителя для T15 не будет, пока дизайн не утверждён. Вкладку `wgka` для T15 не использую: одна вкладка — одна задача; её знания переношу файлом фактов с доказательствами.
+> **От вас.** Ответить на опрос. Если оставляете Mac на ночь — не дайте ему уснуть, иначе агенты оборвутся: например, `caffeinate -dims` в вашем терминале.
+> **Проверено.** Мной: повторный прогон на ccs-it, `changed=0`. Вами: ping, 0 % потерь. Не проверено: ccs-ops — не развёртывал и не трогал.
+> **Изменения на живых машинах.** Только ccs-it (канареечная площадка): keepalive relay из `main`, PR #165. По T15 ночью изменений не будет.
+> **Решения голосования:** новых нет. **Бэклог:** <Artifact URL>
+
+*Gloss: T14 is accepted and being closed (docs, cleanup). T15 entered the backlog at `brainstorm`. Round 1 follows your poll answer. `wgka` is not reused. Keep the Mac awake. Verified: my re-run changed=0 and your ping; ccs-ops untouched.*
+
+AskUserQuestion, header «Дедлайн T15»:
+> **Вопрос:** «У полного brainstorm нет time box (§10a; ваше решение от 2026-09-28 «каждая задача проходит brainstorm»). К утру он может не успеть, если ночью советники разойдутся (split) или понадобится факт, известный только вам. Как поступить?»
+> 1. **Полный brainstorm (рекомендую)** — стартую сейчас, ничего не сокращаю. Утром: утверждённый дизайн как Artifact, либо черновик, открытые вопросы и опросы. Срок сдвигается.
+> 2. **Отменить brainstorm для T15** — разовое исключение из §10a: дизайн пишет один исполнитель в новой вкладке, затем утверждение 2/2. Без независимых черновиков и перекрёстной критики.
+
+*Gloss: 1 = full brainstorm and the deadline slips if needed (recommended); 2 = waive the brainstorm for T15.*
+
+## 7. On the answer and the `wgka` notification
+1. Record the ruling verbatim and dated in the backlog, then republish. If the answer is option 2, round 1 is not sent.
+2. Read `$INBOX/wgka.last`, run `herdr agent get wgka`, and spot-check the cited `path:line` items with `git -C $R grep -n` at `origin/main`. Anything that fails is struck.
+3. Round 1, two background Bash calls in one message:
+```bash
+herdr agent prompt prod-codex "$(cat $S/brainstorm/brief-T15-r1-prod-codex.txt)" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > $INBOX/prod-codex.last
+herdr agent prompt prod-fable "$(cat $S/brainstorm/brief-T15-r1-prod-fable.txt)" --wait --timeout 2700000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > $INBOX/prod-fable.last
+```
+Brief (the `WRITE` path differs per tab):
+```
+You are product advisor <A|B> in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box.
+TASK      T15 — RDP audio
+ROUND     1 draft — ends when your draft file is written and your open questions are listed
+SKILL     superpowers:brainstorming; I am your human partner: send your questions to me
+          (batched); real choices come back as ballot results
+PROBLEM   "Now the RDP audio thing — I want a design by morning."
+FACTS     repo ~/work/ccs.ansible, main @ <sha>; two KVM sites: ccs-it (canary), ccs-ops.
+          Verified role notes with evidence: <S>/handover/T14-roles.md
+DECIDED   <project hard rules, byte for byte from CLAUDE.md>; deploy only from merged main,
+          canary first; the brainstorm has no time box — "by morning" shortens no round
+MAY       read the repository, upstream sources, the web
+WRITE     <S>/brainstorm/<prod-codex|prod-fable>/T15-rdp-audio/draft.md — the only file
+MUST NOT  write anywhere else; touch hosts or herdr; change any working tree; contact the
+          other advisor or the operator
+DECISIONS any choice between alternatives: stop and send me a ballot proposal; draft
+          nothing that depends on it until I relay the result
+REPORT    the file path; open questions, each marked blocking or not. Compact.
+TIME BOX  45 min for this round
+BLOCKED   reply "BLOCKED: <what> <why>" and stop
+```
+4. Foreground cleanup:
+```bash
+herdr tab close <wgka tab_id>
+git -C $R worktree remove .claude/worktrees/wg-keepalive && git -C $R worktree prune
+git -C $R pull && git -C $R branch -d feat/wg-keepalive-relay
+git -C $R worktree list; ps -ax -o pid,command | grep -i '[c]odex'
+```
+
+## 8. When the docs subagent returns
+1. Check every claim against the evidence and run the project's docs-only check.
+2. Push, open the PR, and `gh pr merge <n> --merge --delete-branch`.
+3. Remove the docs worktree, prune, delete the branch, pull.
+4. Write a memory note with the verified traps and add its `MEMORY.md` pointer.
+5. Set T14 to `done`, `docs closed: yes`, republish, and send a status.
+
+Overnight, rounds 2 and 3 go the same way. Every open question goes as a neutral ballot to both voters at once.
+
+## Why
+- RDP audio is a new task. It enters at `brainstorm`, and no executor exists until both product advisors confirm the joint doc and both voters approve it 2/2. Voters don't draft, so two new tabs.
+- `wgka` is neither reused nor compacted for reuse: one tab is one task. Its knowledge leaves as a facts file that I spot-check. I hand over facts and design nothing.
+- "By morning" is a wish: it waives no gate. I won't shorten the brainstorm, and I won't silently let the deadline slip. That trade is a change of course, which is the operator's, and now is the only time tonight they can answer. Round 1 waits for the answer; everything independent does not.
+- "Accepted" does not make T14 `done`. Docs closed and cleanup, including broker 48211, come first.
+- After 9 hours my own context is the scarce resource. Prose goes to subagents, waits are background waiters, and state lives in files.

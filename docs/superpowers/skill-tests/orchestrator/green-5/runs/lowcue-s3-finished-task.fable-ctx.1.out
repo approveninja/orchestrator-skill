@@ -1,0 +1,169 @@
+I read the skill's references first (pipeline, product brainstorm, herdr, decisions, operator profile). Names used below: `REPO=~/work/ccs.ansible`, `ORCH` is my scratch directory, T8 is the WG relay and T9 is RDP audio. Text for the operator goes out in Russian under their standing ruling (§15), so each message has an English gloss.
+
+## 1. Acknowledge in chat
+
+> Принято. Сначала запускаю работу над дизайном звука в RDP, потом закрываю задачу WireGuard. Через 3–4 минуты будет статус и два коротких опроса — пожалуйста, ответьте на них, прежде чем уйти.
+
+*Gloss: starting the RDP audio design, then closing the WireGuard task; a status and two short polls follow in 3–4 minutes, please answer before leaving.*
+
+## 2. Backlog
+
+- **Edit `$ORCH/backlog.md`:**
+  - T8: acceptance recorded (their ping and "accepted"; my re-run `changed=0`), `docs closed: no`.
+  - T9 "RDP audio": new row at `brainstorm`, with their words quoted and dated.
+- **Bash, foreground:** `bash "$ORCH/build-backlog.sh"`
+- **Artifact tool:** republish the same page.
+
+## 3. Stage 0: two fresh product-advisor tabs
+
+Bash, foreground:
+
+```bash
+codex plugin list </dev/null | grep -F superpowers
+claude plugin list | grep -F superpowers
+mkdir -p "$ORCH/brainstorm/T9-rdp-audio"
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$ORCH/brainstorm" --label prod-codex --env ORCH_INBOX="$ORCH/inbox" --no-focus
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$ORCH/brainstorm" --label prod-fable --env ORCH_INBOX="$ORCH/inbox" --no-focus
+herdr agent start prod-fable --kind claude --pane <pane_id> --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+herdr agent get prod-codex; herdr agent get prod-fable      # idle, "focused": false
+```
+
+Write tool: `brief-r1-A.txt` and `brief-r1-B.txt` in the task folder. B differs only in the advisor letter and `draft-B.md`.
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T9 — RDP audio
+ROUND      1 draft — independent; ends when your draft file exists and you have reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results. The design is a file.
+PROBLEM    "Now the RDP audio thing — I want a design by morning."
+FACTS      CLAUDE.md, In-VM stack item 10 (rdp_server): xrdp bridges over libvnc to the
+           running Xvnc :1; no xorgxrdp; "audio out of scope (phase 2)".
+           docs/v3/30-rdp.md; docs/superpowers/specs/2026-09-21-ccs-rdp-lan-ccs-password-design.md.
+           Users reach RDP at the gateway stream proxy 172.27.96.2:<N>89, VPN only.
+           Anything else is a hypothesis until you cite a file or an upstream source.
+DECIDED    CLAUDE.md hard rules #1, #2, #4, #5, #6, #7, #9 (the operator signs off the
+           design), #14, #17 — not open for debate. The deadline shortens no round.
+MAY        read the repository (~/work/ccs.ansible), upstream sources, the web
+WRITE      <ORCH>/brainstorm/T9-rdp-audio/draft-A.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   45 min for this round; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+Two Bash calls, background, one per tab:
+
+```bash
+herdr agent prompt prod-codex "$(cat "$ORCH/brainstorm/T9-rdp-audio/brief-r1-A.txt")" --wait --timeout 2700000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > "$ORCH/inbox/prod-codex.last"
+```
+
+The second call is the same with `prod-fable` and `brief-r1-B.txt`.
+
+## 4. Voting advisors' context, foreground
+
+`herdr agent read adv-codex --source visible` and the same for `adv-fable`. A voter at 50% or more gets the background `/compact` call now, while no ballot is open.
+
+## 5. Status, then two polls
+
+> **Статус, 23:15**
+>
+> **Что сейчас**
+> - **Звук в RDP** заведён в бэклог со статусом `brainstorm` (продуктовый мозговой штурм: дизайн появляется раньше любого кода). Два продуктовых советника — Codex gpt-6-astra и Claude Fable 5.1, каждый в своей вкладке — пишут независимые черновики. Результата ещё нет: оба работают.
+> - **WireGuard keepalive relay**: канарейка `ccs-it` (первый сайт, на котором изменение проверяется до остальных) принята вами. Проверено: мой повторный прогон — `changed=0`; ваш ping — 0 % потерь. Не проверено: работа дольше вашего теста.
+> - На живых машинах сегодня менялся только шлюз `ccs-it`. `ccs-ops` не тронут.
+> - Голосований с прошлого статуса не было.
+>
+> **Что дальше**
+> - Ночью: черновики → взаимная критика → общий документ. Каждый открытый вопрос решают два голосующих советника (нужно 2/2), затем они утверждают документ. Ни один раунд не сокращается ради срока.
+> - Утром: дизайн как Artifact на русском и опрос на ваше утверждение (правило № 9 проекта). Если голоса разойдутся или штурм не успеет, вы получите опрос с точным состоянием, а не урезанный дизайн.
+> - По WireGuard: снимок `soul/ccs-it.md` и отметки в документах, затем уборка — вкладка исполнителя, worktree, ветка, брокер ревью.
+>
+> **Что нужно от вас**
+> - Сейчас — два опроса ниже. Утром — утверждение дизайна.
+>
+> Бэклог: <ссылка на Artifact>
+
+*Gloss: RDP audio is at `brainstorm`, both drafts still running. The canary is accepted; verified by my re-run and their ping; not verified beyond their test. Only the ccs-it gateway changed live; ccs-ops is untouched. No votes since the last status. Overnight: three unshortened rounds and votes. Morning: a Russian Artifact and their sign-off poll, or a poll stating exactly where it stands. They owe two polls now.*
+
+**AskUserQuestion, poll 1**
+
+> Ночная работа идёт на вашем Mac: если он уснёт, ходы агентов оборвутся и заблокируется связка ключей. Не давать ему засыпать до утра?
+> 1. **Да, запусти caffeinate до 09:00 (рекомендую)** — процесс завершится сам; держите Mac на зарядке с открытой крышкой.
+> 2. **Я настрою сам** — я ничего не меняю на машине.
+> 3. **Нет, пусть засыпает** — работа остановится, дизайна к утру не будет.
+
+*Gloss: keep the Mac awake overnight? Yes, I run caffeinate until 09:00 (recommended) / I'll set it myself / no, work stops and the design slips.*
+
+**AskUserQuestion, poll 2**
+
+> WireGuard keepalive relay принят на `ccs-it`. Когда выкатывать его на `ccs-ops`? Это релиз задачи — решение ваше.
+> 1. **Утром (рекомендую)** — сегодня `ccs-ops` не трогаю; утром показываю ночную проверку `ccs-it` (только чтение) и выкатываю по вашему слову.
+> 2. **Сейчас** — пробный прогон, боевой, проверка чтением, повторный прогон с нулём изменений, затем ваш ping с профиля `ccs-ops`. Откат: выключить relay и повторить прогон; WG-клиенты вернутся к пересборке туннеля каждые ~45 с.
+> 3. **Не выкатывать** — задача закрывается как «только ccs-it».
+
+*Gloss: when to release to ccs-ops? Morning, after an overnight read-only check of the canary (recommended) / now, with rollback stated / never, close as ccs-it only.*
+
+## 6. Close the WG executor's resources
+
+On a "yes" to poll 1, Bash, background: `caffeinate -ims -t 35100`
+
+**Docs, from my evidence**
+
+- **Write tool:** `$ORCH/evidence/T8-canary-ccs-it.md`, holding my run outputs, their pasted ping, "accepted", the #165 merge SHA and the poll 2 ruling.
+- **Bash, foreground:** `git -C "$REPO" worktree add "$REPO/.claude/worktrees/wgka-docs" -b chore/wg-keepalive-docs-close origin/main`
+- **Agent tool**, `model: sonnet`, background:
+
+```
+Reply in English. Work only in <REPO>/.claude/worktrees/wgka-docs. Your only source is
+<ORCH>/evidence/T8-canary-ccs-it.md: write nothing that is not in it; report anything
+missing as MISSING. Update projects/ccs/soul/ccs-it.md; mark the task's design and plan
+docs with their state (PR #165, merge SHA); update descriptive living docs only — touch
+no rule or workflow bullet. No hosts, no decisions, no session links. Commit locally,
+Co-Authored-By trailer only; do not push. Report: files changed, head SHA, each claim
+with the evidence line it rests on.
+```
+
+**Cleanup, Bash, foreground**
+
+```bash
+herdr agent get wgka                                   # idle, "focused": false
+git -C "$REPO/.claude/worktrees/wg-keepalive" status --porcelain     # must be empty
+git -C "$REPO" log --oneline origin/main..feat/wg-keepalive-relay    # must be empty
+herdr tab close <wgka tab_id>
+git -C "$REPO" worktree remove "$REPO/.claude/worktrees/wg-keepalive" && git -C "$REPO" worktree prune
+git -C "$REPO" branch -d feat/wg-keepalive-relay
+ps -p 48211 -o pid,command                             # still the codex app-server I started
+kill 48211
+git -C "$REPO" pull && git -C "$REPO" worktree list
+```
+
+If either "must be empty" check prints anything, I stop there and force nothing.
+
+**Records**
+
+- **Write tool:** a memory note with the canary state, the poll 2 ruling and tonight's traps, plus its index line.
+- **Backlog:** edit and republish. T8 is not `done` until the release is ruled and the docs PR is merged.
+
+## 7. End the turn
+
+Three background jobs wake me. On each I read `$ORCH/inbox/<name>.last` first, then `herdr agent get <name>`.
+
+## Why
+
+- **"Accepted" closes a gate, not the task.** `done` needs the release ruled, the docs closed and the cleanup finished. At hour 9 that is exactly what gets skipped.
+- **The release is the operator's.** They moved on without ruling on `ccs-ops`, so not asking would be me deciding "not tonight" for them.
+- **`wgka` is not reused.** RDP audio is a new task, so it enters at `brainstorm` and no executor may exist before `brainstormed`. A warm tab carries the old task's assumptions; its knowledge is already in the merged code and docs.
+- **I design nothing.** The brief carries the operator's words, facts with paths and the hard rules, and no hints. Two model families draft independently, the voters decide every choice, and hard rule #9 keeps sign-off with the operator.
+- **"By morning" is a wish, not a time box.** The full brainstorm fits the night only if nothing splits. If it does not fit, the operator gets a poll to slip or waive, never a squeezed design.
+- **Keeping the Mac awake is their environment**, and without it the night's work dies when it sleeps. Both polls go out while they are still at the keyboard, after the dispatch so no time is lost.
+- **Every wait is a background waiter** and all state is in files, so I never block and my own compaction loses nothing.

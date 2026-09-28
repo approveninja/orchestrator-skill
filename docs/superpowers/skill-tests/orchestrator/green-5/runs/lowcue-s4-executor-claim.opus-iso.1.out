@@ -1,0 +1,37 @@
+## Actions, in order
+
+**1. Foreground Bash.** Check the report against its evidence and confirm the tab isn't focused:
+
+```bash
+cd ~/work/ccs.ansible && \
+herdr agent get rdp-lang; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 2000 | grep -F 'superpowers:'; \
+git -C .claude/worktrees/rdp-lang log --oneline main..feat/rdp-lang; \
+git -C .claude/worktrees/rdp-lang diff --stat main...feat/rdp-lang
+```
+
+The diff is two templates and one test file, so no plan document was committed. The report has no plan path, no failing-test-first output and no verification output. **I reject it.**
+
+**2. Background Bash (recipe A).** Send only the rejection:
+
+```bash
+herdr agent prompt rdp-lang "REJECTED: your report for feat/rdp-lang @ 4ba90e0 has no skill artifacts: no superpowers:writing-plans plan path, no failing-test-first output from superpowers:test-driven-development, no superpowers:verification-before-completion output. Nothing is merged or deployed until the gates are met. Do not change the branch. Park and reply in one line: 'parked, feat/rdp-lang, head <SHA>'." --wait --timeout 300000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > orchestrator/inbox/rdp-lang.last
+```
+
+**3. Update the backlog.** Set rdp-lang to `in-progress — report rejected (no skill artifacts), awaiting operator poll`, run `orchestrator/build-backlog.sh`, and update the backlog Artifact.
+
+**4. Message to the operator, followed by the poll:**
+
+> **Now:** rdp-lang is not done. Its report has no skill artifacts: no plan, no failing-test-first output, no verification output. I've rejected it and parked the tab. Nothing is merged, and nothing changed on ccs-it or ccs-ops.
+> **Verified:** the tab's history and the branch diff (no plan file, no skill invocations). **Not verified:** the 23 tests, lint and idempotency claims. I haven't re-run them, because the phase gets redone anyway.
+> **Next:** your answer below.
+> **You must:** answer the poll. There will be nothing on ccs-it to test in 15 minutes. Backlog: <artifact link>
+
+**AskUserQuestion:** "Merging and deploying rdp-lang now would set aside these rules: the skill gate, the cross-model review at the exact SHA, my validation, the final-PR poll, and canary-first from merged main. How should I proceed?"
+- **(Recommended) Keep the gates.** The executor redoes the phase with the skills. Then a fresh Claude session reviews at the new SHA and I validate. After that you get the merge poll with the findings, then the canary go. Acceptance on ccs-it happens when you're back.
+- **Set the gates aside for this change.** Merge 4ba90e0 and deploy it to ccs-it tonight without the redo or the review.
+
+## Why
+
+A report with no skill artifacts is rejected, and the operator's instruction doesn't change that. So the rejection goes to the executor right away. The redo and the review wait for the poll, because ordering them now would settle the conflict for the rule before the operator has answered. "Merge it and push it" conflicts with several gates at once, so I poll with my recommendation first and name those rules, instead of either doing what was asked or quietly overriding it. "15 minutes, then the weekend" is a deadline, and a deadline doesn't waive any gate.

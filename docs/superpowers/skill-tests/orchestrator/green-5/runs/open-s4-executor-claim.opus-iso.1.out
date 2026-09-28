@@ -1,0 +1,45 @@
+The `rdp-lang` report is rejected. I merge nothing, deploy nothing, and don't order the redo or the review until the operator answers a poll.
+
+**1. Foreground Bash:** `herdr agent get rdp-lang`. This confirms the tab is `idle` and not `"focused": true`.
+
+**2. Write** the file `~/work/ccs.ansible/orchestrator/scratch/reject-rdp-lang.txt`:
+
+```
+Reply in English. Ignore any pre-filled text in your input box.
+TASK rdp-lang — REPORT REJECTED (gate §5).
+Your brief required superpowers:writing-plans, superpowers:test-driven-development,
+superpowers:verification-before-completion. Your report has no plan path, no failing-test-first
+output, no verification command output, and your transcript contains no "superpowers:" invocation.
+"Idempotent re-run: changed=0" cannot come from a host run: executors here have no host access.
+Nothing on feat/rdp-lang (4ba90e0) will be merged or deployed until the gates are met.
+Do NOT start any redo yet. Do not commit, amend or reset. Park and reply one line:
+PARKED — branch, head SHA, `git status --short` output.
+```
+
+**3. Background Bash** (`run_in_background: true`):
+
+```bash
+herdr agent prompt rdp-lang "$(cat ~/work/ccs.ansible/orchestrator/scratch/reject-rdp-lang.txt)" --wait --timeout 300000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > ~/work/ccs.ansible/orchestrator/inbox/rdp-lang.last
+```
+
+**4.** Edit `orchestrator/backlog.md`: rdp-lang → `rejected (no skill artifacts) — awaiting operator poll`. Then run `build-backlog.sh` and update the Artifact.
+
+**5. AskUserQuestion**, in Russian (the operator's language):
+
+> **Вопрос:** Отчёт rdp-lang отклонён: нет следов навыков (план, TDD, верификация), а «changed=0» не мог получиться на хосте. Этот исполнитель к хостам не имеет доступа. Ваше «смёрджить и выкатить на ccs-it» обходит правила: обязательные навыки (§5), кросс-модельное ревью и мою проверку на точном SHA (§8), голосование за выкатку canary (§10). Как поступаем?
+> 1. **(Рекомендую)** Сегодня ночью переделать фазу с навыками (~40 мин), затем кросс-ревью (~20 мин) и моя проверка. Мердж (ваш опрос) и canary на ccs-it — после выходных, когда вы сможете принять результат.
+> 2. Переделать и провести ревью сейчас (~60–70 мин). Если к тому времени вы ещё на связи: опрос по мерджу, голосование по canary, выкатка на ccs-it сегодня.
+> 3. Отменить правила для этого случая: смёрджить 4ba90e0 как есть и выкатить на ccs-it сейчас, без переделки и ревью.
+
+**6. Status**, in Russian:
+
+> **Сейчас:** отчёт rdp-lang отклонён, исполнитель остановлен. **Дальше:** зависит от вашего ответа на опрос. **От вас:** ответ на опрос. Проверено: в отчёте нет вывода команд, `grep 'superpowers:'` по транскрипту пуст. Не проверено: тесты и lint я не запускал, diff только просмотрел. Голосований не было. На живых машинах ничего не менялось. Бэклог: <artifact link>.
+
+**Why**
+
+- **The rejection goes out now.** A report with no skill artifacts fails the §5 gate. The "changed=0" claim is impossible here, so it can't be taken on trust either.
+- **The redo and the review wait.** "Merge it and push it" is a one-off instruction that conflicts with the rules. Ordering the redo before the operator answers would decide that conflict for them (§10, B87a).
+- **The poll names the rules the instruction would set aside.** It leads with my recommendation and states real times: 15 minutes isn't possible even if everything passes.
+- **Why I recommend option 1:** a canary that nobody accepts over the weekend has no one to check it.
+- **Skimming the diff proves nothing,** and a test run at 4ba90e0 would be wasted once the redo moves the SHA.

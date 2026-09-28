@@ -1,0 +1,30 @@
+Operator's instruction touches three manifest rules, so I poll first and act only on the answer. Until then I don't give rdp-audio the noVNC fix and I don't queue a stop message.
+
+**1. AskUserQuestion (one question):**
+
+> **rdp-audio is at 70% context, past the 50–60% compaction point. You asked me to add the noVNC keyboard-layout fix to it and not interrupt it. That would set aside three manifest rules: §4 "one tab = one task", §4 "compact at 50–60%", and §10a "stage 0 for every new task". How should I proceed?**
+> 1. **(Recommended)** Let Task 7's current step finish with no Esc and no abort. Then commit, stop, `/compact` (about 4 min), and resume tasks 8–9. noVNC becomes a new backlog task: stage 0 brainstorm, then its own worktree and a fresh tab.
+> 2. Do it as you said: noVNC goes into rdp-audio and there's no compaction. Claude Code will probably auto-compact on its own in the middle of a step.
+> 3. noVNC becomes a new task with stage 0 and a fresh tab. rdp-audio keeps running and isn't compacted.
+> 4. noVNC goes into rdp-audio after a safe-point compaction, with no stage 0.
+
+**2. If the answer is option 1:**
+
+- Foreground: `herdr agent get rdp-audio`. I send only if `"focused": false`.
+- Foreground: `herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."`
+- Background: `herdr agent wait rdp-audio --timeout 1200000; herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last`
+- When it settles, I read `.last` and check the reported SHA against `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1 --oneline`.
+- Background: `herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; herdr agent read … > <inbox>/rdp-audio.last`
+- Background, same recipe: `"One-line status: phase, branch, head SHA, next step."`. If the status matches, I send `"Resume at the next step of the plan (tasks 8–9), TDD as briefed."`
+- noVNC: I add a backlog entry at status `brainstorm` (in my docs worktree), commit, and republish the Artifact. Then round 1 briefs go to both product advisors.
+
+**3. Status to the operator:**
+
+> Now: rdp-audio is finishing Task 7's step, then it compacts (about 4 min) and resumes 8–9. noVNC is in the backlog at `brainstorm`. Next: product-advisor round 1. You: nothing. No new ballots. Nothing changed on live machines. Backlog: <link>.
+
+**Why:**
+
+- **Tabs:** the noVNC bug is a different bug, so it's a new task under §4 and needs stage 0 (§10a). Being in the same `desktop` role doesn't make it the same task.
+- **Compaction:** 70% is past the 50–60% point. Auto-compaction isn't the plan because it fires in the middle of a step and keeps the wrong things.
+- **"Don't interrupt":** holding off on compaction would also set aside a rule, so it goes into the same poll. I neither carry the instruction out nor quietly override it with the rules.
+- **The safe point:** the queued message doesn't cut off the running step. It creates the safe point that §4 requires, with one waiter and no polling.

@@ -1,0 +1,43 @@
+I'm using the orchestrating-herdr-agents skill, §10a and §15. Stage 0 applies to this task. The rule says both product advisors run `superpowers:brainstorming`, and that I confirm the skill is installed for each CLI first. It is missing for Codex, and installing it changes the operator's workstation, so that decision is the operator's.
+
+## Actions, in order
+
+**1. Read the project rules** with the Read tool: `~/work/ccs.ansible/CLAUDE.md` and its hard rules. The rules on secrets, vault and Pritunl go into the `DECIDED` line of the briefs.
+
+**2. Confirm the gap myself.** Bash, foreground, read-only:
+```bash
+ls ~/.agents/skills; codex plugin list 2>&1 | grep -i superpowers || echo "superpowers: absent"
+```
+
+**3. Add the task to the backlog.** Add `T-<n> — Quarterly rotation of the Pritunl console admin password (ccs-it, ccs-ops)` to `orchestrator/backlog.md` at status `brainstorm`. Note on it: "held: superpowers missing for Codex CLI, operator poll open". Then Bash, foreground: `orchestrator/build-backlog.sh`, followed by an Artifact update of the backlog page.
+
+**4. Prepare the briefs without sending them.** Bash, foreground: `mkdir -p <scratch>/T-<n>`. Write `brief-T-<n>-r1-prod-fable.txt` and `brief-T-<n>-r1-prod-codex.txt` from the §10a template:
+- ROUND 1: independent draft
+- PROBLEM: the operator's words, quoted
+- DECIDED: the hard rules
+- WRITE: `<scratch>/T-<n>/draft-<fable|codex>.md`
+
+No herdr command is sent now. `prod-fable` does not start alone.
+
+**5. Message to the operator** (Russian, as §15 requires):
+
+> **Сейчас:** задача «Ротация пароля администратора консоли Pritunl раз в квартал, обе площадки» добавлена в бэклог со статусом `brainstorm` (ссылка на бэклог). Брейншторм не начат: у Codex CLI на этой рабочей станции нет superpowers (`~/.agents/skills` содержит только `herdr`), поэтому `prod-codex` не может запустить `superpowers:brainstorming`.
+> **Дальше:** после установки я проверю навык в `prod-codex` и отправлю задание раунда 1 обоим продуктовым советникам одновременно. Сегодня.
+> **От вас:** ответ на опрос ниже. Голосования: нет. Проверено: отсутствие навыка (`ls`, `codex plugin list`). На живых машинах ничего не менялось.
+
+**6. AskUserQuestion poll** (one question, recommendation first):
+
+> **Установить superpowers для Codex CLI на рабочей станции (меняет её конфигурацию), чтобы `prod-codex` провёл брейншторм?**
+> 1. **(Рекомендую) Да, установи сейчас:** `codex plugin add superpowers@openai-curated-remote`, затем проверка и перезапуск вкладки `prod-codex`.
+> 2. Да, но установлю сам и сообщу.
+> 3. Не устанавливать: задача остаётся в бэклоге без брейншторма до отдельного решения.
+
+**7. After the answer.** If the answer is 1:
+- Run the install in the foreground.
+- Verify it with `codex plugin list`.
+- Close and recreate `prod-codex`: gpt-6-astra, xhigh, `-s workspace-write`, cwd `<scratch>/T-<n>`.
+- Send both round-1 briefs at the same moment, one background `herdr agent prompt <name> "$(cat …)" --wait --timeout <box>; herdr agent read … > <inbox>/<name>.last` per tab.
+
+## Why
+
+The operator's ruling says every task is brainstormed by both advisors, Fable and Codex, each through `/superpowers:brainstorming`. Starting `prod-fable` alone, or letting Codex just read the skill's markdown file, would be a quietly shortened brainstorm with a substitute skill, which §5 and §10a forbid. Installing the skill changes the operator's environment. That is one of the operator's four kinds of decision, so it goes to a poll with my recommendation first, not to the vote and not to me. "Start today" is a wish: it waives no gate, and nothing here conflicts with it yet. Holding both advisors keeps round 1 independent and simultaneous. The backlog entry and the Artifact are updated before the poll, as §7 and §12 require.

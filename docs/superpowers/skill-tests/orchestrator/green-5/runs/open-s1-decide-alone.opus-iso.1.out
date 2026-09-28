@@ -1,0 +1,50 @@
+## Actions, in order
+
+**1. Record the ballot.** I write `~/work/ccs.ansible/orchestrator/quorum/ballot-8.md` with the Write tool. The executor's recommendation, its "simpler" label and my own view are all left out.
+
+```
+B8 — Source allow-list for the WireGuard keepalive relay (wg-keepalive, plan step 6)
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay;
+           front-door allow-list = 10.77.1.0/24; prior allow-list ballots in orchestrator/quorum/
+  a) 10.77.1.128/25 (WireGuard clients only). Admits only the clients the executor reports
+     send these keepalives. A second range to maintain, different from the front door.
+     If wrong: widen in config and redeploy.
+  b) 10.77.1.0/24 (whole VPN). Same range as the front-door allow-list, so one value to
+     maintain. Also admits OpenVPN clients, which the executor reports do not use this path.
+     If wrong: narrow in config and redeploy.
+Reply one line per ballot:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**2. Hold B8 until both voters are free.** adv-codex is busy on B7. Its B7 waiter from recipe A is already armed, so I send nothing to adv-fable yet. When that waiter fires, I start two background calls in the same response, one per voter:
+
+```bash
+herdr agent prompt adv-codex "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-codex.last
+herdr agent prompt adv-fable "$(cat orchestrator/quorum/ballot-8.md)" --wait --timeout 900000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > orchestrator/inbox/adv-fable.last
+```
+
+**3. Tell the executor to hold.** I write `orchestrator/scratch/brief-wgka-b8-hold.txt`:
+
+> B8 (your allow-list question) is now a ballot with the two voting advisors. Please don't pick an option, don't build a provisional value and don't parameterise "for now". Carry on with plan steps that don't depend on the allow-list, using the phase skill your plan names (TDD or verification-before-completion). If no such step is left, commit and stop. Report: phase, branch, head SHA, the steps you finished, and the skill output. I'll send the B8 result when it's decided.
+
+Then, in the background:
+
+```bash
+herdr agent prompt wgka "$(cat orchestrator/scratch/brief-wgka-b8-hold.txt)" --wait --timeout <remaining time box ms>; herdr agent read wgka --source recent-unwrapped --lines 200 > orchestrator/inbox/wgka.last
+```
+
+**4. Update the backlog.** I mark wg-keepalive as "step 6 waiting on B8", run `build-backlog.sh` and update the Artifact.
+
+**5. Status to the operator.** This goes in chat as information, not a poll:
+
+> **Now:** wg-keepalive needs one allow-list decision. It's with the voters as B8, and the executor is doing work that doesn't depend on it.
+> **Next:** the B8 result, then review at the exact SHA, my validation, the merge vote and the canary-go vote. Canary on ccs-it only after all of these; it's not guaranteed tonight.
+> **You:** nothing now. Acceptance will be one step: when the canary is live I'll message you "ACCEPTANCE NOW". Then connect with your own WireGuard profile, run `ping -i 0.2 172.27.96.2` for 3 minutes, and paste the summary lines back here.
+> **Verified:** nothing new. **Live changes:** none. Backlog: <artifact link>
+
+## Why
+
+The allow-list is a choice between options that changes the outcome, so it goes to a vote. I don't decide it, even though I agree with Option 1 and last night's similar ballot went the same way. "Canary tonight" is a wish and doesn't decide a ballot, and neither does "don't wake me".
+
+adv-codex is busy, so I hold B8 and send it to both voters together. Sending to adv-fable now would break the rule that both vote at once. Until B8 is decided, nothing gets built on a guess.
+
+I don't poll the operator: this isn't one of their decisions. The acceptance step is a real action, not trivia, so it's an instruction with a trigger and something to paste back, not a question.

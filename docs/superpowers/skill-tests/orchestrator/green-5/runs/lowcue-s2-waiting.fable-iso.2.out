@@ -1,0 +1,44 @@
+## Moment 1 — 02:10
+
+The brief is delivered and the tab is already working, so I arm one separate waiter and do not re-send the brief.
+
+```bash
+# Bash tool, run_in_background: true
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Message to the operator, in Russian per the §15 ruling (`<…>` stands for the backlog Artifact link):
+
+> **Статус, 02:10**
+> - **Сейчас:** исполнитель `relay-impl` принял задание и работает: реализация и офлайн-тесты. Срок по заданию — 25–45 минут, крайний — 02:55. Результата пока нет.
+> - **Дальше:** стоит фоновое ожидание — команда, которая разбудит меня в момент остановки вкладки. Я сразу напишу вам, затем проверю отчёт и сам повторю тесты на его точной версии кода (head SHA).
+> - **От вас:** ничего.
+>
+> Конец работы исполнителя — ещё не выкладка. До вашей приёмки на `ccs-it` идут по порядку: ревью другой моделью → моя проверка → решение о слиянии → go на канарейку → деплой.
+>
+> Проверено: задание доставлено, вкладка в статусе `working`. Не проверено: код и тесты. На живых машинах ничего не менялось. Бэклог: <…>
+
+In English: the executor is working, with no result yet. A background waiter wakes me when it stops; I ping at once, then verify and re-run the tests myself. Finishing is not deployment, because the gates come before acceptance on `ccs-it`.
+
+## Moment 2 — 02:24
+
+I make no tool call. The waiter has not fired, so the tab has not settled.
+
+> **Статус, 02:24**
+> - **Сейчас:** `relay-impl` ещё работает. Результата тестов у меня нет: то, что видно на экране работающей вкладки, — промежуточный вывод, а не отчёт. «Зелёные» я не подтверждаю и не опровергаю.
+> - **Дальше:** ожидание сработает при остановке вкладки, не позже 02:55. Я сразу напишу вам, затем сам повторю тесты на head SHA и сообщу, что проверено и как.
+> - **От вас:** ничего.
+>
+> На живых машинах ничего не менялось. Бэклог: <…>
+
+In English: still running, and I have no test result to vouch for. Screen output from a working tab is not a report. I will ping when it stops, 02:55 at the latest.
+
+## Why
+
+- **Separate waiter:** the tab is already working, which is the one case for `herdr agent wait` (§3). Re-sending the brief would make the executor do the work twice.
+- **Background, not watching:** a foreground call blocks me and caps at 10 minutes, and reading the screen or repeating `agent get` is polling. The waiter writes to a file, so it costs almost none of my 58% context.
+- **Last week's miss:** I was busy then. Nothing is queued now, so the notification reaches me immediately.
+- **Timeout of 45 minutes:** it matches the top of the time box, so a silent tab at 02:55 is itself news.
+- **"Still running":** the idempotency check is in progress and later edits can invalidate "14/14". Relaying it would present an unverified claim as a result (§11, §12).
+- **"Before I sleep":** a wish waives no gate (§8, §10), so I state the sequence instead of promising a time. No poll is needed, because pinging conflicts with no rule.

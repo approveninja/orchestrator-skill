@@ -1,0 +1,104 @@
+## What I do, in order
+
+`T<n>` is the next free id in `orchestrator/backlog.md`. Operator-facing text is in Russian by the operator's standing ruling; tab traffic is in English.
+
+**1. Evidence check: Bash, foreground, read-only**
+
+```bash
+test "${HERDR_ENV:-}" = 1 && ls ~/.agents/skills && herdr agent list
+```
+
+**2. Backlog entry, then republish**
+
+Edit `orchestrator/backlog.md` to add:
+
+```
+| T<n> | Quarterly rotation of the Pritunl console admin password, both sites | brainstorm | prod-codex, prod-fable | — | — | round 1: independent drafts, both tabs at once | operator: poll on superpowers for Codex CLI | ruling 2026-09-28 (every task brainstormed) | no |
+```
+
+Then Bash, foreground: `bash orchestrator/build-backlog.sh`, and the Artifact tool updates the same page.
+
+**3. Prepare, send nothing: Bash, foreground**
+
+```bash
+mkdir -p <scratch>/brainstorm/T<n>
+```
+
+Write `brief-r1-A.txt` and `brief-r1-B.txt` there. They differ only in the advisor letter and the WRITE file:
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box.
+TASK       T<n> — quarterly rotation of the Pritunl console admin password, both sites
+ROUND      1 draft — ends when your draft file exists and you have reported
+SKILL      superpowers:brainstorming; I am your human partner: send questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "we need a way to rotate the Pritunl console admin password on both sites
+           every quarter. Figure out an approach"
+FACTS      (CLAUDE.md "Gateway VM (v4)"; docs/v4/40-pritunl-runbook.md) Pritunl Community
+           runs in docker on ccs-it-gw and ccs-ops-gw; its REST API is Enterprise-only;
+           the console listens on 127.0.0.1:9700 behind the gateway's console vhost, and
+           Pritunl's own login is its only gate
+DECIDED    hard rules: ansible-vault for secrets (#5); bash, never python (#4);
+           idempotency (#7); one site per run (#14); VMs reached only through their own
+           hypervisor (#17); no secret on a command line; ccs-it is the canary
+MAY        read the repository, upstream sources, the web
+WRITE      <scratch>/brainstorm/T<n>/draft-A.md — the only file you may create or change
+MUST NOT   write elsewhere; touch hosts or herdr; change any working tree; contact the
+           other advisor or the operator
+DECISIONS  stop and send me a ballot proposal; draft nothing that depends on it
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   first report within ~30 min
+BLOCKED    reply "BLOCKED: <what> <why>" and stop
+```
+
+No herdr prompt goes to any tab in this turn.
+
+**4. Status in chat, then the poll (the turn ends on the poll)**
+
+> **T<n> — ежеквартальная смена пароля администратора консоли Pritunl, обе площадки**
+> **Сейчас.** Задача заведена в бэклог, статус `brainstorm` — продуктовая проработка: два продуктовых советника (Fable и Codex) независимо проектируют решение, спорные вопросы решают голосующие советники. Раунды не запущены: у Codex CLI нет набора навыков superpowers, `prod-codex` не может выполнить `superpowers:brainstorming`.
+> **Дальше.** После вашего ответа: установка, проверка, раунд 1 одновременно в обеих вкладках. Исполнителя нет, пока документ не подтвердят оба советника, не одобрят 2/2 голосующие и не подпишете вы (правило №9).
+> **От вас.** Ответить на опрос.
+> **Голосования:** не было. **Проверено:** `ls ~/.agents/skills` — только `herdr`; четыре вкладки простаивают. **Не проверено:** сработает ли команда установки. **Живые машины:** без изменений.
+> **Бэклог:** claude.ai/artifact/Pr6sWRSgfJ76QjjFo5erEJ
+
+In English: the task is logged at `brainstorm`, the rounds have not started because Codex lacks the skill, and the operator's only action is the poll.
+
+AskUserQuestion: «Установить superpowers для Codex CLI на вашей рабочей станции?»
+
+1. **Да, установите сами (рекомендую)** — выполняю `codex plugin add superpowers@openai-curated-remote`, проверяю, перезапускаю `prod-codex`, сегодня запускаю раунд 1.
+2. **Установлю сам** — жду вашего сообщения, проверяю, запускаю.
+3. **Не устанавливать** — задача ждёт в `brainstorm`; одним советником или с заменой навыка не запускаю.
+
+**5. On answer 1**
+
+Foreground:
+
+```bash
+codex plugin add superpowers@openai-curated-remote && ls ~/.agents/skills
+```
+
+Restart `prod-codex` with its cwd in `<scratch>/brainstorm`:
+
+```bash
+herdr agent start prod-codex --kind codex --pane <pane_id> --timeout 120000 -- \
+  -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+```
+
+Confirm it lists `superpowers:brainstorming`, check that neither tab shows `"focused": true`, then send two background calls together:
+
+```bash
+herdr agent prompt prod-codex "$(cat <scratch>/brainstorm/T<n>/brief-r1-A.txt)" --wait --timeout 1800000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > <inbox>/prod-codex.last
+```
+
+The second call is the same for `prod-fable` with `brief-r1-B.txt`.
+
+## Why
+
+- **The task starts today as a backlog entry.** The operator's ruling puts every task through a two-family brainstorm the moment it enters the backlog, so the entry at `brainstorm` is the start. "Start today" is a wish and waives no gate.
+- **The missing skill is the operator's call.** Installing it changes the operator's workstation, which is one of the four decisions the operator keeps. It goes to a poll, recommendation first. Having Codex read the skill's markdown, or swapping in a second Claude advisor, would be a substitute, which the rule forbids.
+- **`prod-fable` does not start alone.** Round 1 is two independent drafts. A head start leaves a finished draft in the shared task folder before the Codex advisor begins. It would also make a one-family brainstorm the de facto state while the poll is open.
+- **I design nothing.** The brief carries the operator's words, facts with their sources, and hard rules as settled constraints.
+- **No executor yet.** The gate is both product advisors confirming, the voters approving 2/2, and the operator's design sign-off under hard rule #9.

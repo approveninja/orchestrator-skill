@@ -1,0 +1,87 @@
+Operator-facing text is in Russian (§15 ruling) and agent traffic is in English. `<scratch>`, `<inbox>`, `<sha>`, `<file:line>`, `T<id>` and the backlog link are values I fill in from my session and from step 1.
+
+## Actions, in order
+
+**1. Bash, foreground (seconds): state and ballot facts**
+```bash
+herdr agent get wgka        # must show idle, "focused": false
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse HEAD
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive grep -nF -e '10.77.1.128/25' -e '10.77.1.0/24'
+```
+
+**2. Write `<scratch>/relay-wgka-b8-hold.txt`, then Bash, background**
+```bash
+herdr agent prompt wgka "$(cat <scratch>/relay-wgka-b8-hold.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+```
+Reply in English. Ignore any pre-filled text in your input box.
+Your step-6 question (relay source allow-list) is a decision. It goes to ballot B8;
+I do not decide it, and your recommendation is not a decision.
+Until I relay "DECIDED B8":
+MUST NOT  pick either range provisionally, add a placeholder or variable that stands
+          in for the choice, or build or test anything that depends on it.
+MAY       continue the plan steps that do not depend on the allow-list, under the
+          SKILLS of your brief, local commits only. If there is none, park.
+REPORT    steps done, steps blocked on B8, branch, head SHA, test output.
+TIME BOX  30 min.
+```
+
+**3. Write `quorum/ballot-8.md` and hold it (not sent yet)**
+```
+B8 — Source allow-list of the WireGuard keepalive relay: which range?
+  Context: T<id>, branch feat/wg-keepalive-relay @ <sha>, plan step 6.
+    Verified in the repo: WireGuard clients 10.77.1.128/25 (<file:line>); VPN range
+    10.77.1.0/24, which also holds the OpenVPN clients (<file:line>); front-door
+    allow-list 10.77.1.0/24 (<file:line>).
+    Not verified: which clients send these keepalives.
+    Either option is one value in versioned configuration; nothing is deployed.
+  a) 10.77.1.128/25 — admits WireGuard clients only. Scope differs from the front door.
+     Cost if wrong: a legitimate sender outside the /25 is refused.
+     Rollback: widen the value, merge, redeploy.
+  b) 10.77.1.0/24 — admits every VPN client. Scope equals the front door.
+     Cost if wrong: clients with no use for the relay can reach it.
+     Rollback: narrow the value, merge, redeploy.
+Reply one line:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**4. Backlog:** edit `orchestrator/backlog.md` (blocked-on: B8, held until B7 settles), run `build-backlog.sh`, republish the Artifact.
+
+**5. Chat message to the operator (no poll)**
+
+> **Статус, 01:40 — wg-keepalive**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 плана. Нужно выбрать, с каких адресов релей принимает keepalive-пакеты (они поддерживают VPN-соединение): только диапазон WireGuard `10.77.1.128/25` или весь VPN `10.77.1.0/24`. Это решают два голосующих советника — бюллетень B8. Он уйдёт обоим одновременно, когда `adv-codex` закончит B7; B7 ещё выполняется, результата нет.
+>
+> **Дальше.** Решение B8 → код → ревью другой моделью на точном SHA → моя проверка → решение о слиянии → решение о запуске канарейки (первая площадка, ccs-it) → деплой. Ни один шаг ради «сегодня ночью» не пропускается. Если голоса разойдутся или шаг окажется вашим, здесь будет опрос — он дождётся вас.
+>
+> **От вас: приёмка канарейки, вручную.** Когда я напишу здесь «канарейка на ccs-it развёрнута и проверена» (если вы уже спите — первым делом после возвращения):
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2`, через 3 минуты остановите: Ctrl+C.
+> 3. Вставьте сюда последние три строки вывода.
+>
+> До вашей приёмки на ccs-ops ничего не выкатывается.
+>
+> **Проверено:** состояние `wgka`, SHA ветки `<sha>`, оба диапазона — по файлам репозитория. **Не проверено:** утверждение исполнителя, что keepalive шлют только клиенты WireGuard. **На живых машинах** ничего не менялось. Бэклог: <ссылка>
+
+In English: status now, the remaining gates, and the acceptance instruction — connect with your WireGuard profile, run the ping for 3 minutes, paste the last three lines. Nothing goes to ccs-ops before that.
+
+**6. On the B7 waiter's notification** (already armed; I arm nothing new): read `<inbox>/adv-codex.last`, run `herdr agent get` on both voters, then send both in one message, Bash, background:
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+herdr agent prompt adv-fable "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+**7. On both votes:** write `quorum/ballot-8.results.md`.
+- **2/2:** relay `DECIDED B8: <letter>` to `wgka` by the step-2 call, and update the backlog.
+- **Split:** AskUserQuestion, my recommendation (the /25) first, with both votes and rationales; `wgka` stays parked.
+
+**8. When the canary is deployed and verified:** post the three acceptance steps again, headed «Сейчас».
+
+## Why
+
+- **The vote owns the allow-list.** It changes who can reach the relay. My agreement with Option 1 and last night's 2/2 on a different allow-list are not decisions, and neither goes into the ballot.
+- **The ballot waits about 12 minutes.** Neither voter may see the other's vote first, so `adv-fable` does not get it early.
+- **The executor is answered at once.** Its time box is running, and the one background call is also its waiter. It makes no provisional pick, because work built on a guess is rework if the guess loses and tilts the vote toward what exists.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate. I ask the operator nothing, so "don't wake me for trivia" holds; B8 reaches them only on a split.
+- **Acceptance is the operator's by hand.** It needs their own WireGuard profile, which I must never hold, and an end-user path is never my evidence. So it is an instruction with a trigger and a paste-back, not a question and not my own ping.

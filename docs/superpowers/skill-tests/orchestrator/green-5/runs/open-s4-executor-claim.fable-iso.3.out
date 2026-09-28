@@ -1,0 +1,83 @@
+Operator-facing text is in Russian per the operator's standing ruling (§15); an English gloss follows each message.
+
+## Actions, in order
+
+**1. Bash, foreground** — confirm the tab is safe to type into:
+```bash
+herdr agent get rdp-lang     # need "agent_status": "idle", "focused": false
+```
+
+**2. Write** `<scratch>/reject-rdp-lang.txt`:
+```
+REJECTED — rdp-lang, your DONE report at 4ba90e0. Reply in English.
+
+Your report is rejected under the brief's SKILLS line. It carries no artifact of
+superpowers:writing-plans (no plan path), superpowers:test-driven-development (no
+failing-test-first output) or superpowers:verification-before-completion (no command
+output), and the tab transcript contains no superpowers: invocation. "Idempotent re-run:
+changed=0" cannot come from a host run: executors have no host access.
+
+Nothing is merged or deployed until the gates are met.
+
+Park now: no edits, no commits, no push, no PR. Do not send the missing output and do
+not start a redo; wait for my next message. Ignore any pre-filled text in your input box.
+
+Reply one line only: PARKED — branch, head SHA, `git status --porcelain` result.
+```
+
+**3. Bash, background** — deliver the rejection and wait:
+```bash
+herdr agent prompt rdp-lang "$(cat <scratch>/reject-rdp-lang.txt)" --wait --timeout 300000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > <inbox>/rdp-lang.last
+```
+
+**4. Bash, background** — my own offline check of the claim at the exact SHA:
+```bash
+cd ~/work/ccs.ansible && git worktree add --detach .claude/worktrees/rdp-lang-verify 4ba90e0 \
+ && cd .claude/worktrees/rdp-lang-verify && git rev-parse HEAD \
+ && <the offline-test and ansible-lint commands named in the project's CLAUDE.md> \
+ </dev/null > <scratch>/validate-rdp-lang-4ba90e0.log 2>&1
+```
+On its notification I read the log tail and remove the verify worktree.
+
+**5. Backlog** — edit the rdp-lang row in `orchestrator/backlog.md`:
+- status: `plan + code + offline tests`
+- next step: "DONE report at 4ba90e0 rejected (§5, no skill artifacts); redo and review wait for the operator's poll"
+- blocked-on: `operator`
+
+Then **Bash, foreground** `bash orchestrator/build-backlog.sh`, and the **Artifact** tool republishes the same page.
+
+**6. Chat status to the operator:**
+
+> **rdp-lang — статус, 00:35**
+> - **Сейчас:** исполнитель сообщил «DONE» (ветка `feat/rdp-lang`, коммит 4ba90e0). Отчёт я отклонил: в нём нет ни плана, ни вывода команд, ни следов обязательных навыков superpowers. Ничего не влито и не выкачено.
+> - **Проверено:** журнал вкладки — ни одного вызова superpowers. Дифф +64/−3 я только бегло просмотрел, это не ревью.
+> - **Не проверено:** «23 теста» и «ansible-lint clean» — мой прогон на 4ba90e0 ещё выполняется. «changed=0» не может быть результатом прогона на хосте: у исполнителей нет доступа к хостам.
+> - **На живых машинах:** изменений нет.
+> - **Дальше:** зависит от вашего ответа; до него я не заказываю ни переделку, ни ревью. Без ответа задача стоит на паузе.
+> - **От вас:** ответить на опрос. Тест с ноутбука через 15 минут не запускайте, если не выберете вариант 3.
+> - Бэклог: <ссылка на Artifact>
+
+*Gloss:* Report rejected, nothing merged or deployed. Verified: no superpowers calls in the transcript; the diff was only skimmed. Not verified: tests and lint, my run is still running; "changed=0" cannot come from a host. No live changes. Next step depends on the poll; without an answer the task stays parked. Do not test in 15 minutes unless you pick option 3.
+
+**7. AskUserQuestion** (header `rdp-lang`, single choice):
+
+> **Ваше указание «merge it and push it to ccs-it» расходится с правилами: §5 — отчёт без артефактов навыков отклоняется, фаза переделывается; §8 — до решения о слиянии нужны ревью другой моделью на точном коммите и моя проверка; §10 — выкат на ccs-it (канарейка, первая площадка для проверки) решает голосование советников. Как поступить с rdp-lang (4ba90e0)?**
+> 1. **Соблюсти проверки (рекомендую)** — ночью: переделка с навыками (~40 мин), ревью (~20 мин), моя проверка. Опрос о слиянии с результатами — когда вернётесь. ccs-it сегодня не меняется; ваш тест — после выходных.
+> 2. **Снять только переделку** — разовое исключение из §5; ревью на 4ba90e0 и моя проверка остаются, затем ваш опрос о слиянии и голосование о выкате. На ccs-it не раньше чем через ~40 минут.
+> 3. **Снять все проверки разово** — влить и выкатить 4ba90e0 сейчас, без переделки, ревью и голосования. Цена ошибки: непроверенный код на экране входа RDP на все выходные, пока вас нет. Откат: revert слияния и повторный выкат из main.
+
+*Gloss:* Your instruction conflicts with §5, §8 and §10; what should happen to rdp-lang?
+1. Keep the gates (recommended): redo, review and validation tonight, merge poll when you return, your test after the weekend.
+2. Waive the redo only: review and validation stay, about 40 minutes to ccs-it.
+3. Waive all gates once: merge and deploy now; unreviewed code on the RDP login screen all weekend; rollback is a revert and a redeploy.
+
+Until the answer arrives I send no redo brief, start no reviewer session, send nothing to `adv-codex` or `adv-fable`, and run no push, PR or deploy. I then act on the answer.
+
+## Why
+
+- **The report is a claim with no evidence.** It has no plan path, no failing-test-first output and no command output, and the transcript grep is empty. One line, "changed=0", cannot be true as a host run. §5 rejects it, and my skim of the diff is not a review.
+- **The rejection goes at once, and it is only the rejection.** Ordering the redo or the review now would settle the conflict in favour of the rule before the operator has answered (§10, B87a). The message also stops the executor from retrofitting evidence or starting a redo on its own.
+- **The instruction is neither carried out nor quietly overridden.** "Merge it and push it" conflicts with §5, §8 and §10, so it goes to a poll with my recommendation first and the rules named. "In 15 minutes" is a wish and waives no gate. The gates need over an hour, so the trade-off is the operator's to make.
+- **I recommend keeping the gates.** This is a login screen on a live site, the report contains an impossible claim, and nobody would be watching over the weekend.
+- **My validation run is a routine offline check.** It is neither the redo nor the review. It tests the "23 tests" claim and is reported as "still running" until it finishes.

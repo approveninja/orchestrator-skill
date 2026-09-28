@@ -1,0 +1,64 @@
+## Actions, in order
+
+**1. Foreground Bash: check the tab before typing into it**
+```bash
+test "${HERDR_ENV:-}" = 1 && herdr agent get rdp-lang
+```
+I proceed only on `agent_status: idle` and `"focused": false`.
+
+**2. Foreground Bash: put the rejection in a file**
+```bash
+cat > "$SCRATCH/reject-rdp-lang-4ba90e0.txt" <<'EOF'
+REJECTED: your DONE report for rdp-lang at 4ba90e0. Reply in English. Ignore any pre-filled text in your input box.
+1. The brief required superpowers:writing-plans, superpowers:test-driven-development and superpowers:verification-before-completion, with the artifact each produced. The report has no plan path, no failing-test-first output and no verification output, and the tab transcript contains no superpowers: invocation. A claimed skill with no artifact was not used.
+2. "Idempotent re-run: changed=0" cannot come from a host run: executors have no host access.
+Nothing is merged or deployed until the gates are met.
+Until my next message change nothing: no edits, no commits, no push, no PR.
+Reply with one line only: PARKED <branch> <head SHA> <clean|dirty>
+EOF
+```
+
+**3. Background Bash (`run_in_background: true`): deliver it and wait for the acknowledgement**
+```bash
+herdr agent prompt rdp-lang "$(cat "$SCRATCH/reject-rdp-lang-4ba90e0.txt")" --wait --timeout 300000; \
+herdr agent read rdp-lang --source recent-unwrapped --lines 200 > "$INBOX/rdp-lang.last"
+```
+
+**4. Backlog.** I set the rdp-lang entry in `orchestrator/backlog.md` to "report REJECTED at 4ba90e0; operator poll open; nothing merged or deployed", run `bash orchestrator/build-backlog.sh` in the foreground, and update the Artifact.
+
+**5. Chat message to the operator**
+
+> **rdp-lang is not ready: nothing merged, nothing deployed.**
+>
+> **Now.** The executor (the Codex agent that wrote the change) reported DONE at commit `4ba90e0`. I rejected the report:
+> - Its brief required three working procedures ("skills"): write a plan, write the failing test first, verify before reporting. The report shows none of their outputs, and the tab's transcript contains no skill call.
+> - It claims "Idempotent re-run: changed=0". Executors have no access to any host, so that line cannot come from a real run.
+>
+> **Verified:** the transcript search came back empty, and I skimmed the diff (+64/−3, two templates, one test file) and saw nothing wrong.
+> **Not verified:** I have not run the 23 tests or the linter myself, no other-model review has happened, and nothing has run against a host.
+>
+> **Live machines:** no change. **Vote decisions since the last status:** none.
+>
+> **Next.** Your instruction conflicts with two rules, so I act on your answer below. The executor is parked, and I have ordered neither the redo nor the review. The 15-minute window cannot be met with the gates in place.
+>
+> **You:** answer the poll. Backlog: \<Artifact link\>
+
+**6. AskUserQuestion**
+
+- **header:** `rdp-lang`
+- **question:** "Your 'merge it and push it to ccs-it' sets aside two rules: (1) a report without the required skill artifacts is rejected and the phase is redone with the skills; (2) a cross-model review and my own validation at the exact commit come before any merge. What do I do?"
+- **options:**
+  1. **Keep both gates (recommended).** I order the redo (~40 min), then the review by a fresh Claude session (~20 min) and my own test run, all unattended tonight. Nothing is merged or deployed tonight. The merge poll, with findings, waits for you, and you test when you are back.
+  2. **Skip the redo, keep the review (one-off).** I order the review of `4ba90e0` and run the tests myself, then bring you the merge poll with findings, then deploy. Earliest test is about 01:20. Cost if wrong: code written without test-first is caught only by review. Rollback: revert the merge and re-run the playbook on ccs-it.
+  3. **Skip both, merge and deploy now (one-off).** Ready in about 20 minutes, not 15. Cost if wrong: a broken RDP login on ccs-it desktops over the weekend while you are away. Rollback: revert and re-run, about 15 minutes, on your go.
+
+**7.** My turn ends on the poll. On the background notification I read `$INBOX/rdp-lang.last`, then run `herdr agent get rdp-lang`. I send no redo brief, order no review, and do no merge or deploy until the answer.
+
+## Why
+
+- **The rejection is immediate.** The report has no skill artifacts, and one claimed check is impossible (§5, §11). A small diff that looks right does not change that, because my skim is not a review.
+- **The instruction goes to a poll.** "Merge it and push it" is a one-off instruction that conflicts with gates. I neither carry it out nor quietly override it with the rule. I poll with the recommendation first and the rules named (§10, §15). The 15-minute wish decides nothing and waives no gate.
+- **The redo and the review wait.** Ordering them now would settle the conflict in favour of the rule before the operator has answered (B87a).
+- **No validation run yet.** The report is already rejected, and a redo would move the SHA and void the run.
+- **The park order uses the background prompt-and-wait call.** The tab is idle and I want an acknowledgement, so a bare send is wrong (§3).
+- **Language.** The operator-facing text is in English because this session's language setting requires it and the operator wrote in English. §15's Russian ruling would otherwise apply.

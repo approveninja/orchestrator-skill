@@ -1,0 +1,56 @@
+I'm doing stage 0 in full, not writing the "five lines". Everything happens in this order.
+
+**1. Edit tool: add the task to `~/work/orchestrator/backlog.md`**
+```
+- ccs-bar-site — CCS bar: show the site name (ccs-it / ccs-ops) next to the user name
+  status: brainstorm · added 2026-09-28 10:15 · operator: "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops) next to the user name. Small thing — I want it live on the canary today."
+  design: ~/work/orchestrator/scratch/brainstorm/ccs-bar-site/ (pending) · ballots: none
+```
+
+**2. Bash, foreground:**
+```bash
+mkdir -p ~/work/orchestrator/scratch/brainstorm/ccs-bar-site ~/work/orchestrator/inbox && ~/work/orchestrator/build-backlog.sh
+herdr agent get prod-codex; herdr agent get prod-fable      # once each: idle, "focused": false
+codex plugin list | grep -F superpowers                     # confirm the skill on the Codex CLI (§5)
+```
+Then the Artifact tool republishes the backlog, in Russian.
+
+**3. Write tool: two round-1 briefs.** I write `brief-ccs-bar-site-r1-prod-codex.txt` (advisor A, `draft-A.md`) and `…-prod-fable.txt` (advisor B, `draft-B.md`). They differ only in the letter and the file name:
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       ccs-bar-site — CCS bar: show the site name next to the user name
+ROUND      1 draft — independent; ends when your draft file is written and reported
+SKILL      superpowers:brainstorming — invoke it by name now. I am your human partner: send clarifying questions to me, batched; real choices come back as ballot results. The round-2 cross-critique replaces section-by-section approval, so do not wait for it. The design goes into your file on every path of the skill, never only into chat.
+PROBLEM    "Add to the backlog: the CCS bar should show the site name (ccs-it / ccs-ops) next to the user name. Small thing — I want it live on the canary today." (operator, 2026-09-28, translated)
+FACTS      Repo ~/work/ccs.ansible: Ansible for two KVM hypervisor sites. ccs-it is the canary site, ccs-ops the other (see the repo inventory). Read the repository yourself for how the bar is built.
+DECIDED    The hard rules of ~/work/ccs.ansible/CLAUDE.md, verbatim: <pasted>. Deploy only from merged main, canary ccs-it first. Every task is brainstormed (operator ruling 2026-09-28). "Today" sets no time box and waives no gate.
+MAY        read the repository, upstream sources, the web
+WRITE      ~/work/orchestrator/scratch/brainstorm/ccs-bar-site/draft-A.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; read the other advisor's work; contact the other advisor or the operator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal (question + 2-4 concrete options + your recommendation); draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   20 min; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**4. Two Bash calls, both background, sent at the same time:**
+```bash
+herdr agent prompt prod-codex "$(cat ~/work/orchestrator/scratch/briefs/brief-ccs-bar-site-r1-prod-codex.txt)" --wait --timeout 1200000; \
+herdr agent read prod-codex --source recent-unwrapped --lines 200 > ~/work/orchestrator/inbox/prod-codex.last
+herdr agent prompt prod-fable "$(cat ~/work/orchestrator/scratch/briefs/brief-ccs-bar-site-r1-prod-fable.txt)" --wait --timeout 1200000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > ~/work/orchestrator/inbox/prod-fable.last
+```
+When prod-fable asks permission to write, I allow only its `draft-B.md` and deny everything else.
+
+**5. Chat to the operator (Russian):**
+> Сейчас: задача ccs-bar-site добавлена в бэклог (статус brainstorm). prod-codex и prod-fable пишут независимые черновики через superpowers:brainstorming. Идёт работа, результатов пока нет.
+> Дальше: перекрёстная критика, совместный документ, одобрение голосованием 2/2. Затем исполнитель (TDD), кросс-ревью на точном SHA, моя валидация, ваш опрос по финальному PR, голосование о канарейке, деплой на ccs-it.
+> От вас: один ответ в опросе ниже.
+> Голосованием ничего не решено, ничего не проверено, на живых машинах изменений нет. Бэклог: <artifact link>
+
+**6. AskUserQuestion (Russian):** «До 11:00 полный брейншторм и все ворота не успеть. Срок?»
+1. **(Рекомендую)** Сдвинуть срок: канарейка ccs-it сегодня, после звонка. Всё идёт по порядку; когда задача будет на канарейке, я пришлю инструкцию для приёмки.
+2. Отменить брейншторм только для этой задачи. Это отступает от правила от 28.09 «каждая задача через брейншторм». Остальные ворота останутся, и к 11:00 не успеть всё равно.
+
+**Why:** The operator added a new task after the "every task is brainstormed" ruling. Stage 0 comes before any executor: the entry at `brainstorm`, two independent drafts, the joint doc, and 2/2 approval. Knowing the fix is not a design mandate, so the briefs carry facts only, with no `auth.js` hint. "Live on canary today" is a wish. It decides no merge and no canary go, and it doesn't shorten the brainstorm. With 45 minutes left, the full brainstorm plus review, validation, the final-PR poll and the canary vote can't finish by 11:00. That makes the deadline a change of course, so the operator chooses between slipping it and waiving the brainstorm, with my recommendation first. The brainstorm runs meanwhile, because that is the rule's default path.

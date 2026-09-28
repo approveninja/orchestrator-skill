@@ -1,0 +1,125 @@
+Before sending anything, I checked the manifest for four things. A new task starts at stage 0, which has no time box (§10a). One tab handles one task (§4). A task isn't `done` until its docs are closed and cleanup is finished (§8). Everything I say to the operator is in Russian (§15). Everything between agents is in English.
+
+Paths used below: `ORCH=~/work/orchestrator`, `REPO=~/work/ccs.ansible`, `BS=$ORCH/brainstorm/rdp-audio`.
+
+## 1. Preflight (foreground; all read-only and quick)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent list; herdr tab list --workspace "$HERDR_WORKSPACE_ID"
+codex plugin list | grep -i superpowers; claude plugin list | grep -i superpowers
+grep -n -i 'rdp\|audio' $ORCH/backlog.md
+```
+
+If superpowers is missing from either CLI, I stop and send the operator an install poll. I don't use a substitute.
+
+## 2. Backlog, then republish (foreground)
+
+- **Relay task:** status `docs closed`, "docs closed: no: snapshot, living docs, design/plan status, memory pending".
+- **New entry `T<next>` "RDP audio":** status `brainstorm`, design doc `$BS/joint.md` (not written yet), next step "round 1 drafts".
+- Then `bash $ORCH/build-backlog.sh` and **Artifact** republish to the same page path.
+
+## 3. Stage 0: create the two product-advisor tabs (foreground) and send the round-1 briefs (background)
+
+```bash
+mkdir -p $BS $ORCH/inbox
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $BS --label pa-codex --no-focus
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd $BS --label pa-fable --no-focus
+herdr agent start pa-codex --kind codex --pane <pane_id_1> --timeout 120000 -- \
+  -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr agent start pa-fable --kind claude --pane <pane_id_2> --timeout 120000 -- \
+  --model claude-fable-5-1 --effort xhigh --name pa-fable
+```
+
+I answer pa-fable's permission prompts myself: writes inside `$BS` only, everything else denied.
+
+`$BS/brief-r1-A.txt` (B is the same, except `B`, `draft-fable.md` and `pa-fable`):
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box.
+TASK       T<next> — RDP audio
+ROUND      1 draft — ends when your draft file is written; do not read any other draft
+SKILL      superpowers:brainstorming; I am your human partner: send questions to me (batched)
+PROBLEM    "Now the RDP audio thing — I want a design by morning."
+FACTS      Repo ~/work/ccs.ansible at origin/main <sha>; canary site ccs-it, other site ccs-ops;
+           desktop/gateway/host_proxy roles; WireGuard keepalive relay merged in PR #165 and live on ccs-it.
+DECIDED    <project hard rules, verbatim from $ORCH/decided-ccs.txt>
+MAY        read the repository, upstream sources, the web
+WRITE      /Users/…/orchestrator/brainstorm/rdp-audio/draft-codex.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact the other advisor or the operator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal (question + 2-4 options
+           + your recommendation); draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   60 min to first report; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+Two background calls (`run_in_background: true`), one per tab:
+
+```bash
+herdr agent prompt pa-codex "$(cat $BS/brief-r1-A.txt)" --wait --timeout 3600000; \
+herdr agent read pa-codex --source recent-unwrapped --lines 200 > $ORCH/inbox/pa-codex.last
+herdr agent prompt pa-fable "$(cat $BS/brief-r1-B.txt)" --wait --timeout 3600000; \
+herdr agent read pa-fable --source recent-unwrapped --lines 200 > $ORCH/inbox/pa-fable.last
+```
+
+## 4. Close the relay task's docs (foreground worktree, then a background subagent)
+
+```bash
+git -C $REPO fetch && git -C $REPO worktree add $REPO/.claude/worktrees/wgka-docs -b chore/wgka-docs origin/main
+```
+
+**Agent tool** (Opus, background), with this prompt:
+
+> "Work only in `/Users/…/ccs.ansible/.claude/worktrees/wgka-docs`, in English. From the evidence in `$ORCH/evidence/wgka/`, do three things:
+> 1. Update `projects/ccs/soul/ccs-it.md` to the post-relay state. The evidence is the deploy and re-run logs (re-run `changed=0`) and the operator's ping (0% loss over 3 min).
+> 2. Update the living docs and runbooks the relay changed.
+> 3. Mark the relay design doc and plan as implemented, citing PR #165 and its merge SHA.
+>
+> State nothing the evidence doesn't show. `git grep -nE "code/session_[0-9A-Za-z]"` must return nothing. Commit with a `Co-Authored-By:` trailer only. Report the SHA and the files changed."
+
+## 5. To the operator: a status, then one AskUserQuestion poll
+
+These go out now, before the operator goes to sleep.
+
+> **Сейчас:** WireGuard keepalive relay принят на канарейке ccs-it: #165 смержен, повторный прогон дал changed=0, ваш пинг — 0% потерь за 3 мин. По этой задаче закрываю документацию: снимок soul/ccs-it.md, живые доки, статус дизайна и плана, заметка в память. Пишет prose-субагент в отдельном worktree, я сверяю с доказательствами и мержу как docs-only. Потом уборка: вкладка wgka, worktree, ветка, codex app-server (pid 48211). До этого задача не `done`.
+> RDP-аудио заведено в бэклоге со статусом `brainstorm`. Два продуктовых советника (gpt-6-astra и Fable 5.1, xhigh) пишут независимые черновики через superpowers:brainstorming. Дальше перекрёстная критика, общий документ и утверждение голосующими советниками 2/2. Утро — цель, но этапы я не сокращаю. Если не успеваем, спрошу вас опросом. Исполнитель появится только после `brainstormed`.
+> **Далее:** раунд 2 (критика). Открытые вопросы уходят бюллетенями голосующим советникам.
+> **От вас:** один ответ ниже. Если советники разойдутся, утром будет опрос.
+> Решено голосованием: ничего нового. На живых машинах с приёмки ничего не менялось. Бэклог: <artifact link>.
+
+*(In English: the relay is accepted and I'm closing its docs and cleaning up. RDP audio has entered stage 0 with two product advisors. Morning is the target, but no stage gets shortened. One poll follows.)*
+
+**Poll:** «Не давать Mac заснуть ночью, чтобы брейншторм не оборвался?» (keep the Mac awake overnight so the brainstorm isn't cut off?)
+- **Рекомендую:** да, запустить `caffeinate -dims` до утра (yes, run `caffeinate -dims` until morning)
+- Нет, ничего не менять (no, change nothing)
+
+## 6. When the subagent reports
+
+1. I check every claim in the new text against the evidence and run the `git grep`.
+2. `git push -u origin chore/wgka-docs`, `gh pr create`, then `gh pr merge <n> --merge --delete-branch` (docs-only).
+3. I write the memory file `wg-keepalive-relay.md`, recording only what's non-obvious, and add one line to `MEMORY.md`.
+
+## 7. Cleanup (foreground; I check each target before touching it)
+
+```bash
+git -C $REPO/.claude/worktrees/wg-keepalive status --porcelain      # must be empty
+git -C $REPO log origin/main..feat/wg-keepalive-relay --oneline     # must be empty
+herdr tab close <wgka tab_id>
+git -C $REPO worktree remove $REPO/.claude/worktrees/wg-keepalive
+git -C $REPO worktree remove $REPO/.claude/worktrees/wgka-docs && git -C $REPO worktree prune
+git -C $REPO branch -d feat/wg-keepalive-relay chore/wgka-docs
+ps -p 48211 -o pid,lstart,command   # must be the codex app-server started at 21:30
+kill 48211
+git -C $REPO switch main && git -C $REPO pull --ff-only && git -C $REPO worktree list
+```
+
+Then the backlog goes to relay `done` / `docs closed: yes`, and I republish.
+
+## Why
+
+- **"Go" is a request, and "by morning" is a wish.** Neither waives stage 0. RDP audio is a new task, so no executor exists until two product advisors have brainstormed it and both voting advisors have approved it 2/2.
+- **I don't bring in wgka.** It's an executor, and executors don't design. One tab handles one task. The advisors can read the roles wgka knows directly from the repo.
+- **The relay isn't `done` yet.** Its docs, memory note and cleanup are still open. They run in parallel with the brainstorm, in a worktree, through a prose subagent, with my own check before the merge.
+- **The poll is about the Mac.** If it sleeps overnight, the brainstorm dies and there's no design by morning. Keeping it awake changes the operator's own environment, so I ask rather than start `caffeinate` myself.

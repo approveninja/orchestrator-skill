@@ -1,0 +1,55 @@
+**Nothing goes to `rdp-audio` until the operator answers one poll.** Queuing the noVNC fix would carry the instruction out, and queuing a stop for compaction would override it.
+
+## 1. Status to the operator (chat)
+
+> **Now:** `rdp-audio` is still running task 7 of 9, so there is no result yet. Its context is 70% used. I have sent nothing to the tab.
+> **Next:** depends on your answer below.
+> **From you:** one answer.
+
+## 2. Poll (AskUserQuestion, one question, header `rdp-audio`)
+
+> Your instruction would set aside three rules: one tab = one task (§4), stage-0 brainstorm for every new task (§10a), and compaction at 50–60% context (§4). How do I proceed?
+>
+> 1. **New task + compact now (recommended).** noVNC enters the backlog, gets its brainstorm, then a fresh tab and worktree. `rdp-audio` finishes its current step, commits, is compacted (~4 min), then runs tasks 8–9.
+> 2. **New task, `rdp-audio` untouched.** No message and no compaction; risk of auto-compaction mid-task.
+> 3. **Same tab, compact first.** noVNC goes to `rdp-audio` after task 9 with no brainstorm; both fixes share one branch and PR.
+> 4. **As instructed.** noVNC goes into `rdp-audio`, with no stop and no compaction.
+
+## 3. On answer 1
+
+Any other answer is carried out as chosen. Either way I record the answer verbatim with its date.
+
+```bash
+# foreground: send only if "focused": false
+herdr agent get rdp-audio
+# foreground, returns at once
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+# background
+herdr agent wait rdp-audio --timeout 1200000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+While that runs, I add noVNC to `orchestrator/backlog.md` at `brainstorm`, run `build-backlog.sh`, and update the Artifact. Then I send round-1 briefs to the two product advisors, quoting the operator's words.
+
+On the notification I read `<inbox>/rdp-audio.last`, run `herdr agent get rdp-audio`, and check the reported SHA with `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1`. Then:
+
+```bash
+# background
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+# background, after it settles
+herdr agent prompt rdp-audio "Report one line: phase, branch, head SHA, next step." --wait --timeout 120000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+# background, once that line matches the pre-compaction report
+herdr agent prompt rdp-audio "$(cat <scratch>/brief-rdp-audio-resume.txt)" --wait --timeout 3600000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > <inbox>/rdp-audio.last
+```
+
+The resume brief reads: "Continue the plan at task 8 under the original brief. Scope unchanged: tasks 8–9 only. Skills: superpowers:test-driven-development, then superpowers:verification-before-completion. Reply in English."
+
+## Why
+
+- **The poll comes first.** A one-off chat instruction that conflicts with a manifest rule is never acted on directly, and never quietly overridden (§10, §15). Waiving a rule for one case is the operator's call, so it is an option in the poll.
+- **noVNC is a new task.** Sharing the `desktop` role does not make it the same task, and the rdp-audio design doc does not cover it. In the same tab it would inherit rdp-audio's assumptions and arrive undesigned.
+- **Compaction is overdue.** At 70% used the tab is past the 50–60% threshold. Auto-compaction fires at the worst moment and keeps the wrong things, and two remaining tasks do not change that.
+- **The safe point is made, not watched for.** A tab working through a plan never goes idle between steps. A queued message lands at the next tool boundary, so there is no `esc`, no screen-watching, and the stop falls after a commit.
+- **Language.** §15 sets operator-facing text to Russian. This session's language setting requires English, so the poll is in English here.

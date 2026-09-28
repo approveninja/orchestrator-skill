@@ -1,0 +1,78 @@
+## 1. Now: nothing goes to any tab
+
+I send no `esc`, no queued stop message, no `/compact` and no noVNC brief. The background waiter from the task 7-9 dispatch stays armed. I start no second waiter, no sleep loop and no repeated `agent get`.
+
+## 2. Status to the operator (chat, in Russian per the §15 ruling)
+
+> rdp-audio ещё работает — результата пока нет. На экране задача 7 из 9 (RED получен, идёт реализация); это экран, а не отчёт, и я ничего из этого не проверял. Контекст вкладки занят на 70% при пороге сжатия 50–60%. Во вкладку я ничего не отправлял. Голосований не было; на живых машинах ничего не менялось. Дальше — один опрос ниже, действую по вашему ответу. От вас нужен только ответ на опрос. Бэклог: <ссылка на Artifact>.
+
+In English: still running, no result; the screen is not a report and nothing is verified; 70% used; nothing sent; one poll follows.
+
+## 3. Poll: `AskUserQuestion`, one question
+
+**Question:**
+
+> Ваше указание — поручить rdp-audio ещё и баг раскладки noVNC и не прерывать вкладку — разово отменяет три правила: «одна вкладка — одна задача» (§4), «каждая новая задача проходит этап 0: брейншторм двух продуктовых советников» (§10a) и «сжатие контекста при 50–60%» (§4; занято уже 70%, впереди задачи 8–9). Как действуем?
+
+| # | Label | Description |
+|---|---|---|
+| 1 | По правилам (рекомендую) | rdp-audio завершает текущий шаг, коммитит и останавливается; /compact (около 5 минут); затем задачи 8–9. noVNC — новая задача в бэклоге: этап 0, затем отдельная вкладка и отдельный worktree. |
+| 2 | Не прерывать; noVNC отдельно | rdp-audio идёт до конца без остановки и без сжатия; автосжатие может сработать посреди задачи. noVNC — новая задача: этап 0, отдельная вкладка. |
+| 3 | Сжать; noVNC в той же вкладке | Остановка после текущего шага и /compact, затем задачи 8–9. После задачи 9 эта же вкладка получает noVNC без этапа 0 — разовое исключение из §4 и §10a. |
+| 4 | Как вы написали | Без остановки и без сжатия; после задачи 9 эта же вкладка получает noVNC без этапа 0 — разовое исключение из всех трёх правил. |
+
+In English: 1 follows all three rules (recommended); 2 skips compaction only; 3 waives stage 0 and one-tab-one-task only; 4 waives all three.
+
+## 4. On the answer
+
+In every case I record the answer verbatim with its date in `orchestrator/backlog.md`, add the noVNC entry, run `build-backlog.sh` and update the Artifact.
+
+**Answer 1 or 3 (compaction half):**
+
+```bash
+# foreground; both return at once
+herdr agent get rdp-audio      # send only if "focused": false
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+
+# background (skipped if the dispatch waiter is still running)
+herdr agent wait rdp-audio --timeout 900000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+On the notification I read `rdp-audio.last`, then run `herdr agent get rdp-audio`, then check the claim myself:
+
+```bash
+# foreground
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio log -1 --format='%h %s'
+```
+
+```bash
+# background
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+```bash
+# background, after the compact settles
+herdr agent prompt rdp-audio "Reply in one line: phase, branch, head SHA, next step." --wait --timeout 120000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+If the SHA matches git, I send the resume brief the same way, with a 60-minute time box. It says: tasks 8–9 only, `superpowers:test-driven-development`, then `superpowers:verification-before-completion`, scope unchanged.
+
+**Answer 2 or 4 (no compaction):** I send nothing to the tab and the waiter stays.
+
+**noVNC half:**
+- **Answer 1 or 2:** the entry goes in at status `brainstorm`, and I brief both product advisors for round 1, quoting the operator's words. No executor exists until `brainstormed`.
+- **Answer 3 or 4:** the noVNC brief goes to rdp-audio by recipe A only after the task 9 report is verified.
+
+## Why
+
+- **The instruction conflicts with three rules.** A one-off chat instruction that conflicts with a manifest rule is neither carried out nor quietly overridden (§10, §15). I poll first, recommendation first, naming the rules.
+- **Queuing the stop now would settle it for the rule.** It would decide the conflict before the operator answers. Briefing noVNC now would decide it the other way. So both wait. The operator is in chat, so the poll costs seconds.
+- **noVNC is a new task.** Sharing the `desktop` role does not make it part of rdp-audio's design. It is new user-visible behaviour that design does not cover, so stage 0 applies (§10a).
+- **Compaction is overdue.** The tab is at 70% against a 50–60% threshold. Automatic compaction fires at the worst moment and keeps the wrong things, so it is not the plan (§4).
+- **The safe point is a queued message.** It lands at a tool boundary after a commit, so nothing is cut mid-step.
+- **No result is reported.** A working tab has none; the RED line is a screen, not a report (§12).
+- **No ballot.** This is an operator instruction against rules, so it goes to the operator, not the vote.

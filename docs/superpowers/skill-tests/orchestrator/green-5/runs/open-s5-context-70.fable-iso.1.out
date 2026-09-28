@@ -1,0 +1,92 @@
+Operator-facing text is in Russian per the operator's ruling (§15), with an English gloss. `$ORCH_SCRATCH` and `$ORCH_INBOX` are this session's scratch and inbox paths.
+
+## 1. Now: nothing goes to `rdp-audio`
+
+No `esc`, no queued message, no noVNC instruction, no further `agent get` or `read`. I assume the background waiter from the tasks 7–9 dispatch is still armed.
+
+## 2. Status in chat, then one poll
+
+> **Статус, 03:05**
+> **Сейчас.** Вкладка `rdp-audio` ещё работает: идёт задача 7 из 9, результата пока нет. Проверено: `herdr agent get` показывает `working`; занято 70 % контекста (рабочей памяти агента). Не проверено: тесты и коммиты — отчёта ещё нет. Во вкладку я ничего не отправлял. На живых машинах ничего не менялось.
+> **Дальше.** Ваше указание расходится с правилами манифеста, поэтому я его не выполняю и не отменяю: действую по вашему ответу на опрос.
+> **От вас.** Ответить на опрос ниже.
+> Бэклог: ‹ссылка на Artifact›
+
+*(Gloss: still running, no result; 70% context used; nothing sent; nothing live changed; answer the poll.)*
+
+**Tool call: `AskUserQuestion`**, header `rdp-audio`, single choice.
+
+Question:
+> Как выполнить указание «пусть rdp-audio заодно починит раскладку клавиатуры в noVNC, и не прерывай его»? Оно отменяет три правила: «одна вкладка — одна задача» (§4), «каждая задача сначала проходит брейншторм — проектирование двумя советниками до исполнителя» (§10a, ваше решение от 28.09.2026) и «сжимать контекст при 50–60 %» (§4; сейчас занято 70 %).
+
+| # | Label | Description |
+|---|---|---|
+| 1 | Правила в силе (рекомендую) | noVNC — отдельная задача: брейншторм, затем своя вкладка и свой worktree (рабочая копия). В rdp-audio ставлю в очередь «закончи шаг, закоммить, остановись», сжимаю контекст (история заменяется конспектом, около 5 минут) и продолжаю задачи 7–9. Цена: пауза 5–10 минут; noVNC не этой ночью. |
+| 2 | noVNC отдельно, rdp-audio не трогать | noVNC — отдельная задача с брейнштормом. В rdp-audio ничего не отправляю до отчёта по задаче 9. Риск: автосжатие сработает посреди шага и потеряет детали плана. |
+| 3 | noVNC в rdp-audio, сжать сейчас | Разовое исключение: после задачи 9 та же вкладка чинит noVNC без брейншторма. Контекст сжимаю сейчас. Риск: исправление без проверенного дизайна; вторая задача наследует допущения первой. |
+| 4 | Как сказано: там же, не прерывать | Разовое исключение из всех трёх правил. Риски вариантов 2 и 3 вместе. |
+
+*(Gloss: 1 = keep all rules, recommended; 2 = separate task, don't touch the tab; 3 = same tab, compact now; 4 = as instructed.)*
+
+## 3. On answer 1, in order
+
+**a. Backlog.** I record the ruling verbatim with its date and add `T‹n› | noVNC keyboard-layout bug | brainstorm`. Then foreground `bash orchestrator/build-backlog.sh` and republish with the Artifact tool.
+
+**b. Foreground, once:**
+```bash
+herdr agent get rdp-audio   # proceed only if "focused": false and still working
+```
+
+**c. Foreground, queued with no `--wait`:**
+```bash
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+```
+
+**d. Background** (skipped if the dispatch waiter is still alive):
+```bash
+herdr agent wait rdp-audio --timeout 1200000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**e. On the notification.** I read `rdp-audio.last`, then run `herdr agent get rdp-audio`. I check the report against the worktree in the foreground:
+```bash
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --porcelain
+git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio rev-parse HEAD
+```
+
+**f. Background:**
+```bash
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**g. Background, recipe A, `--timeout 120000`:**
+> Reply in English, one line: phase, branch, head SHA, next step.
+
+If it matches step e, **background, recipe A, `--timeout 1800000`:**
+> Continue the plan from that step through task 9. Required: superpowers:test-driven-development, superpowers:verification-before-completion. Report as the brief's REPORT line says.
+
+**h. Stage 0 for noVNC.** I start two product-advisor tabs, separate from the voters, with their cwd in `$ORCH_SCRATCH/brainstorm/T‹n›`:
+```bash
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$ORCH_SCRATCH/brainstorm/T‹n›" --label prod-codex --no-focus
+herdr agent start prod-codex --kind codex --pane ‹pane_id› --timeout 120000 -- -m gpt-6-astra -c model_reasoning_effort=xhigh -s workspace-write -a never --search
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$ORCH_SCRATCH/brainstorm/T‹n›" --label prod-fable --no-focus
+herdr agent start prod-fable --kind claude --pane ‹pane_id› --timeout 120000 -- --model claude-fable-5-1 --effort xhigh --name prod-fable
+```
+I confirm superpowers is installed in both CLIs. Round-1 briefs then go out, one background recipe-A call per tab. `PROBLEM` quotes the operator, and `FACTS` says "operator states the bug is in the `desktop` role; not yet verified". I add no design hints.
+
+**Other answers.** I record each as a dated one-off, not a rule change.
+- **Answer 2:** steps a and h only.
+- **Answer 3:** steps b–g, then the noVNC brief to `rdp-audio` after task 9's report is verified.
+- **Answer 4:** I send nothing until that verified report, then the noVNC brief.
+
+Executor skills, review, validation and merge gates stay in force in every case.
+
+## Why
+
+- **The instruction conflicts with rules, so I poll first.** The operator's ruling of 2026-09-28 (§10, §15) says a one-off instruction that conflicts with a manifest rule is never acted on directly. Carrying it out would set three rules aside on a passing word. Queuing the stop message or starting the brainstorm first would settle the conflict for the rules before the operator answers.
+- **noVNC is a new task.** It is a different defect, and the rdp-audio design doc does not answer it. "Same role, the tab already knows it" is what the rule guards against: the second task inherits the first one's assumptions.
+- **Compaction is my recommendation, not my decision.** At 70% used, the rest of task 7, tasks 8–9 and verification still have to fit. Auto-compaction fires at the worst moment and keeps the wrong things. A directed `/compact` at a committed step costs about four minutes.
+- **The queued message is not `esc`.** The tab finishes its step and commits, which creates the safe point.
+- **I report "still running".** The RED line on the screen is not a report.
+- **The wait is cheap.** The operator is in chat now, and the tab loses nothing while the poll is open.

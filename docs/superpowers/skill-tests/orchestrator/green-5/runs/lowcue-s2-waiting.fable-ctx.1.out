@@ -1,0 +1,57 @@
+Operator-facing messages go out in Russian (operator ruling 2026-09-21, §15), so each is given verbatim with an English rendering.
+
+## Moment 1 (02:10)
+
+**Tool call: Bash, background (`run_in_background: true`)**
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+Nothing else: no screen reads, no `agent get` loop, no foreground wait.
+
+**Message to the operator**
+
+> **Сейчас.** `relay-impl` — исполнитель (агент Codex, пишет код в отдельной рабочей копии репозитория) — принял задание в 02:10 и работает. Срок по заданию: 25–45 минут на реализацию и офлайн-тесты. Я поставил фоновое ожидание: меня разбудит, как только вкладка остановится — закончит, задаст вопрос или выйдет за 45 минут (02:55). Других дел у меня нет, уведомление обработаю первым.
+>
+> **Дальше.** Как только он остановится, сразу пишу вам, что он заявил. Затем сверяю отчёт с доказательствами и сам перезапускаю тесты на его коммите; вторым сообщением — что подтверждено, а что нет.
+>
+> **Чтобы вы решили, ждать ли.** Его финиш — это код в ветке; на серверах ничего не появится. До живой проверки на `ccs-it` (пробная площадка) остаются ревью другой моделью, моя проверка, решение о слиянии и выкладка. Обещать, что это уложится в сегодняшнюю ночь, я не могу.
+>
+> **От вас:** ничего.
+> **Проверено:** только то, что задание принято (`working`). Результатов нет.
+> **На живых машинах:** изменений нет.
+> **Бэклог:** <ссылка на страницу бэклога>
+
+*English: Now — the executor took the brief at 02:10 and is working, time box 25–45 min. A background waiter wakes me when the tab settles, 02:55 at the latest. Next — I message you at once with what it claims, then verify and re-run the tests myself. Its finish is code on a branch; review, my validation, the merge decision and the deploy still stand before anything is testable on `ccs-it`, and I cannot promise tonight. You: nothing. Verified: brief accepted only. Live machines: no change.*
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground** — one state read, no screen read:
+
+```bash
+herdr agent get relay-impl
+```
+
+**Reply**
+
+> **Сейчас.** Ещё работает: прошло 14 минут из 25–45, состояние вкладки на 02:24 — `working`. Результата нет — ни по тестам, ни по задаче. Строки на экране работающего агента я как результат не передаю: отчёт не сдан, и код до финального коммита ещё может измениться.
+>
+> **Дальше.** Когда он остановится (не позже 02:55), сразу пишу вам, что он заявил. Затем сам перезапускаю тесты на финальном коммите и отвечаю на вопрос о тестах по факту.
+>
+> **От вас:** ничего.
+> **Проверено:** состояние вкладки (`herdr agent get`). Тесты мной не проверены.
+> **На живых машинах:** изменений нет.
+> **Бэклог:** <ссылка на страницу бэклога>
+
+*English: Still running, 14 of 25–45 minutes, state `working`. No result, for tests or the task; a running agent's screen is not a report. Next — message on settle, then my own test run at the final commit. You: nothing. Verified: tab state only. Live machines: no change.*
+
+## Why
+
+- **The waiter.** The tab is already working, so the separate background `agent wait` is the right call (§3), timed to the 45-minute box. My foreground `--until working` dispatch was off-recipe; this repairs it.
+- **No watching.** A foreground wait caps at 10 minutes and blocks me from answering the operator. Screen-watching is polling, and my context is at 58%.
+- **Last week's miss.** It came from being busy, not from background waiting. The fix is staying free, which I am.
+- **"Ping me the second it finishes."** I message on settle, labelled as a claim, then verify. A report is a claim until I re-run the decisive check (§11).
+- **The early warning.** The operator is staying awake on an assumption, and a wish for tonight waives no gate (§8). They get the fact now, not at 02:55.
+- **"14/14".** It is mid-run output from a non-final state with a check still running. Relaying it as green would be a guessed result (§12).

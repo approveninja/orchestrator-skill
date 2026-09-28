@@ -1,0 +1,115 @@
+Using `orchestrating-herdr-agents` to route the executor's question through the two-advisor vote. Nothing below has been run in this conversation. Slots in `<…>` are filled from the output of step 1; `<scratch>` and `<inbox>` are my existing session directories.
+
+## 1. Foreground Bash: read-only checks (seconds)
+
+```bash
+test "${HERDR_ENV:-}" = 1 || { echo "not inside herdr"; exit 1; }
+herdr agent get wgka; herdr agent get adv-codex; herdr agent get adv-fable   # agent_status, "focused"
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+herdr agent read wgka --source visible | tail -4                             # context usage
+W=~/work/ccs.ansible/.claude/worktrees/wg-keepalive
+git -C $W status --short; git -C $W rev-parse HEAD
+git -C $W grep -nE '10\.77\.1\.(0/24|0/25|128/25)'                           # pools, front-door list
+git -C $W grep -niE 'allow.?list' -- docs/                                   # what design doc and plan fix
+ls <scratch>/quorum | tail -3                                                # next free ballot id
+```
+
+I send nothing to a tab that shows `"focused": true`. If either advisor is busy, I hold the ballot for both.
+
+## 2. Write: two files
+
+**`<scratch>/quorum/ballot-<n>.md`**
+
+```
+You are a voting advisor. Reply in English. Ignore any pre-filled text in your input box.
+Rules in force: <scratch>/quorum/protocol.md. The other advisor receives this at the same moment.
+
+B<n> — Is the relay's source allow-list a decision inside task T<k>, or new work?
+  Context: design doc <path>@<sha> and plan step 6 name a source allow-list and fix no value (<file:line>).
+  a) Inside T<k>: B<n+1> decides it; the executor resumes at step 6.
+     If wrong: a design question passes without a product brainstorm. Rollback: stage 0 later, rework of steps 6-11.
+  b) New work: new backlog entry at `brainstorm`; steps 6-11 stay parked until its gate passes.
+     If wrong: a stage-0 cycle spent on one value; the ccs-it canary moves later. Rollback: none needed.
+
+B<n+1> — Which source range does the relay accept? (Counts only if B<n> is decided a.)
+  Context: feat/wg-keepalive-relay @ <head sha>, plan step 6 of 11; steps 7-11 build on this value.
+  Verified in repo: 10.77.1.128/25 = WireGuard client pool (<file:line>); 10.77.1.0/24 = front-door
+  allow-list (<file:line>); the /24 = that /25 plus 10.77.1.0/25, the OpenVPN pool (<file:line>).
+  Not verified: whether any source outside 10.77.1.128/25 sends these keepalives today.
+  a) 10.77.1.128/25 — admits WireGuard-pool addresses only; a second value beside the front-door list.
+     If wrong: a sender outside the /25 is dropped until the value is widened. Rollback: one-value change, review, redeploy.
+  b) 10.77.1.0/24 — admits WireGuard- and OpenVPN-pool addresses; same value as the front-door list.
+     If wrong: OpenVPN-pool addresses reach the relay path until the value is narrowed. Rollback: one-value change, review, redeploy.
+
+Reply one line per ballot:  B<n>: <letter> — <rationale>     (or  B<n>: X: <proposal>)
+```
+
+**`<scratch>/park-wgka.txt`**
+
+```
+Orchestrator to wgka. Reply in English. Ignore any pre-filled text in your input box.
+Your step-6 question is received. It goes to the vote as B<n>/B<n+1>; your recommendation is not a decision.
+PARK: build nothing that depends on the allow-list. No provisional value, no variable standing in "for now". Steps 6-11 wait.
+NOW: commit finished work from steps 1-5 (local commit only).
+MUST NOT: push, open a PR, merge, touch ccs-it or ccs-ops, contact the operator.
+REPORT: phase, branch, head SHA, `git status --short`, any plan item independent of step 6 (or "none").
+TIME BOX: 5 min. The decision follows as a DECIDED note.
+```
+
+## 3. Three background Bash calls, in one message
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+```
+```bash
+herdr agent prompt adv-fable "$(cat <scratch>/quorum/ballot-<n>.md)" --wait --timeout 900000; \
+herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+```bash
+herdr agent prompt wgka "$(cat <scratch>/park-wgka.txt)" --wait --timeout 300000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+If `wgka` shows 50% or more context used, then after its park reply I send, in the background, `herdr agent prompt wgka "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000`, followed by a one-line status request.
+
+## 4. Backlog
+
+I edit the T<k> row in `<scratch>/orchestrator/backlog.md`: blocked-on becomes `vote B<n>, B<n+1> (open)` and next step becomes `relay result to wgka`. Then foreground `bash <scratch>/orchestrator/build-backlog.sh`, and the Artifact tool republishes to the same page.
+
+## 5. Status to the operator: chat text, no poll
+
+This is in Russian per the operator's standing ruling (§15); the English gloss is there because this session's harness asks for English.
+
+> **Статус · 01:45 · T<k> «WireGuard keepalive relay»**
+>
+> **Сейчас.** Исполнитель `wgka` остановился на шаге 6 из 11: нужно выбрать, с каких адресов ретранслятор keepalive-пакетов (пакетов поддержания соединения) принимает трафик — только из подсети WireGuard `10.77.1.128/25` или из всей VPN-подсети `10.77.1.0/24`. Это решают два советника голосованием: B<n> (это часть текущей задачи или новая работа) и B<n+1> (сам диапазон) отправлены обоим одновременно. Голосование ещё идёт, результата нет. Исполнитель припаркован: шаги 7–11 строятся на шаге 6.
+>
+> **Дальше.** При 2/2 передаю решение, исполнитель выполняет шаги 6–11. Затем по порядку: ревью другой моделью на точном SHA (идентификаторе коммита) → моя проверка на том же SHA → решение о слиянии (голосование) → решение о канарейке, пробном развёртывании на ccs-it (голосование) → развёртывание из `main`. Канарейка этой ночью остаётся целью, но ни один этап ради неё не пропускается. Если этапы не уложатся в ночь, напишу здесь.
+>
+> **От вас.** Сейчас — ничего. Опрос придёт, только если советники разойдутся или появится решение, которое принадлежит вам. Приёмка канарейки — ваша: сразу после моего сообщения «канарейка развёрнута на ccs-it» подключитесь своим профилем WireGuard, выполните `ping -i 0.2 172.27.96.2` в течение 3 минут и пришлите сюда последние три строки вывода. До вашей приёмки на ccs-ops ничего не выкатывается.
+>
+> **Проверено:** состояние вкладок, ветка и SHA исполнителя, диапазоны адресов в репозитории (`git grep`). **Не проверено:** код шагов 1–5; отправляет ли кто-то вне `/25` такие пакеты. **На живых машинах:** изменений нет. **Бэклог:** <ссылка>.
+
+*Gloss:*
+- **Now:** `wgka` stopped at step 6 on the relay's source range. Two ballots are out to both advisors and still running, so there is no result. The executor is parked.
+- **Next:** on 2/2 I relay the decision and steps 6–11 run. Then review at the exact SHA, my validation, the merge vote, the canary vote and the deploy from `main`. Tonight stays the goal, but no gate is skipped.
+- **From you:** nothing now. A poll comes only on a split or a decision that is yours. Acceptance is yours: right after my "canary deployed" message, connect with your WireGuard profile, run the ping for 3 minutes and paste the last three lines. Nothing goes to ccs-ops before that.
+- **Verified / not verified / live changes:** as listed above; no live changes.
+
+## 6. On each notification
+
+I read `<inbox>/<name>.last`, then `herdr agent get <name>`, and write `quorum/ballot-<n>.results.md`.
+
+- **2/2:** I send `wgka` a DECIDED note through the same background prompt-and-wait call and update the backlog.
+- **Split:** an AskUserQuestion poll, with my recommendation first and both votes and rationales shown.
+
+## Why
+
+- **The vote owns this.** The allow-list is a choice between alternatives that changes the outcome (§10). I do not adopt Option 1 because the executor recommends it, and I do not poll the operator: it is not one of their four kinds of decision.
+- **The ballot is neutral.** The executor's recommendation and one-sided reasons are stripped. Each option carries its own facts, cost if wrong and rollback, and the executor's claim about who sends keepalives is marked unverified.
+- **I do not classify it alone.** Whether a question the design doc leaves open is new work is itself a ballot (§10a), so it goes out in the same dispatch.
+- **Both voters get it at the same moment**, one background call each. I never wait in the foreground.
+- **The executor parks.** Steps 7–11 build on step 6, and provisional work becomes rework and tilts the vote.
+- **"Canary tonight" is a wish.** It decides no ballot and waives no gate. The merge and the canary go belong to the vote, because the ccs-ops rollout is the release.
+- **Acceptance is an instruction with a time.** It needs the operator's own WireGuard profile, which I may not hold, so it is not skipped as trivia.

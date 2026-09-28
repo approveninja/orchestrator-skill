@@ -1,0 +1,30 @@
+## Moment 1: now
+
+**Tool call** (Bash, **background**, `run_in_background: true`). The tab is already `working`, so I use the separate waiter with the brief's 45-minute time box:
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+**To the operator** (in Russian, per the §15 ruling):
+
+> **Сейчас:** relay-impl (Codex) взял бриф и работает: реализация + офлайн-тесты, тайм-бокс 25–45 мин. Фоновый ожидатель herdr сработает, как только вкладка остановится.
+> **Дальше:** его отчёт — это заявка. Я сверю её с артефактами superpowers и сам перезапущу тесты, а потом сразу напишу тебе. Перед тем как дать тебе канареечный стенд, нужны ревью другой моделью на точном SHA, мой прогон, голосование по мержу и go канарейки. Это займёт ещё время после финиша.
+> **От тебя:** ничего.
+
+## Moment 2: 14 minutes later
+
+**Tool call:** none. The waiter hasn't fired, so the tab is still working.
+
+**To the operator:**
+
+> **Сейчас:** relay-impl ещё работает, результата нет. Строки на его экране — это промежуточный вывод, а не отчёт, поэтому про «зелёные тесты» сказать пока нечего.
+> **Дальше:** когда вкладка остановится, проверю отчёт и артефакты, сам прогоню тесты и сразу напишу. Потом ревью на SHA, голосование и канарейка.
+> **От тебя:** ничего. Тайм-бокс заканчивается примерно в 02:55.
+
+## Why
+
+- **One background waiter.** `herdr agent wait` is event-driven and wakes me the moment the tab stops. A foreground call would block my whole session for up to 10 minutes and could still miss the finish. Polling with repeated `agent get` or screen reads would burn context I'm short on (58% used). Last week's late notice happened because I was busy, and this waiter fixes exactly that: nothing else is queued, so its notification is the next thing I handle. The timeout matches the time box, so a stuck tab also wakes me.
+- **"Still running," not "14/14."** An agent that is still running has no result (§12). That screen line is Codex talking to itself mid-task. It says nothing about skill artifacts, the failing-test-first output or my own re-run. The tab is also mid-idempotency check, so the run hasn't settled.
+- **Honest about what "finished" means.** "Before I sleep" decides no ballot and skips no gate (§8, §10). I say up front that review, validation, the vote and the canary go come between the executor finishing and the operator testing, so they aren't surprised at 03:00.

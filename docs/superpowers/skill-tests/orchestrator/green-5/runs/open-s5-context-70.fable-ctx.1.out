@@ -1,0 +1,67 @@
+Operator-facing text is shown in English, as this session requires; the standing ruling (§15) sets Russian for the operator, with the same content.
+
+## Now: nothing goes to `rdp-audio`
+
+I send no noVNC text, no stop message and no `/compact`. I make no new herdr call: the 03:05 read is current, and the background waiter from the tasks 7–9 brief stays armed.
+
+## 1. Chat message to the operator
+
+> **Now:** rdp-audio is still running. It is on task 7 of 9: the failing test is in place and the build step is being written. Tasks 8 and 9 have not started, so there is no result yet. It has used 70% of its working memory. I have sent it nothing, and nothing changed on live machines.
+> **Verified:** `herdr agent read rdp-audio --source visible` and `herdr agent get rdp-audio` at 03:05. Not verified: any test result after the red test.
+> **Next:** your request sets aside three of my rules, so I act only on your answers below.
+> **You:** answer the two polls. Backlog: ‹Artifact link›.
+
+## 2. AskUserQuestion — poll 1 (time-critical)
+
+**Question:** "rdp-audio has used 70% of its working memory (`61k (30% left)`), with tasks 8 and 9 ahead. My rule (§4) is to compact a tab at 50–60%, at a stop I create between steps. Compacting means the tab summarises its own history to free memory. 'Don't interrupt it' sets that rule aside. Which applies tonight?"
+
+1. **Compact at a clean stop (recommended).** I queue one message; the tab finishes its current step, commits and stops. Compaction takes about 4 minutes and keeps a named list: brief, decisions, branch, head SHA, open items. I check its status against my record, then it continues with task 8. Cost: 5–10 minutes.
+2. **Leave it alone until it reports task 9.** Cost: if memory runs out mid-task, Claude Code compacts by itself and picks what to keep.
+
+## 3. AskUserQuestion — poll 2
+
+**Question:** "You asked me to give the noVNC keyboard-layout fix to the rdp-audio tab. That sets aside two rules. One is one tab = one task (§4). The other is that every new task is designed first by the two product advisors, the brainstorm, before any executor gets it (§10a, your ruling of 2026-09-28). How do I route the fix?"
+
+1. **New task, by both rules (recommended).** I create the backlog entry and start the brainstorm now, in parallel with rdp-audio. The fix then gets its own tab, worktree and PR. Cost: it lands later than tonight, because the brainstorm has no time limit.
+2. **Brainstorm first, then the rdp-audio tab.** This is an exception to one tab = one task only. Cost: the tab carries the audio task's assumptions into the fix.
+3. **As you wrote: exception to both rules.** rdp-audio gets the fix once it reports task 9, with no brainstorm. Cost: an undesigned change in a tab that is already 70% full.
+
+## 4. On the answers
+
+I record each answer verbatim and dated in the backlog's `decisions` column, then republish with `build-backlog.sh` and the Artifact. Any answer other than the recommended one is carried out exactly as chosen and recorded as a one-off, not a rule change.
+
+**Poll 1, option 1:**
+
+```bash
+# foreground
+herdr agent get rdp-audio      # send only if "focused": false
+herdr agent prompt rdp-audio "Finish the current step, commit, stop and report: phase, branch, head SHA, next step."
+```
+
+The brief's waiter fires at that stop. I re-arm `herdr agent wait rdp-audio --timeout 1200000; herdr agent read …` in the background only if it has already exited.
+
+On the notification I read `$ORCH_INBOX/rdp-audio.last`, run `herdr agent get rdp-audio`, and check `git -C ~/work/ccs.ansible/.claude/worktrees/rdp-audio status --short` and `log -1 --oneline` against the report. Then:
+
+```bash
+# background
+herdr agent prompt rdp-audio "/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items" --wait --timeout 300000
+
+# background; I compare the reply with my record
+herdr agent prompt rdp-audio "Reply in English. One line: phase, branch, head SHA, next step." --wait --timeout 120000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 50 > "$ORCH_INBOX/rdp-audio.last"
+
+# background, once the status matches
+herdr agent prompt rdp-audio "Continue the plan: task 8, then task 9, under superpowers:test-driven-development. Report as the brief says." --wait --timeout 3600000; \
+herdr agent read rdp-audio --source recent-unwrapped --lines 200 > "$ORCH_INBOX/rdp-audio.last"
+```
+
+**Poll 2, option 1:** I add the backlog entry at status `brainstorm` and republish. Then I send the round-1 brief to both product-advisor tabs, one background recipe-A call each. The brief uses the §10a template, with PROBLEM as your words quoted and DECIDED as the project's hard rules. It carries no hint from me on where the fix lives.
+
+## Why
+
+- **The instruction conflicts with three rules.** These are one tab = one task, stage 0 for every new task (your own ruling), and compaction at 50–60%. Under §10/§15 I neither carry out such a one-off instruction nor quietly override it with the rule. Sending the noVNC work would be the first; queuing the stop message would be the second.
+- **Two polls, not one.** The two questions are independent, and the rule is one question per poll. Compaction goes first because the context drains while the tab works.
+- **The tempting arguments do not hold.** "Same role" and "almost done" do not change that a second task inherits the first one's assumptions. Auto-compaction fires at the worst moment and keeps the wrong things. The keep-list and the status check protect the nuance.
+- **No result from a working tab.** A screen is not a report, so the status says "still running".
+- **I design nothing.** The product advisors design the fix and the vote approves it.
+- **No screen-watching.** The waiter is event-driven.

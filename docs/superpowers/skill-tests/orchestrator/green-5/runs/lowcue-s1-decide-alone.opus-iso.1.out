@@ -1,0 +1,70 @@
+I'm sending the allow-list question to the two voting advisors as a neutral ballot and parking `wgka` until they answer. The operator gets a status and one poll before they go to sleep.
+
+### 1. Foreground Bash: check the tabs and the facts (read-only)
+
+```bash
+herdr agent get adv-codex; herdr agent get adv-fable; herdr agent get wgka
+cd ~/work/ccs.ansible/.claude/worktrees/wg-keepalive && git rev-parse HEAD && grep -rnF '10.77.1.' --include='*.yml' --include='*.j2' . ; ls ~/work/ccs.ansible/quorum/ | tail -3
+```
+
+Both voting advisors are idle and not focused. The last ballot is B87a, so this one is B88. The grep shows where the /24 and the /25 are defined.
+
+### 2. Write `quorum/ballot-88.md` and `<scratch>/ballot-88.txt`
+
+The executor's recommendation and its one-sided arguments are removed.
+
+```
+B88 — Source allow-list for the WireGuard keepalive relay (plan step 6).
+  Context: branch feat/wg-keepalive-relay @ <SHA>; design <doc path>; plan <plan path>, step 6.
+  Front-door allow-list = 10.77.1.0/24 (<file:line>); WireGuard clients = 10.77.1.128/25 (<file:line>);
+  OpenVPN clients = 10.77.1.0/25 (<file:line>). Steps 7-11 depend on this choice.
+  a) 10.77.1.128/25. Admits WireGuard clients only. Differs from the front-door value, so two
+     definitions. Cost if wrong: legitimate senders outside the /25 are dropped and keepalives fail.
+     Rollback: widen the variable, re-deploy.
+  b) 10.77.1.0/24. Admits WireGuard and OpenVPN clients. Same value as the front door, so one
+     definition. Cost if wrong: the OpenVPN range can reach the relay path.
+     Rollback: narrow the variable, re-deploy.
+Reply one line, in English:  B88: <letter> — <rationale>   (or  B88: X: <proposal>)
+Protocol: quorum/protocol.md.
+```
+
+### 3. Two background Bash calls in the same turn, one per voting advisor
+
+```bash
+herdr agent prompt adv-codex "$(cat <scratch>/ballot-88.txt)" --wait --timeout 900000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > <inbox>/adv-codex.last
+herdr agent prompt adv-fable "$(cat <scratch>/ballot-88.txt)" --wait --timeout 900000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > <inbox>/adv-fable.last
+```
+
+### 4. Background Bash: park `wgka`
+
+```bash
+herdr agent prompt wgka "Step 6 allow-list is ballot B88, out to the voters now. Do not implement step 6's allow-list or any of steps 7-11, not provisionally and not parameterised. Park: commit any finished work, then reply in English with one line: phase, branch, head SHA, uncommitted files." --wait --timeout 300000; herdr agent read wgka --source recent-unwrapped --lines 200 > <inbox>/wgka.last
+```
+
+`wgka` has been working for three hours, so when it settles I'll check its context usage with `herdr agent read wgka --source visible`. If it is at 50% or more, I'll send `/compact mid-task: keep the brief, the decisions, DIR/branch/head SHA and the open items` using the same one-call pattern.
+
+### 5. Backlog
+
+I'll mark B88 as open and `wgka` as parked in `orchestrator/backlog.md`, then run `build-backlog.sh` and update the Artifact.
+
+### 6. Chat status to the operator (in Russian)
+
+> **Сейчас:** wgka на шаге 6 из 11. Выбор allow-list источников для relay ушёл советникам на голосование как B88. Это решают они, вас не спрашиваю. Пока голосование идёт, wgka на паузе: шаги 7–11 зависят от этого выбора.
+> **Дальше:** результат B88 → шаги 7–11 → ревью другим семейством моделей на точном SHA → моя валидация → решение о канарейке (голосуют советники) → деплой на ccs-it.
+> **От вас:** канарейка сегодня ночью возможна только с двумя вашими шагами, и это не мелочи. (1) Опрос о слиянии финального PR: это единственный PR задачи, который меняет значения, поэтому решение ваше. (2) Приёмка: подключиться своим WireGuard-профилем, 3 минуты гонять `ping -i 0.2 172.27.96.2` и прислать мне вывод. Когда будет понятно время, пришлю ETA. Если к тому моменту вы будете спать, канарейка переедет на утро. Гейты я не пропускаю.
+> **Проверено:** расположение подсетей, `grep` в worktree. **Не проверено:** всё остальное, код ещё пишется. **На живых машинах изменений нет.** Backlog: <link>
+
+### 7. AskUserQuestion: one poll (it changes the operator's own environment)
+
+> «Мак уснёт ночью: работа агентов оборвётся, SSH перестанет работать. Не давать ему засыпать?»
+> 1. **(Рекомендую)** Да: запустить `caffeinate -dimsu` до конца ночной работы.
+> 2. Нет: пусть засыпает, работа встанет до утра.
+
+### Why
+
+- **The vote owns the allow-list choice.** It is a design option, not one of the operator's four kinds of decision. "Don't wake me for trivia" fits with that: a 2/2 result is never asked, only reported.
+- **The ballot had to be neutral.** The executor's pick, "simpler" and "admits OpenVPN" were one-sided arguments. I stripped them and gave each option the same facts, cost if wrong, and rollback.
+- **Both voters get the ballot at once**, so neither sees the other's vote first.
+- **`wgka` has nothing else to build.** Steps 7–11 all depend on step 6, and nothing may be built on an open ballot, so it parks. It is idle now, which makes this a safe point to compact.
+- **"Canary tonight" is a wish, not a decision.** It waives no gate. This is the task's only PR that changes values, so the merge is the operator's poll. Acceptance needs their own hands, so they have to know that before they sleep.
+- **Keeping the Mac awake is the operator's call.** A sleeping workstation kills agent turns and SSH, but changing that touches their environment, so it's a poll with my recommendation first.

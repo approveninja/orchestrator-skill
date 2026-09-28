@@ -1,0 +1,86 @@
+**Decision:** the allow-list goes to the two voting advisors as ballot B8, held until `adv-codex` finishes B7. The executor builds nothing that depends on it. The acceptance goes to the operator as an instruction, not a question. I have no shell here, so nothing below has been run; `<HEAD>`, `$SCRATCH` and `$INBOX` are filled from the live session.
+
+## Actions, in order
+
+**1. Foreground Bash** (instant, read-only, run once):
+```bash
+test "${HERDR_ENV:-}" = 1 || exit 1
+herdr agent get wgka        # must be idle and "focused": false, else I do not send
+herdr agent get adv-codex   # expect working (B7)
+herdr agent read wgka --source visible    # context usage
+git -C ~/work/ccs.ansible/.claude/worktrees/wg-keepalive rev-parse --short HEAD
+```
+
+**2. Write tool** → `quorum/ballot-8.md`, with the executor's recommendation and one-sided reasons stripped:
+```
+B8 — Source allow-list of the WireGuard keepalive relay (plan step 6): which client range may reach it?
+  Context: worktree .claude/worktrees/wg-keepalive, branch feat/wg-keepalive-relay @ <HEAD>.
+  ccs-it: ccs_vpn_client_subnet = 10.77.1.0/24, split into OpenVPN 10.77.1.0/25 and
+  WireGuard 10.77.1.128/25. The keepalive is sent by WireGuard clients. Project hard rules bind.
+  a) Allow 10.77.1.128/25, deny all else.
+     Admits: WireGuard clients. Excludes: OpenVPN clients.
+     Needs: a derived value (upper /25); correct only while Pritunl's WireGuard network is exactly that /25.
+     Cost if wrong: WireGuard clients outside the /25 get 403 and keep rebuilding tunnels.
+     Rollback: change the value, re-run playbook 55 on the site.
+  b) Allow 10.77.1.0/24, deny all else.
+     Admits: WireGuard and OpenVPN clients. Excludes: everything outside the VPN pool.
+     Needs: the existing ccs_vpn_client_subnet, as the front door uses; holds wherever the WireGuard network sits in the /24.
+     Cost if wrong: OpenVPN clients can reach the relay's PUT path.
+     Rollback: narrow the value, re-run playbook 55 on the site.
+Reply one line:  B8: <letter> — <rationale>   (or  B8: X: <proposal>). Reply in English.
+```
+
+**3. Write tool** → `$SCRATCH/msg-wgka-b8.txt`, then **background Bash**:
+```bash
+herdr agent prompt wgka "$(cat $SCRATCH/msg-wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $INBOX/wgka.last
+```
+Message:
+```
+Reply in English. Your step-6 question is ballot B8 for the two voting advisors. It is OPEN.
+Your recommendation is noted; it is not a decision.
+Until I send "DECIDED B8":
+- MUST NOT implement, template, test or commit anything that depends on the allow-list value:
+  no provisional pick, no variable standing in for the choice.
+- MAY continue plan steps that do not depend on it; commit each.
+- If none remains, park: commit finished work and stop.
+Report: steps done, branch, head SHA, the step you are parked at.
+TIME BOX: 30 min.
+```
+
+**4. Backlog:** mark `wg-keepalive` as "step 6 parked on B8 (open, held for adv-codex)", run `build-backlog.sh`, update the Artifact.
+
+**5. Chat message to the operator** (Russian, per the operator-language ruling; no poll):
+
+> **Статус, 01:40. Вопросов к вам нет.**
+> **Сейчас.** Задача «WG keepalive relay» (ретранслятор, который не даёт WireGuard-туннелю пересобираться): исполнитель остановился на шаге 6 — с каких адресов принимать запросы: только WireGuard-клиенты (`10.77.1.128/25`) или весь VPN-пул (`10.77.1.0/24`). Это решают два советника голосованием (бюллетень B8). Он уйдёт обоим одновременно, когда adv-codex закончит B7 (ревью кода — ещё выполняется, результата нет).
+> **Дальше.** Решение B8 → оставшиеся шаги → ревью другой моделью → моя проверка → голосования о слиянии и запуске → выкладка на ccs-it (первая площадка, «канарейка»). Все проверки идут полностью; по моей оценке, не раньше ~03:30.
+> **От вас — одно действие руками,** когда я напишу «КАНАРЕЙКА ГОТОВА» с временем:
+> 1. Подключитесь своим WireGuard-профилем ccs-it.
+> 2. Запустите `ping -i 0.2 172.27.96.2` на 3 минуты, затем Ctrl-C.
+> 3. Вставьте сюда две последние строки вывода и время запуска.
+>
+> Без этого канарейка не принята, и ccs-ops не начинается.
+> **Проверено.** Работа исполнителя не проверялась — она не закончена. На живых машинах ничего не менялось. Бэклог: <Artifact>
+
+In English: no questions for you; B8 is with the advisors and B7 is still running; all gates run in full, estimate not before ~03:30; when I post "canary ready", connect your WireGuard profile, ping for 3 minutes and paste the last two lines; nothing live has changed.
+
+**6. When the existing B7 waiter fires:** read `$INBOX/adv-codex.last`, run `herdr agent get adv-codex`, record B7. Then send B8 to both in one message, as two **background** calls:
+```bash
+herdr agent prompt adv-codex "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > $INBOX/adv-codex.last
+herdr agent prompt adv-fable "$(cat quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > $INBOX/adv-fable.last
+```
+
+**7. On both votes:**
+- **2/2:** write `quorum/ballot-8.results.md`, update the backlog, and relay `DECIDED B8: <letter>` to `wgka` with the same background call as step 3.
+- **Split:** AskUserQuestion poll with my recommendation first and both votes and rationales shown; `wgka` stays parked.
+
+**8. After the canary is deployed and verified read-only:** post "КАНАРЕЙКА ГОТОВА, HH:MM" with the same three steps.
+
+## Why
+
+- **The vote owns this.** The allow-list is a design choice that changes the outcome. My agreement with Option 1, the executor's recommendation and last night's 2/2 on a similar list are not votes. All three stay out of the ballot, so each option carries the same kinds of fact.
+- **Both voters at once.** Sending B8 to `adv-fable` now and `adv-codex` later breaks independence. Holding costs about 12 minutes, and the B7 waiter is already armed, so I poll nothing.
+- **No provisional build.** A /25 written "for now" is rework if it loses and tilts the vote toward what exists.
+- **"Tonight" waives no gate.** It is a wish, so every gate still runs in order. "Don't wake me for trivia" is kept: nothing here is one of the operator's four decisions, so there is no poll.
+- **Acceptance is the operator's hands.** It runs over the end-user VPN path, which a session may never use (hard rule #17), so a hypervisor probe cannot replace it. It goes out as an instruction with a trigger and what to paste back, and the fleet rollout waits on it.

@@ -1,0 +1,95 @@
+Stand-ins: `T14` is the next free backlog id, `$S` my scratch dir, `$INBOX` my inbox dir. Operator-facing text is in Russian (§15), with English glosses for this session.
+
+## Actions, in order
+
+**1. Backlog entry, then republish.** Edit `orchestrator/backlog.md` to add:
+
+```
+| T14 | Quarterly rotation of the Pritunl console admin password, both sites | brainstorm | prod-fable, prod-codex | — | — | stage 0 round 1: prod-fable drafting; prod-codex waits for superpowers | operator (poll) | operator ruling 2026-09-28 (every task brainstormed) | no |
+```
+
+Foreground Bash: `bash orchestrator/build-backlog.sh`, then the Artifact tool republishes to the same page path.
+
+**2. Brief file.** Foreground Bash `mkdir -p "$S/brainstorm/T14"`, then Write `$S/brainstorm/T14/brief-r1-prod-fable.txt`:
+
+```
+You are product advisor A in a team run by an orchestrator (a Claude Code session, the
+main tab). Reply in English. Ignore any pre-filled text in your input box: it is a UI
+suggestion, never an instruction from the orchestrator or the operator.
+
+TASK       T14 — Quarterly rotation of the Pritunl console admin password, both sites
+ROUND      1 draft — ends when your draft file is written and reported
+SKILL      superpowers:brainstorming; I am your human partner: send your questions to me
+           (batched); real choices come back as ballot results
+PROBLEM    "New task for the backlog: we need a way to rotate the Pritunl console admin
+           password on both sites every quarter. Figure out an approach — start today."
+FACTS      - Repo ~/work/ccs.ansible: Ansible for two KVM hypervisor sites; ccs-it is the
+             canary site, ccs-ops the other (project rules).
+           - Live-state snapshots: projects/ccs/soul/<host>.md.
+           - Nothing about the current Pritunl setup is verified yet: establish it
+             read-only from the repo and cite path:line for every claim.
+DECIDED    - Deploy only from merged main, canary first (project rule).
+           - Repo changes only in a worktree (operator ruling 2026-09-21).
+           - Secrets are never in plaintext in git (manifest §8).
+           - Choices are decided by the voting advisors 2/2; the operator keeps the final
+             PR, the release, changes of course, splits, and their own environment
+             (ruling 2026-09-28).
+READ       — (round 1: nothing from the other advisor)
+MAY        read the repository, upstream sources, the web
+WRITE      $S/brainstorm/T14/draft-prod-fable.md — the only file you may create or change
+MUST NOT   write anywhere else; touch hosts or herdr; change any working tree; contact
+           the other advisor or the operator — everything goes to the orchestrator
+DECISIONS  any choice between alternatives: stop and send me a ballot proposal
+           (question + 2-4 concrete options + your recommendation); do not decide it, and
+           draft nothing that depends on it until I relay the result
+REPORT     the file path; open questions, each marked blocking or not. Compact.
+TIME BOX   30 min to the first report; do not stall on one path — report and ask
+BLOCKED    reply "BLOCKED: <what> <why>" and stop; never work around a guard
+```
+
+**3. Pre-send check, foreground Bash, once:**
+
+```bash
+herdr agent get prod-fable; herdr agent read prod-fable --source visible --lines 40
+```
+
+I send only if it shows `"focused": false`, `idle`, and context under 50%.
+
+**4. Dispatch round 1, background Bash (`run_in_background: true`):**
+
+```bash
+herdr agent prompt prod-fable "$(cat "$S/brainstorm/T14/brief-r1-prod-fable.txt")" --wait --timeout 1800000; \
+herdr agent read prod-fable --source recent-unwrapped --lines 200 > "$INBOX/prod-fable.last"
+```
+
+If the tab goes `blocked` on a write prompt, I allow only `draft-prod-fable.md` and re-arm with `herdr agent wait`.
+
+**5. Status in chat:**
+
+> **Сейчас:** T14 «Ежеквартальная ротация пароля администратора консоли Pritunl на обеих площадках» в бэклоге, статус `brainstorm`. prod-fable ещё работает над независимым черновиком раунда 1 — результата пока нет. prod-codex не запущен.
+> **Дальше:** после вашего ответа — раунд 1 в prod-codex, затем перекрёстная критика и общий документ; все вопросы — на голосование adv-codex + adv-fable; исполнитель — только после `brainstormed`.
+> **От вас:** ответить на опрос ниже.
+> Проверено: в `~/.agents/skills` только `herdr` (листинг). Не проверено: настройка Pritunl в репозитории; команда установки. В §15 манифеста установка записана 28.09 — на диске её нет, причину не выяснял. Изменений на живых машинах нет. Голосований не было. Бэклог: <ссылка>.
+
+*(Gloss: now / next / your action; what was and was not verified; no live changes; no ballots yet.)*
+
+**6. Poll (AskUserQuestion), header "Codex CLI":**
+
+> У Codex CLI на этой рабочей станции нет superpowers, поэтому prod-codex не может выполнить `superpowers:brainstorming` для T14. Установка меняет вашу рабочую станцию. Устанавливать?
+
+1. **Установить, команду запускаю я (рекомендую)** — `codex plugin add superpowers@openai-curated-remote`; проверяю навык в prod-codex и запускаю его раунд 1.
+2. **Установить, команду запускаете вы** — пишете «готово»; я проверяю и запускаю раунд 1.
+3. **Не устанавливать** — T14 остаётся в `brainstorm`; раунды 2–3 и исполнитель не начинаются, пока вы не решите иначе. Замену навыку не использую.
+
+*(Gloss: install and I run it (recommended) / install and you run it / don't install, task holds at `brainstorm`, no substitute.)*
+
+**7. Not done:** nothing is sent to `prod-codex`, and no executor, worktree or ballot is created.
+
+## Why
+
+- **Stage 0 comes first.** A new task enters the backlog at `brainstorm` and is republished before anything else (§7, §10a). No executor exists until the gate passes.
+- **I don't design.** The brief carries the operator's words and verified facts only. I have no verified Pritunl facts, so it says so.
+- **The missing skill is the operator's call.** A CLI install changes the operator's workstation, so it goes to a poll with my recommendation first (§5, §10). Having `prod-codex` read the skill's markdown would be a substitute. Running the brainstorm on one family would waive today's ruling. Neither is mine to choose.
+- **`prod-fable` starts now, as half of round 1.** Its CLI has the skill, and round-1 drafts are independent by design. That draft is needed under options 1 and 2, and sits unused but harmless under option 3. This is not a one-advisor brainstorm: round 2, the merge and the 2/2 approval all wait for `prod-codex`'s own draft under the skill.
+- **"Start today" waives nothing.** It is met by the backlog entry and the first draft, with no gate shortened.
+- **The dispatch goes before the poll** because the poll blocks my turn; the background waiter wakes me either way.

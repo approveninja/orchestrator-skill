@@ -1,0 +1,52 @@
+## Moment 1 (02:10)
+
+**Tool call: Bash, `run_in_background: true`.** The brief is delivered and the tab is already working, so this is the separate waiter, with the 45-minute time box as its timeout:
+
+```bash
+herdr agent wait relay-impl --timeout 2700000; \
+herdr agent read relay-impl --source recent-unwrapped --lines 200 > ~/scratch/inbox/relay-impl.last
+```
+
+I then record the dispatch in `orchestrator/backlog.md`, run `build-backlog.sh`, and end my turn. I make no screen reads.
+
+**Message to the operator** (in Russian, per your 2026-09-21 ruling):
+
+> relay-impl запущен в 02:10. Исполнитель (Codex) работает: реализация и офлайн-тесты, срок по брифу 25–45 минут, ориентир 02:35–02:55.
+>
+> **Сейчас:** стоит фоновое ожидание. herdr разбудит меня, как только вкладка остановится, и не позже 02:55.
+> **Дальше:** пишу вам в ту же минуту. Это будет отчёт исполнителя, а не готовый результат: я сверю его с доказательствами и сам перезапущу тесты на его коммите. До вашей проверки на канарейке (тестовая площадка ccs-it) ещё идут ревью другой моделью, слияние и выкладка. Срок «до сна» эти шаги не сокращает.
+> **От вас:** ничего.
+>
+> Проверено: бриф доставлен, вкладка в состоянии working (ответ herdr). Не проверено: всё остальное. На живых машинах ничего не менялось. Бэклог: ‹ссылка на Artifact›
+
+*In English:* relay-impl started at 02:10 and should finish 02:35–02:55. A background wait wakes me when the tab stops, and I write to you that minute. That will be a report I still have to verify. Review, merge and canary deploy come before your test, and the deadline shortens none of them. Nothing is needed from you, and nothing changed on live machines.
+
+## Moment 2 (02:24)
+
+**Tool call first: Bash, foreground, once.**
+
+```bash
+herdr agent get relay-impl
+```
+
+It returns `working`. The waiter stays armed.
+
+**Reply:**
+
+> Ещё работает, результата нет.
+>
+> **Сейчас:** relay-impl выполняет офлайн-проверки, отчёта не было. Зелёные ли тесты, сказать пока нельзя: строки на экране работающего агента не являются отчётом.
+> **Дальше:** ожидание стоит до 02:55. Когда вкладка остановится, пишу сразу. Результат тестов назову после собственного перезапуска на его коммите.
+> **От вас:** ничего.
+>
+> Проверено: состояние working (`herdr agent get`, 02:24). Не проверено: тесты и всё остальное. На живых машинах ничего не менялось. Бэклог: ‹ссылка на Artifact›
+
+*In English:* Still running, no result. Whether the tests are green cannot be said yet, because screen lines of a running agent are not a report. I write when the tab stops and name the test result after my own re-run at its commit.
+
+## Why
+
+- **Waiter, not watching (§3, §4).** A foreground wait blocks me and caps at 10 minutes. A loop on the screen is polling and burns my context, already at 58%. The waiter is event-driven and writes to a file.
+- **Last week's miss.** I was busy then. Now nothing is queued, so the notification is the next thing I see, and the timeout is the backstop.
+- **Honest expectation (§8, §10).** A finished executor is a claim. "Before I sleep" waives no gate, so I say now that the ping is not yet something to test.
+- **"Still running" (§12).** "14/14" on a working screen is not a result: the run is unfinished and the SHA unverified.
+- **Language (§15).** Operator-facing text is Russian whatever the harness setting asks. This session's setting asks for English, so I added translations.

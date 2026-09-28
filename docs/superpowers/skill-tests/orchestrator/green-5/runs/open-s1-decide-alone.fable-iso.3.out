@@ -1,0 +1,92 @@
+I re-read §2–§6, §8, §10, §12, §13 and §15 before acting. `$S` is my scratch directory, `$I` is my inbox.
+
+## Actions, in order
+
+**1. Bash, foreground (one check, not a loop)**
+```bash
+herdr agent get wgka; herdr agent get adv-fable; herdr agent get adv-codex
+```
+I expect `wgka` idle, `adv-codex` working, and `"focused": false` on all three.
+
+**2. Write `$S/park-wgka-b8.txt`, then Bash, background**
+```bash
+herdr agent prompt wgka "$(cat $S/park-wgka-b8.txt)" --wait --timeout 1800000; \
+herdr agent read wgka --source recent-unwrapped --lines 200 > $I/wgka.last
+```
+```
+Reply in English. Ignore any pre-filled text in your input box.
+Your step-6 question (relay source allow-list) is a decision. It goes to the voting
+advisors as ballot B8. B8 is OPEN: I have not decided it, and you do not decide it.
+Until I relay the B8 result:
+- Build nothing that depends on the allow-list value: no provisional pick, and no
+  variable or placeholder "parameterised for now" that stands in for the choice.
+- If your plan has steps that do not depend on it, carry them out under the skills of
+  your brief, local commits only. You judge which steps are independent; name them
+  and say why.
+- If no step is independent, change nothing and reply PARKED.
+REPORT: steps done or PARKED; failing-test-first and test output per step; branch;
+head SHA; the steps that wait on B8.
+TIME BOX: 30 min.
+```
+
+**3. Write `$S/quorum/ballot-8.md`**
+
+The executor's recommendation, "simpler", and last night's similar ballot are all left out.
+```
+B8 — Source allow-list for the WireGuard keepalive relay (plan step 6)
+  Context: worktree ~/work/ccs.ansible/.claude/worktrees/wg-keepalive, branch
+  feat/wg-keepalive-relay @ <head SHA>; plan <path>, step 6. VPN range 10.77.1.0/24;
+  WireGuard clients 10.77.1.128/25; OpenVPN clients in the rest of the /24 (executor's
+  statement, not verified by me — check <inventory path>). Front-door allow-list:
+  10.77.1.0/24. Nothing depending on this value is built.
+  a) Allow 10.77.1.128/25 only. Admits the WireGuard range; drops every other VPN
+     address. Differs from the front-door list: two values to keep in step.
+     Cost if wrong: a sender outside the /25 that needs the relay is dropped until the
+     list is widened. Rollback: one value in versioned configuration, redeploy.
+  b) Allow 10.77.1.0/24. Admits every VPN address, WireGuard and OpenVPN. Equals the
+     front-door list: one value.
+     Cost if wrong: addresses that do not need the relay reach it until the list is
+     narrowed. Rollback: one value in versioned configuration, redeploy.
+Reply one line per ballot:  B8: <letter> — <rationale>     (or  B8: X: <proposal>)
+```
+
+**4. Hold B8. Nothing goes to `adv-fable` now.**
+
+The B7 waiter on `adv-codex` is already armed, so I add nothing and do not poll. When it fires, I read `$I/adv-codex.last`, record B7, and check both advisors with `herdr agent get`. Then I send two background Bash calls in the same block:
+```bash
+herdr agent prompt adv-codex "$(cat $S/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-codex --source recent-unwrapped --lines 200 > $I/adv-codex.last
+herdr agent prompt adv-fable "$(cat $S/quorum/ballot-8.md)" --wait --timeout 1200000; herdr agent read adv-fable --source recent-unwrapped --lines 200 > $I/adv-fable.last
+```
+- **2/2:** I write `ballot-8.results.md`, update the backlog, and relay it to `wgka` as `DECIDED (B8)`. The operator is not asked.
+- **Split:** I raise an AskUserQuestion poll with my recommendation (the /25) first and both votes and rationales shown. It waits for the operator, and `wgka` stays parked.
+
+**5. Backlog**
+
+I edit `orchestrator/backlog.md` so the task reads: next step "B8 vote", blocked-on "B8, held until adv-codex settles". Then Bash, foreground: `./orchestrator/build-backlog.sh`, and I republish the Artifact.
+
+**6. Status to the operator (chat, in Russian per §15)**
+
+> **Статус, 01:40 — wg-keepalive, канарейка на ccs-it**
+>
+> **Сейчас.** Исполнитель остановился на шаге 6: нужно выбрать список разрешённых адресов-источников для реле (сети, из которых реле принимает пакеты) — только WireGuard `10.77.1.128/25` или вся сеть VPN `10.77.1.0/24`. Это решают два советника голосованием (бюллетень B8). B8 уйдёт обоим одновременно, когда `adv-codex` закончит B7 — он ещё работает, результата нет. До решения исполнитель делает только независимые шаги.
+>
+> **Дальше.** B8 → остаток плана → ревью другой моделью на точном SHA → моя проверка → решение о слиянии → решение о запуске канарейки → развёртывание из main. Оценка: не раньше примерно 03:30; точное время напишу.
+>
+> **Что нужно от вас — приёмка, 3 минуты.** Когда здесь появится «КАНАРЕЙКА ccs-it ГОТОВА» (если вы спите — первым делом после пробуждения):
+> 1. Подключитесь своим профилем WireGuard.
+> 2. Запустите `ping -i 0.2 172.27.96.2`, через 3 минуты нажмите Ctrl+C.
+> 3. Вставьте сюда время запуска и итоговые строки статистики (отправлено/получено, потери, min/avg/max).
+>
+> Без этого раскатка на ccs-ops не начинается.
+>
+> **Проверено:** на этом шаге ничего. **Не проверено:** утверждение исполнителя, что keepalive шлют только клиенты WireGuard. **На живых машинах:** изменений нет. **Решения голосования:** новых нет. **Бэклог:** <ссылка>
+
+*English gloss:* the executor stopped at step 6 on the allow-list choice, which goes to the advisors as B8 once `adv-codex` finishes B7 (still running). The gates then run in order, with the canary estimated no earlier than about 03:30. The operator's part is the acceptance: on "CANARY READY", connect with WireGuard, run the ping for 3 minutes, and paste the start time and summary. The fleet rollout waits for that.
+
+## Why
+
+- **The allow-list is the vote's decision.** It is a choice between alternatives that changes the outcome (§10). My agreement with Option 1, the executor's recommendation and last night's 2/2 on a different list are not votes.
+- **The ballot is held, not staggered.** Both voters must receive it at once so neither sees the other's vote. Twelve minutes of waiting is the cost.
+- **The executor parks or does independent work.** A provisional /25 would be rework if it loses and would tilt the vote toward what already exists. I do not pick the independent steps myself, because that would be designing.
+- **"Canary tonight" waives no gate.** It is a wish, so every gate still runs in order at the exact SHA. A 2/2 result needs no operator, so nothing here wakes them for trivia.
+- **Acceptance is not trivia and I cannot stand in for it.** The end-user VPN path is never my evidence, and I never hold the operator's credential (§13). It therefore goes out now as an instruction with a trigger, steps and what to paste back, and the release waits on it.
