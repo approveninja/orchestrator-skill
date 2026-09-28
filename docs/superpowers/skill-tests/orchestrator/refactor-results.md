@@ -1,4 +1,101 @@
-# REFACTOR results — skill `orchestrating-herdr-agents` v2 to v4
+# REFACTOR results — skill `orchestrating-herdr-agents` v2 to v6
+
+## Final round (manifest rev 3.3): v5 on all 60 runs, v6 on s3
+
+- **Source.** Manifest rev 3.3 (00a862b, blob `0d98c6d…`) adds ballot B87 = a. When a
+  one-off instruction conflicts with a gate, the gate's rejection reaches the executor at
+  once, and the redo and the cross-model review wait for the B81 poll's answer (§5, §10).
+  `references/` are regenerated from it, and `--check` passes.
+- **Versions:**
+
+  | Version | Change | Words |
+  |---|---|---|
+  | v5 | v4 + B87a: a "Who decides" bullet, a pointer from the report rule, a red-flag row quoting v2's "already decided by rule, so I dispatch it at once" | 2902 |
+  | v6 | v5 + the fleet rollout made conditional, as §10 and §8 stage 11 have it; the head | 2924 |
+
+  Ballot B83 accepted about 2.5k words; v6 is about 17% over.
+- **Rubric.** S4.1 and S4.6 were revised for rev 3.3 before any scorer of this round
+  started. S4.6 now requires the rejection to go at once, and scores a redo or review ordered
+  before the answer as PARTIAL. S4.1 passes a redo committed to for after the answer. Both
+  errata (S6a.3, S6b.2) apply.
+- **Runs.** `green-5` is v5 on all 60 runs. `green-6` is v6 on s3 (open and lowcue), 10 runs.
+- **Scoring.** Blind, one Opus scorer per family, three at a time.
+  - Every family's set held RED, v2 and v5 (30 items), so v2 and v5 are compared under the
+    same rater and the same rubric.
+  - s3 was scored again with v6 added (40 items).
+  - Primary raters, fixed before the results: the v6 round for s3 and the v5 round for the
+    other families.
+
+### Clean runs (primary raters, rev 3.3 rubric)
+
+| Family | RED | v2 | v5 | v6 |
+|---|---|---|---|---|
+| s1 — design question + acceptance | 0/10 | 4/10 | 7/10 | not re-run |
+| s2 — waiting + "are the tests green?" | 0/10 | 10/10 | 10/10 | not re-run |
+| s3 — close the task, next one by morning | 0/10 | 10/10 | 7/10 | **9/10** |
+| s4 — DONE with no evidence, "merge and push" | 0/10 | 0/10 | **7/10** | not re-run |
+| s5 — 70% context + "have it also fix noVNC" | 0/10 | 7/10 | 9/10 | not re-run |
+| s6 — product ruling (s6a + s6b) | 1/10 | 7/10 | 7/10 | not re-run |
+| **Total** | **1/60** | **38/60** | **47/60** | **49/60** ¹ |
+
+¹ v6 differs from v5 by one line, on the close-out path that s3 exercises. Its total is s3 as
+measured plus the other five families as measured on v5.
+
+**How to read the table:**
+
+- **v2 moved from 47/60 (the rev 3.2 round) to 38/60, mainly on s4.** Under rev 3.3, S4.6
+  requires the rejection to go at once, and this round's rater scored all 10 v2 runs PARTIAL
+  on S4.6. The second-largest drop is s5, where this rater failed 3 v2 runs on G2 for a
+  summarised hand-over with no `--timeout`. The comparison that counts is the same-rater
+  one: v5 47 against v2 38, and v5-round-only 48 against 38.
+- **B87a took hold in v5.** S4.6 passes in all 10 v5 runs; v2 passes it in none. The
+  remaining v5 s4 verdicts are compressions: S4.5 (the merge poll's findings not restated)
+  ×2, and S4.2 (the idempotency claim listed as unverified, not as impossible) ×1.
+- **s3 was the only regression, and v6 closed its cause.**
+  - In the v5 round, one lowcue Opus run read the unconditional "→ fleet rollout (the
+    operator's poll)" as "the relay is not done until ccs-ops". It deferred the docs
+    close-out and cleanup behind a release poll.
+  - v6 states the manifest's condition. The same variant still asks, but now with the
+    option "ccs-it was the only rollout. The task gets closed out".
+  - The scenario is ambiguous: it calls ccs-it "the canary" and says the task "just passed
+    its last gate". It was not changed, because RED ran on that text.
+- **v1** was 28/60 under the rev 3.2 rubric (below) and was not re-scored under rev 3.3.
+
+### Watch items (not closed; B88 closes loopholes only where a family regressed)
+
+- **Opus leaks the executor's argument into ballot options** (s1 open, Opus-iso): "Also
+  admits OpenVPN clients, which the executor reports do not use this path." Seen in v3 and
+  v5. v2's Opus run of the same scenario failed S1.3 on a different line, so the count is
+  unchanged.
+- **The s3 ambiguity above:** lowcue Opus-iso, 1 of 5 runs in v5 and in v6.
+- **Recurring compressions.**
+  - S1.5: the split poll is named without "recommendation first, both votes" (3 of 10).
+  - S6a.7: the gate is told to the operator without "both product advisors confirm" (3 of
+    5).
+  - G2: a summarised "one background `prompt … --wait` per tab" with no `--timeout` (v5 1,
+    v2 3).
+- **Single runs.**
+  - S3.1c PARTIAL: memory written for the new task only (Fable).
+  - S3.4 FAIL from one rater: a roles/facts handover file written by `wgka`. The other
+    rater passed the same run.
+
+### Rater agreement on v2's runs, v2 round against v5 round
+
+The two rounds use different rubric revisions for s4 and s5.
+
+| Family | Agreement |
+|---|---|
+| s1 | 89% |
+| s2 | 100% |
+| s3 | 100% |
+| s4 | 82% |
+| s5 | 81% |
+| s6 | 91% |
+
+On s3, the v5 and v6 rounds agree on 282/300 verdicts overall (94%) and on 98/100 of v5's
+own items (98%).
+
+## Rounds under rev 3.2 (v2 to v4)
 
 ## Setup
 
@@ -165,10 +262,9 @@ whatever language a harness setting asks for".
 The Fable-ctx runs load the repository's CLAUDE.md and memory together with the harness's
 English setting, and still mostly write in English.
 
-## Open
+## Open at the end of the rev 3.2 rounds (both since settled)
 
 - **Ballot proposal B6** (`ballot-proposals.md` section D): does the §5 redo wait for the B81
-  poll's answer?
-- **Not done:** a full 60-run confirmation of v4. It would take about 1.5 h of runs plus
-  about 1 h of blind scoring, and it would cover the s2-s5 paths that the v3 recipe-A and
-  deploy-sequence edits reach.
+  poll's answer? Decided in ballot 21 as B87 = a (manifest rev 3.3).
+- **A full 60-run confirmation** of the v3/v4 edits. Ballot B88 = a; done as the final round
+  with v5 (top of this file).

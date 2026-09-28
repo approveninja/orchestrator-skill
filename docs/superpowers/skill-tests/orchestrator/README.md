@@ -11,8 +11,9 @@ for documentation).
   It is re-tested on the same scenarios and scored against a rubric derived from rev 3.1,
   side by side with the RED runs.
 - **REFACTOR**: v2 is cut from rev 3.2 (3ae551f) and re-run on all 60 runs; v3 and v4 close
-  the loopholes that run found and are re-run on the scenarios they touch. See
-  `refactor-results.md`.
+  the loopholes that run found and are re-run on the scenarios they touch. v5 is cut from
+  rev 3.3 (00a862b) and re-run on all 60 runs; v6 closes the one regression and is re-run
+  on s3. See `refactor-results.md`.
 
 **GREEN method, the delta against RED:**
 
@@ -45,12 +46,12 @@ for documentation).
 | `scenarios/s1b/`, `run-s1b-ctx.sh` | S1 with a design question that neither the repository nor its CLAUDE.md answers (an upstream read timeout). Run only in the realistic-context variant, baseline and GREEN. |
 | `green-micro/` | Micro-test before the full batch: open S1 and S2 with the skill. |
 | `green-1/` | The first full GREEN batch. `prompts/_skill-block.txt` is the exact skill text every run saw. |
-| `green-2/`, `green-3/`, `green-4/` | REFACTOR batches: v2 on all 60 runs; v3 on s1 (open, lowcue) and s6a; v4 on s6a. |
-| `score/` | Blind scoring. `make-items.sh` copies the RED and GREEN runs under shuffled item ids. `scorer-brief.md` is the scorers' brief, and `map.tsv` maps items back to runs. `scores-s*.md` hold the verdicts with quotes; `*.r2.md` are the second raters for s1 and s3. `tally.sh` counts verdicts per criterion and batch. REFACTOR rounds live in `score/v2/`, `score/v3/` and `score/v4/`, each with its own `map.tsv` (`MAP=… bash tally.sh`). `clean.sh` counts clean runs per batch, and `agree.sh` compares two rounds' verdicts on the same runs. |
+| `green-2/` … `green-6/` | REFACTOR batches: v2 on all 60 runs; v3 on s1 (open, lowcue) and s6a; v4 on s6a; v5 on all 60 runs; v6 on s3. In every committed prompt, `<scratch>` stands for the absolute scratch-directory path the runs saw (scrubbed because it embeds a session id). |
+| `score/` | Blind scoring. `make-items.sh` copies the RED and GREEN runs under shuffled item ids. `scorer-brief.md` is the scorers' brief, and `map.tsv` maps items back to runs. `scores-s*.md` hold the verdicts with quotes; `*.r2.md` are the second raters for s1 and s3. `tally.sh` counts verdicts per criterion and batch. REFACTOR rounds live in `score/v2/` … `score/v6/`, each with its own `map.tsv` (`MAP=… bash tally.sh`). `clean.sh` counts clean runs per batch, and `agree.sh` compares two rounds' verdicts on the same runs. |
 | `green-results.md` | GREEN outcome: headline, per scenario and per criterion against RED, remaining loopholes, rater agreement. |
 | `refactor-results.md` | REFACTOR outcome: v2-v4 against RED and v1 under the rev 3.2 rubric, the rubric changes and errata, rater agreement, watch items. |
 | `audit-v1.md` | An independent audit of SKILL.md v1 against the manifest, with the v2 disposition of each finding. |
-| `skill-versions/` | The tested bodies: `v1-SKILL.md` (GREEN), `v2-SKILL.md`, `v3-SKILL.md` and `v4-SKILL.md` (REFACTOR; v4 equals the repo copy). `v2-draft-SKILL.md` is the untested draft that became v2. |
+| `skill-versions/` | The tested bodies: `v1-SKILL.md` (GREEN), then `v2-SKILL.md` … `v6-SKILL.md` (REFACTOR; v6 equals the repo copy). `v2-draft-SKILL.md` is the untested draft that became v2. |
 | `s1b-ctx/` | S1b runs, baseline and GREEN, and their scoring (`scores.md`). |
 
 ## Method
