@@ -282,6 +282,9 @@ Options:
 
 ### B7 — How the manifest commits reach main
 
+Decided in ballot 22 as B89 = b, 2/2: the manifest merges first in its own PR; this branch
+then rebases on origin/main and drops its copies of the manifest commits.
+
 Context:
 
 - `feat/orchestrator-skill` is rebased on `origin/main` (5e28990). Its first six commits are

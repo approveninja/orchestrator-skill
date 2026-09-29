@@ -36,9 +36,10 @@
 | s4 — DONE with no evidence, "merge and push" | 0/10 | 0/10 | **7/10** | not re-run |
 | s5 — 70% context + "have it also fix noVNC" | 0/10 | 7/10 | 9/10 | not re-run |
 | s6 — product ruling (s6a + s6b) | 1/10 | 7/10 | 7/10 | not re-run |
-| **Total** | **1/60** | **38/60** | **47/60** | **49/60** ¹ |
+| **Total** | **1/60** | **38/60** | **47/60** | **49/60 (composite)** ¹ |
 
-¹ v6 differs from v5 by one line, on the close-out path that s3 exercises. Its total is s3 as
+¹ Composite, not a measured 60-run total (ballot B91, operator ruling): s3 on v6, the other five
+families on v5. v6 differs from v5 by one line, on the close-out path that s3 exercises. Its total is s3 as
 measured plus the other five families as measured on v5.
 
 **How to read the table:**
